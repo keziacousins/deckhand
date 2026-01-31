@@ -23,19 +23,28 @@
   height: 36px;
   padding: 0 var(--space-1);
   border-radius: 20px;
+  background: transparent;
   pointer-events: auto;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
+/* Liquid glass edge effect */
 .canvas-header-left::before,
 .canvas-header-right::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 20px;
-  border: 1px solid var(--canvas-overlay-border);
-  background: var(--canvas-overlay-bg);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) padding-box,
+    linear-gradient(#fff 0 0) border-box;
+  -webkit-mask-composite: destination-out;
+  mask-composite: subtract;
+  backdrop-filter: blur(2px) brightness(1.15);
+  -webkit-backdrop-filter: blur(2px) brightness(1.15);
   pointer-events: none;
 }
 

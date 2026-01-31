@@ -33,6 +33,7 @@ function ComponentCard({
 }: ComponentCardProps) {
   const meta = registry.getMeta(component.type);
   const componentName = meta?.name ?? component.type;
+  const gridWidth = (component.props as Record<string, unknown>).gridWidth as number | undefined;
 
   // Group properties by their group field
   const groupedProperties = useMemo(() => {
@@ -82,6 +83,9 @@ function ComponentCard({
       <div className="component-card-header" onClick={onSelect}>
         <div className="component-card-title">
           <span className="component-card-name">{componentName}</span>
+          {gridWidth !== undefined && gridWidth > 0 && (
+            <span className="component-card-meta">{gridWidth} col</span>
+          )}
         </div>
         <div className="component-card-actions">
           <button

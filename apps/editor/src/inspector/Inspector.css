@@ -1,21 +1,17 @@
-/* Inspector panel */
+/* Inspector panel - sits beside canvas */
 .inspector {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 320px;
+  width: 0;
+  height: 100%;
   background: var(--bg-panel);
   border-left: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
-  z-index: var(--z-dropdown);
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
+  overflow: hidden;
+  transition: width 0.2s ease;
 }
 
 .inspector-visible {
-  transform: translateX(0);
+  width: 320px;
 }
 
 /* Header with Tabs */
@@ -205,6 +201,16 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.component-card-meta {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-tertiary);
+  background: var(--bg-surface-secondary);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
 }
 
 .component-card-actions {

@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import './fields.css';
 
 interface TextFieldProps {
@@ -15,6 +16,11 @@ export function TextField({
   placeholder,
   multiline,
 }: TextFieldProps) {
+  // Select all text on focus
+  const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    e.target.select();
+  }, []);
+
   return (
     <div className="inspector-field">
       <label className="inspector-field-label">{label}</label>
@@ -23,6 +29,7 @@ export function TextField({
           className="inspector-field-input inspector-field-textarea"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={handleFocus}
           placeholder={placeholder}
         />
       ) : (
@@ -31,6 +38,7 @@ export function TextField({
           className="inspector-field-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={handleFocus}
           placeholder={placeholder}
         />
       )}

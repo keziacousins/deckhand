@@ -1,7 +1,25 @@
 import { test, expect } from '@playwright/test';
+import { getDeckIdFromUrl, deleteDeckApi } from './utils';
 
 test.describe('Grid Layout', () => {
   test.setTimeout(60000);
+
+  // Track deck IDs created during tests for cleanup
+  const createdDeckIds: string[] = [];
+
+  test.afterEach(async ({ page }) => {
+    const deckId = getDeckIdFromUrl(page);
+    if (deckId) {
+      createdDeckIds.push(deckId);
+    }
+  });
+
+  test.afterAll(async () => {
+    for (const id of createdDeckIds) {
+      await deleteDeckApi(id);
+    }
+    createdDeckIds.length = 0;
+  });
 
   test('inspect deck-slide and component structure', async ({ page }) => {
     // Navigate to the app

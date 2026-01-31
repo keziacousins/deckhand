@@ -3,12 +3,10 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
   useStoreApi,
-  addEdge,
   type Edge,
   type Connection,
   type OnSelectionChangeParams,
@@ -66,8 +64,8 @@ export function Canvas({
     targetNode: SlideNodeType | null;
   } | null>(null);
 
-  // Convert deck slides to React Flow nodes
-  const initialNodes = useMemo(() => {
+  // Derive nodes from deck state
+  const deckNodes = useMemo(() => {
     const deckGridColumns = deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
     return Object.values(deck.slides).map((slide): SlideNodeType => ({
       id: slide.id,
@@ -85,8 +83,8 @@ export function Canvas({
     }));
   }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, showGrid, selectedSlideId, selectedComponentId]);
 
-  // Convert deck flow edges to React Flow edges
-  const initialEdges = useMemo(() => {
+  // Derive edges from deck state
+  const deckEdges = useMemo(() => {
     return Object.values(deck.flow.edges).map((edge): Edge => ({
       id: edge.id,
       source: edge.from,
@@ -96,38 +94,46 @@ export function Canvas({
     }));
   }, [deck.flow.edges]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // Use React Flow's state management - initialize with empty, sync via effect
+  const [nodes, setNodes, onNodesChange] = useNodesState<SlideNodeType>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
-  // Sync nodes when deck changes (but preserve positions from React Flow state)
+  // Sync nodes when deck changes - merge to preserve React Flow's internal state
   useEffect(() => {
-    const deckGridColumns = deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
     setNodes((currentNodes) => {
-      // Merge: use deck data but preserve current positions if node exists
-      const currentPositions = new Map(currentNodes.map((n) => [n.id, n.position]));
-      return Object.values(deck.slides).map((slide): SlideNodeType => {
-        const existingPos = currentPositions.get(slide.id);
-        return {
-          id: slide.id,
-          type: 'slide',
-          position: existingPos ?? slide.position,
-          data: {
-            slide,
-            theme: deck.theme,
-            aspectRatio: deck.aspectRatio,
-            gridColumns: deckGridColumns,
-            showGrid,
-            selectedComponentId: slide.id === selectedSlideId ? selectedComponentId : null,
-          },
-          selected: slide.id === selectedSlideId,
-        };
-      });
+      const currentById = new Map(currentNodes.map((n) => [n.id, n]));
+      
+      // Build new array, preserving existing node objects where possible
+      const newNodes: SlideNodeType[] = [];
+      for (const deckNode of deckNodes) {
+        const current = currentById.get(deckNode.id);
+        if (current) {
+          // Update existing node in place - only change what's different
+          const needsUpdate = 
+            current.position.x !== deckNode.position.x ||
+            current.position.y !== deckNode.position.y ||
+            current.data !== deckNode.data ||
+            current.selected !== deckNode.selected;
+          
+          if (needsUpdate) {
+            newNodes.push({ ...current, ...deckNode });
+          } else {
+            newNodes.push(current);
+          }
+        } else {
+          // New node from deck
+          newNodes.push(deckNode);
+        }
+      }
+      
+      return newNodes;
     });
-  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, showGrid, selectedSlideId, setNodes]);
+  }, [deckNodes, setNodes]);
 
+  // Sync edges when deck changes
   useEffect(() => {
-    setEdges(initialEdges);
-  }, [initialEdges, setEdges]);
+    setEdges(deckEdges);
+  }, [deckEdges, setEdges]);
 
   const selectedNodes = useMemo(
     () => nodes.filter((n) => n.selected),
@@ -150,25 +156,32 @@ export function Canvas({
     [selectSlide]
   );
 
-  // Persist position to deck when drag ends
+  // Persist positions to deck when drag ends (handles single and multi-select)
   const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, node: SlideNodeType) => {
+    (_event: React.MouseEvent, _node: SlideNodeType, draggedNodes: SlideNodeType[]) => {
       onUpdateDeck((d) => {
-        const slide = d.slides[node.id];
-        if (!slide) return d;
-        // Only update if position actually changed
-        if (slide.position.x === node.position.x && slide.position.y === node.position.y) {
-          return d;
+        let hasChanges = false;
+        const updatedSlides = { ...d.slides };
+
+        for (const node of draggedNodes) {
+          const slide = d.slides[node.id];
+          if (!slide) continue;
+          // Only update if position actually changed
+          if (slide.position.x === node.position.x && slide.position.y === node.position.y) {
+            continue;
+          }
+          hasChanges = true;
+          updatedSlides[node.id] = {
+            ...slide,
+            position: { x: node.position.x, y: node.position.y },
+          };
         }
+
+        if (!hasChanges) return d;
+
         return {
           ...d,
-          slides: {
-            ...d.slides,
-            [node.id]: {
-              ...slide,
-              position: { x: node.position.x, y: node.position.y },
-            },
-          },
+          slides: updatedSlides,
         };
       });
     },
@@ -183,7 +196,7 @@ export function Canvas({
 
       const edgeId = generateEdgeId();
 
-      // Update deck state
+      // Update deck state - edges will update via deckEdges memo
       onUpdateDeck((d) => ({
         ...d,
         flow: {
@@ -200,13 +213,8 @@ export function Canvas({
           },
         },
       }));
-
-      // Optimistically update React Flow edges
-      setEdges((eds) =>
-        addEdge({ ...connection, id: edgeId, type: 'smoothstep' }, eds)
-      );
     },
-    [onUpdateDeck, setEdges]
+    [onUpdateDeck]
   );
 
   // Track connection start for drop-on-node
@@ -487,21 +495,27 @@ export function Canvas({
         onNodeContextMenu={onNodeContextMenu}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.2, maxZoom: 1.0 }}
         minZoom={0.1}
         maxZoom={4}
+        panOnDrag={false}
         panOnScroll
+        selectionOnDrag
         zoomOnScroll
+        snapToGrid
+        snapGrid={[10, 10]}
         defaultEdgeOptions={{
           type: 'smoothstep',
         }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls />
-        <MiniMap
-          nodeColor={() => 'var(--node-bg)'}
-          maskColor="var(--bg-overlay)"
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={16}
+          size={1}
+          color="var(--canvas-dots)"
+          style={{ backgroundColor: 'var(--canvas-bg)' }}
         />
+        <Controls />
         <CanvasHeader
           deckName={deck.meta.title}
           onBack={onBack}

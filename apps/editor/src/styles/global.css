@@ -90,7 +90,14 @@ button:disabled {
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-/* Selection */
+/* Text selection */
 ::selection {
-  background: var(--canvas-selection-bg);
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+input::selection,
+textarea::selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
 }

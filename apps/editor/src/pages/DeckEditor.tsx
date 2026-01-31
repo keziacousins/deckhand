@@ -4,6 +4,7 @@ import { Canvas } from '../canvas/Canvas';
 import { Inspector } from '../inspector/Inspector';
 import { SelectionProvider, useSelection } from '../selection';
 import { useYDoc } from '../sync';
+import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
 import type { Deck } from '@deckhand/schema';
 import '../styles/layout.css';
 
@@ -13,11 +14,14 @@ interface DeckEditorProps {
 }
 
 function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
-  const { deck, status, error, updateDeck } = useYDoc(deckId);
+  const { deck, status, error, updateDeck, undo, redo, canUndo, canRedo } = useYDoc(deckId);
   const [inspectorVisible, setInspectorVisible] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const { selectSlide } = useSelection();
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
+
+  // Register undo/redo keyboard shortcuts
+  useUndoRedoShortcuts({ undo, redo, canUndo, canRedo });
 
   // Select first slide when deck loads
   useEffect(() => {
@@ -86,17 +90,19 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
 
   return (
     <div className="editor-container">
-      <ReactFlowProvider>
-        <Canvas
-          deck={deck}
-          onUpdateDeck={handleUpdateDeck}
-          onBack={onBack}
-          onNameChange={handleNameChange}
-          inspectorVisible={inspectorVisible}
-          onToggleInspector={toggleInspector}
-          showGrid={showGrid}
-        />
-      </ReactFlowProvider>
+      <div className="editor-canvas">
+        <ReactFlowProvider>
+          <Canvas
+            deck={deck}
+            onUpdateDeck={handleUpdateDeck}
+            onBack={onBack}
+            onNameChange={handleNameChange}
+            inspectorVisible={inspectorVisible}
+            onToggleInspector={toggleInspector}
+            showGrid={showGrid}
+          />
+        </ReactFlowProvider>
+      </div>
       <Inspector
         visible={inspectorVisible}
         onClose={toggleInspector}

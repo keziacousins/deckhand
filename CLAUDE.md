@@ -24,11 +24,20 @@ npm run dev:all
 # Build all packages and apps
 npm run build
 
-# Run tests across all workspaces
+# Run unit tests across all workspaces
 npm run test
 
-# Run tests in a specific package
+# Run unit tests in a specific package
 npm run test --workspace=packages/schema
+npm run test --workspace=packages/sync
+npm run test --workspace=packages/components
+npm run test --workspace=apps/server
+
+# Run E2E tests (Playwright) - requires dev servers running
+npx playwright test
+
+# Run specific E2E test file
+npx playwright test tests/inspector.spec.ts
 
 # Type checking
 npm run typecheck
@@ -59,6 +68,21 @@ npm run db:init --workspace=apps/server
 - Web components use Shadow DOM for complete style isolation from editor UI
 - Canvas (React Flow) is for visualization/navigation only; content editing happens via LLM tools or contenteditable in preview
 - JSON is the source of truth (no YAML layer)
+
+## Testing
+
+**Unit tests** use Vitest and are located in `__tests__` directories within each package:
+- `packages/schema/src/__tests__/` - Schema validation tests (153 tests)
+- `packages/sync/src/__tests__/` - YDoc diffing/patching tests (95 tests)
+- `packages/components/src/__tests__/` - Web component tests with happy-dom (41 tests)
+- `apps/server/src/__tests__/` - API integration tests with in-memory SQLite (28 tests)
+
+**E2E tests** use Playwright and are in `tests/` at the project root:
+- `tests/basic-functionality.spec.ts` - Homepage and deck creation
+- `tests/grid-layout.spec.ts` - CSS grid layout verification
+- `tests/deck-operations.spec.ts` - Deck CRUD operations
+- `tests/canvas.spec.ts` - React Flow canvas interactions
+- `tests/inspector.spec.ts` - Inspector panel UI
 
 ## Reference Code
 

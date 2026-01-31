@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "db:init": "tsx src/db/init.ts"
+    "db:init": "tsx src/db/init.ts",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@deckhand/schema": "*",
@@ -21,8 +22,11 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",
     "@types/express": "^4.17.21",
+    "@types/supertest": "^6.0.0",
     "@types/ws": "^8.5.0",
+    "supertest": "^7.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
   }
 }

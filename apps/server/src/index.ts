@@ -1,52 +1,23 @@
-import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { initSchema } from './db/schema.js';
-import { decksRouter } from './routes/decks.js';
+import { createApp } from './app.js';
 import {
   getOrCreateSession,
   addClient,
   removeClient,
-  getAllSessions,
 } from './sessions.js';
 import { loadYDoc, debouncedSaveYDoc, flushSave } from './persistence.js';
 
 // Initialize database
 initSchema();
 
-const app = express();
+const app = createApp();
 const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
 const PORT = process.env.PORT || 3001;
-
-// JSON body parsing
-app.use(express.json());
-
-// CORS for development
-app.use((_req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  if (_req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-// Health check
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// Sessions endpoint
-app.get('/api/sessions', (_req, res) => {
-  res.json(getAllSessions());
-});
-
-// Deck routes
-app.use('/api/decks', decksRouter);
 
 // WebSocket upgrade handling
 server.on('upgrade', (request, socket, head) => {

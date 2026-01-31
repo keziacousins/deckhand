@@ -91,6 +91,7 @@ export function deckToYDoc(deck: Deck, ydoc?: Y.Doc): Y.Doc {
     root.set('meta', toYValue(deck.meta));
     root.set('theme', toYValue(deck.theme));
     root.set('aspectRatio', deck.aspectRatio);
+    root.set('gridColumns', deck.gridColumns);
     root.set('slides', toYValue(deck.slides));
     root.set('flow', toYValue(deck.flow));
     if (deck.assets) {
@@ -111,6 +112,7 @@ export function yDocToDeck(ydoc: Y.Doc): Deck {
     meta: fromYValue(root.get('meta')),
     theme: fromYValue(root.get('theme')),
     aspectRatio: (root.get('aspectRatio') as string) || '16:9',
+    gridColumns: (root.get('gridColumns') as number) || 8,
     slides: fromYValue(root.get('slides')),
     flow: fromYValue(root.get('flow')),
     assets: fromYValue(root.get('assets')),

@@ -1,0 +1,270 @@
+/* Semantic Token Mappings */
+
+/* ============================================
+   Light Theme (Default)
+   ============================================ */
+:root,
+:root[data-theme='light'] {
+  /* Backgrounds - layered depth */
+  --bg-app: var(--color-gray-100);           /* Deepest - app chrome */
+  --bg-canvas: var(--color-gray-200);        /* Canvas area - visible texture */
+  --bg-surface: var(--color-white);          /* Cards, panels - elevated */
+  --bg-surface-secondary: var(--color-gray-50); /* Secondary surfaces */
+  --bg-surface-hover: var(--color-gray-100);
+  --bg-surface-active: var(--color-gray-200);
+  --bg-panel: var(--color-gray-50);          /* Side panels */
+  --bg-panel-header: var(--color-gray-100);
+  --bg-input: var(--color-white);
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Text */
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-600);
+  --text-tertiary: var(--color-gray-500);
+  --text-disabled: var(--color-gray-400);
+  --text-inverse: var(--color-white);
+  --text-link: var(--color-blue-600);
+  --text-link-hover: var(--color-blue-700);
+
+  /* Borders */
+  --border-default: var(--color-gray-300);
+  --border-strong: var(--color-gray-400);
+  --border-subtle: var(--color-gray-200);
+  --border-focus: var(--color-blue-500);
+  --border-input: var(--color-gray-300);
+  --border-input-hover: var(--color-gray-400);
+
+  /* Interactive - buttons, links */
+  --interactive-primary: var(--color-blue-600);
+  --interactive-primary-hover: var(--color-blue-700);
+  --interactive-primary-active: var(--color-blue-800);
+  --interactive-secondary: var(--color-gray-100);
+  --interactive-secondary-hover: var(--color-gray-200);
+
+  /* Accent - primary action buttons */
+  --bg-accent: var(--color-blue-600);
+  --bg-accent-hover: var(--color-blue-700);
+  --bg-accent-active: var(--color-blue-800);
+  --text-on-accent: var(--color-white);
+
+  /* Error states */
+  --bg-error: var(--color-red-600);
+  --text-on-error: var(--color-white);
+
+  /* Status */
+  --status-success-bg: var(--color-green-50);
+  --status-success-text: var(--color-green-700);
+  --status-success-border: var(--color-green-200);
+  --status-error-bg: var(--color-red-50);
+  --status-error-text: var(--color-red-700);
+  --status-error-border: var(--color-red-200);
+  --status-warning-bg: var(--color-amber-50);
+  --status-warning-text: var(--color-amber-600);
+
+  /* Slide nodes on canvas */
+  --node-bg: var(--color-white);
+  --node-border: var(--color-gray-300);
+  --node-border-hover: var(--color-gray-400);
+  --node-border-selected: var(--color-blue-500);
+  --node-shadow: var(--shadow-sm);
+  --node-shadow-hover: var(--shadow-md);
+  --node-shadow-selected: var(--shadow-lg);
+
+  /* Canvas - same darker tone for both themes */
+  --canvas-bg: var(--color-gray-700);
+  --canvas-dots: var(--color-gray-600);
+  --canvas-selection-bg: rgba(12, 126, 232, 0.08);
+  --canvas-selection-border: rgba(12, 126, 232, 0.6);
+
+  /* Canvas overlay elements (always on dark canvas) */
+  --canvas-overlay-text: rgba(255, 255, 255, 0.9);
+  --canvas-overlay-text-secondary: rgba(255, 255, 255, 0.7);
+  --canvas-overlay-text-hover: rgba(255, 255, 255, 1);
+  --canvas-overlay-border: rgba(255, 255, 255, 0.15);
+  --canvas-overlay-bg: rgba(255, 255, 255, 0.1);
+  --canvas-overlay-separator: rgba(255, 255, 255, 0.2);
+
+  /* Edges */
+  --edge-stroke: var(--color-gray-400);
+  --edge-stroke-hover: var(--color-gray-500);
+  --edge-stroke-selected: var(--color-blue-500);
+
+  /* Scrollbar */
+  --scrollbar-thumb: var(--color-gray-300);
+  --scrollbar-thumb-hover: var(--color-gray-400);
+  --scrollbar-track: transparent;
+}
+
+/* ============================================
+   Dark Theme
+   ============================================ */
+:root[data-theme='dark'] {
+  /* Backgrounds - layered depth */
+  --bg-app: var(--color-gray-900);
+  --bg-canvas: var(--color-gray-800);
+  --bg-surface: var(--color-gray-800);
+  --bg-surface-secondary: var(--color-gray-700);
+  --bg-surface-hover: var(--color-gray-700);
+  --bg-surface-active: var(--color-gray-600);
+  --bg-panel: var(--color-gray-900);
+  --bg-panel-header: var(--color-gray-800);
+  --bg-input: var(--color-gray-800);
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+
+  /* Text */
+  --text-primary: var(--color-gray-50);
+  --text-secondary: var(--color-gray-400);
+  --text-tertiary: var(--color-gray-500);
+  --text-disabled: var(--color-gray-600);
+  --text-inverse: var(--color-gray-900);
+  --text-link: var(--color-blue-400);
+  --text-link-hover: var(--color-blue-300);
+
+  /* Borders */
+  --border-default: var(--color-gray-700);
+  --border-strong: var(--color-gray-600);
+  --border-subtle: var(--color-gray-800);
+  --border-focus: var(--color-blue-400);
+  --border-input: var(--color-gray-600);
+  --border-input-hover: var(--color-gray-500);
+
+  /* Interactive */
+  --interactive-primary: var(--color-blue-500);
+  --interactive-primary-hover: var(--color-blue-400);
+  --interactive-primary-active: var(--color-blue-300);
+  --interactive-secondary: var(--color-gray-700);
+  --interactive-secondary-hover: var(--color-gray-600);
+
+  /* Accent - primary action buttons */
+  --bg-accent: var(--color-blue-500);
+  --bg-accent-hover: var(--color-blue-400);
+  --bg-accent-active: var(--color-blue-300);
+  --text-on-accent: var(--color-white);
+
+  /* Error states */
+  --bg-error: var(--color-red-500);
+  --text-on-error: var(--color-white);
+
+  /* Status */
+  --status-success-bg: rgba(34, 197, 94, 0.15);
+  --status-success-text: var(--color-green-500);
+  --status-success-border: rgba(34, 197, 94, 0.3);
+  --status-error-bg: rgba(239, 68, 68, 0.15);
+  --status-error-text: var(--color-red-500);
+  --status-error-border: rgba(239, 68, 68, 0.3);
+  --status-warning-bg: rgba(245, 158, 11, 0.15);
+  --status-warning-text: var(--color-amber-500);
+
+  /* Slide nodes on canvas */
+  --node-bg: var(--color-gray-800);
+  --node-border: var(--color-gray-600);
+  --node-border-hover: var(--color-gray-500);
+  --node-border-selected: var(--color-blue-400);
+  --node-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --node-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --node-shadow-selected: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* Canvas - same darker tone for both themes */
+  --canvas-bg: var(--color-gray-700);
+  --canvas-dots: var(--color-gray-600);
+  --canvas-selection-bg: rgba(54, 159, 250, 0.15);
+  --canvas-selection-border: rgba(54, 159, 250, 0.7);
+
+  /* Edges */
+  --edge-stroke: var(--color-gray-600);
+  --edge-stroke-hover: var(--color-gray-500);
+  --edge-stroke-selected: var(--color-blue-400);
+
+  /* Scrollbar */
+  --scrollbar-thumb: var(--color-gray-600);
+  --scrollbar-thumb-hover: var(--color-gray-500);
+  --scrollbar-track: transparent;
+}
+
+/* ============================================
+   System Preference Detection
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    /* Backgrounds */
+    --bg-app: var(--color-gray-900);
+    --bg-canvas: var(--color-gray-800);
+    --bg-surface: var(--color-gray-800);
+    --bg-surface-secondary: var(--color-gray-700);
+    --bg-surface-hover: var(--color-gray-700);
+    --bg-surface-active: var(--color-gray-600);
+    --bg-panel: var(--color-gray-900);
+    --bg-panel-header: var(--color-gray-800);
+    --bg-input: var(--color-gray-800);
+    --bg-overlay: rgba(0, 0, 0, 0.6);
+
+    /* Text */
+    --text-primary: var(--color-gray-50);
+    --text-secondary: var(--color-gray-400);
+    --text-tertiary: var(--color-gray-500);
+    --text-disabled: var(--color-gray-600);
+    --text-inverse: var(--color-gray-900);
+    --text-link: var(--color-blue-400);
+    --text-link-hover: var(--color-blue-300);
+
+    /* Borders */
+    --border-default: var(--color-gray-700);
+    --border-strong: var(--color-gray-600);
+    --border-subtle: var(--color-gray-800);
+    --border-focus: var(--color-blue-400);
+    --border-input: var(--color-gray-600);
+    --border-input-hover: var(--color-gray-500);
+
+    /* Interactive */
+    --interactive-primary: var(--color-blue-500);
+    --interactive-primary-hover: var(--color-blue-400);
+    --interactive-primary-active: var(--color-blue-300);
+    --interactive-secondary: var(--color-gray-700);
+    --interactive-secondary-hover: var(--color-gray-600);
+
+    /* Accent - primary action buttons */
+    --bg-accent: var(--color-blue-500);
+    --bg-accent-hover: var(--color-blue-400);
+    --bg-accent-active: var(--color-blue-300);
+    --text-on-accent: var(--color-white);
+
+    /* Error states */
+    --bg-error: var(--color-red-500);
+    --text-on-error: var(--color-white);
+
+    /* Status */
+    --status-success-bg: rgba(34, 197, 94, 0.15);
+    --status-success-text: var(--color-green-500);
+    --status-success-border: rgba(34, 197, 94, 0.3);
+    --status-error-bg: rgba(239, 68, 68, 0.15);
+    --status-error-text: var(--color-red-500);
+    --status-error-border: rgba(239, 68, 68, 0.3);
+    --status-warning-bg: rgba(245, 158, 11, 0.15);
+    --status-warning-text: var(--color-amber-500);
+
+    /* Nodes */
+    --node-bg: var(--color-gray-800);
+    --node-border: var(--color-gray-600);
+    --node-border-hover: var(--color-gray-500);
+    --node-border-selected: var(--color-blue-400);
+    --node-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --node-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --node-shadow-selected: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    /* Canvas - same darker tone for both themes */
+    --canvas-bg: var(--color-gray-700);
+    --canvas-dots: var(--color-gray-600);
+    --canvas-selection-bg: rgba(54, 159, 250, 0.15);
+    --canvas-selection-border: rgba(54, 159, 250, 0.7);
+
+    /* Edges */
+    --edge-stroke: var(--color-gray-600);
+    --edge-stroke-hover: var(--color-gray-500);
+    --edge-stroke-selected: var(--color-blue-400);
+
+    /* Scrollbar */
+    --scrollbar-thumb: var(--color-gray-600);
+    --scrollbar-thumb-hover: var(--color-gray-500);
+    --scrollbar-track: transparent;
+  }
+}

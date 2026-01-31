@@ -1,0 +1,120 @@
+/**
+ * SlideNode.css
+ *
+ * Styles for slide nodes on the canvas.
+ * Dimensions are set via inline styles on the component (800 x aspectRatio height).
+ *
+ * Structure:
+ *   .slide-node (wrapper - receives dimensions)
+ *     .slide-node-detail (full preview - visible when zoomed in)
+ *       deck-slide (web component)
+ *     .slide-node-overview (simplified - visible when zoomed out)
+ *       .slide-node-title
+ *     Handle components (4 handles for connections)
+ *
+ * LOD (Level of Detail):
+ *   When .react-flow has .zoom-overview class, we hide detail and show overview.
+ */
+
+/* ===========================================
+   Base Node Styles
+   =========================================== */
+
+.slide-node {
+  position: relative;
+  background: var(--node-bg);
+  border: 2px solid var(--node-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--node-shadow);
+  overflow: hidden;
+  transition:
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.slide-node:hover {
+  border-color: var(--node-border-hover);
+  box-shadow: var(--node-shadow-hover);
+}
+
+.slide-node.selected {
+  border-color: var(--node-border-selected);
+  box-shadow: var(--node-shadow-selected);
+}
+
+/* ===========================================
+   Detail View (Full Slide Preview)
+   Read-only preview - editing happens in Inspector
+   =========================================== */
+
+.slide-node-detail {
+  position: absolute;
+  inset: 0;
+  background: var(--color-white);
+  overflow: hidden;
+  user-select: none;
+}
+
+.slide-node-detail deck-slide {
+  width: 100%;
+  height: 100%;
+}
+
+/* Selected component highlight */
+.slide-node-detail .component-selected {
+  outline: 2px solid var(--interactive-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+
+/* ===========================================
+   Connection Handles
+   =========================================== */
+
+.slide-node .react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: var(--node-border);
+  border: 2px solid var(--node-bg);
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.slide-node:hover .react-flow__handle,
+.slide-node.selected .react-flow__handle {
+  opacity: 1;
+}
+
+.slide-node.selected .react-flow__handle {
+  background: var(--node-border-selected);
+}
+
+.slide-node .react-flow__handle:hover {
+  background: var(--interactive-primary);
+  transform: scale(1.3);
+}
+
+.slide-node .react-flow__handle.connecting {
+  background: var(--interactive-primary);
+}
+
+/* Source handles (right, bottom) - distinct color */
+.slide-node .react-flow__handle[data-handlepos="right"],
+.slide-node .react-flow__handle[data-handlepos="bottom"] {
+  background: var(--interactive-primary);
+}
+
+.slide-node .react-flow__handle[data-handlepos="right"]:hover,
+.slide-node .react-flow__handle[data-handlepos="bottom"]:hover {
+  background: var(--interactive-primary-hover);
+}
+
+/* Hide handles when zoomed out */
+.react-flow.zoom-overview .slide-node .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}

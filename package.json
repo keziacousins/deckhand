@@ -1,0 +1,29 @@
+{
+  "name": "deckhand",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/editor",
+    "dev:server": "npm run dev --workspace=apps/server",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "tsc --build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.1",
+    "concurrently": "^8.2.2",
+    "playwright": "^1.58.1",
+    "typescript": "^5.4.0"
+  },
+  "overrides": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

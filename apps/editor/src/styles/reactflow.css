@@ -1,0 +1,119 @@
+/* React Flow customizations */
+@import '@xyflow/react/dist/style.css';
+
+.react-flow {
+  background: var(--canvas-bg);
+}
+
+.react-flow__background {
+  background: var(--canvas-bg);
+}
+
+.react-flow__background-pattern {
+  fill: var(--canvas-dots);
+}
+
+/* Selection box */
+.react-flow__selection {
+  background: var(--canvas-selection-bg);
+  border: 1px solid var(--canvas-selection-border);
+}
+
+/* Nodes - reset RF defaults so our styles take over */
+.react-flow__node {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* Edges */
+.react-flow__edge-path {
+  stroke: var(--edge-stroke);
+  stroke-width: 2;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--edge-stroke-hover);
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--edge-stroke-selected);
+}
+
+/* Connection line while dragging */
+.react-flow__connection-line {
+  stroke: var(--edge-stroke-selected);
+  stroke-width: 2;
+}
+
+/* Controls */
+.react-flow__controls {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: var(--bg-surface);
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.react-flow__controls-button svg {
+  max-width: 14px;
+  max-height: 14px;
+}
+
+/* Minimap */
+.react-flow__minimap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.react-flow__minimap-mask {
+  fill: var(--bg-overlay);
+}
+
+/* Attribution - hide in app */
+.react-flow__attribution {
+  display: none;
+}
+
+/* Handle styling */
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background: var(--border-default);
+  border: 2px solid var(--bg-surface);
+  border-radius: var(--radius-full);
+}
+
+.react-flow__handle:hover {
+  background: var(--interactive-primary);
+}
+
+.react-flow__handle-connecting {
+  background: var(--interactive-primary);
+}

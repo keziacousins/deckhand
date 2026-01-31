@@ -1,0 +1,179 @@
+.deck-list-page {
+  min-height: 100%;
+  background: var(--bg-app);
+  padding: var(--space-8);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.deck-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.deck-list-header h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.create-deck-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--interactive-primary);
+  color: var(--text-inverse);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: background var(--transition-fast);
+}
+
+.create-deck-button:hover {
+  background: var(--interactive-primary-hover);
+}
+
+.deck-list-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.deck-list-error button {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-size-xs);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-md);
+}
+
+.deck-list-error button:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.deck-list-loading,
+.deck-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.deck-list-empty p {
+  margin-bottom: var(--space-2);
+}
+
+.deck-list-empty .create-deck-button {
+  margin-top: var(--space-4);
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.deck-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.deck-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.deck-card-preview {
+  aspect-ratio: 16 / 9;
+  background: var(--bg-surface-secondary);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: var(--space-2);
+}
+
+.deck-card-slide-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  background: var(--bg-surface);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.deck-card-info {
+  padding: var(--space-3) var(--space-4);
+}
+
+.deck-card-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-card-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-card-date {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.deck-card-actions {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.deck-card:hover .deck-card-actions {
+  opacity: 1;
+}
+
+.deck-card-action {
+  padding: var(--space-2);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.deck-card-action:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.deck-card-action-danger:hover {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}

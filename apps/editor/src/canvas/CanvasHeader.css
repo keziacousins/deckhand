@@ -1,0 +1,137 @@
+/* Canvas header - floating toolbar on canvas */
+.canvas-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2);
+  pointer-events: none;
+  z-index: var(--z-sticky);
+}
+
+/* Shared pill styling for left and right groups */
+.canvas-header-left,
+.canvas-header-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 36px;
+  padding: 0 var(--space-1);
+  border-radius: 20px;
+  pointer-events: auto;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.canvas-header-left::before,
+.canvas-header-right::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  border: 1px solid var(--canvas-overlay-border);
+  background: var(--canvas-overlay-bg);
+  pointer-events: none;
+}
+
+/* Base button style for all header buttons */
+.header-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--canvas-overlay-text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.header-button:hover {
+  color: var(--canvas-overlay-text-hover);
+  transform: scale(1.1);
+}
+
+.header-button.active {
+  color: var(--canvas-overlay-text-hover);
+}
+
+.header-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Separator line */
+.header-separator {
+  width: 1px;
+  height: 16px;
+  background: var(--canvas-overlay-separator);
+  margin: 0 var(--space-1);
+}
+
+/* Deck identity pill */
+.deck-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 28px;
+  padding: 0 var(--space-1);
+}
+
+.deck-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--canvas-overlay-text-secondary);
+}
+
+.deck-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Name button - click to edit */
+.name-button {
+  display: flex;
+  align-items: center;
+  padding: var(--space-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--canvas-overlay-text);
+  cursor: pointer;
+  transition: color 0.15s ease;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name-button:hover {
+  color: var(--canvas-overlay-text-hover);
+}
+
+/* Name input - editing mode */
+.name-input {
+  padding: var(--space-1);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  outline: none;
+  min-width: 100px;
+  max-width: 200px;
+}

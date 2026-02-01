@@ -5,6 +5,7 @@
 
 import express, { type Express } from 'express';
 import { decksRouter } from './routes/decks.js';
+import assetsRouter from './routes/assets.js';
 import { getAllSessions } from './sessions.js';
 
 export function createApp(): Express {
@@ -36,6 +37,9 @@ export function createApp(): Express {
 
   // Deck routes
   app.use('/api/decks', decksRouter);
+
+  // Asset routes (includes /api/decks/:deckId/assets paths)
+  app.use('/api', assetsRouter);
 
   return app;
 }

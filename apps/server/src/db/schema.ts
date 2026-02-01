@@ -4,20 +4,12 @@
  */
 
 import Database, { type Database as DatabaseType } from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { paths, ensureDirectories } from '../config.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/deckhand.db');
+// Ensure directories exist before opening database
+ensureDirectories();
 
-// Ensure data directory exists
-import fs from 'fs';
-const dataDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-export const db: DatabaseType = new Database(DB_PATH);
+export const db: DatabaseType = new Database(paths.dbFile);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
@@ -47,8 +39,25 @@ export function initSchema(): void {
       FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
     );
 
+    -- Assets table: stores asset metadata (files stored on disk)
+    CREATE TABLE IF NOT EXISTS assets (
+      id TEXT PRIMARY KEY,
+      deck_id TEXT NOT NULL,
+      filename TEXT NOT NULL,          -- Original filename
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,           -- File size in bytes
+      width INTEGER,                   -- Image width (if applicable)
+      height INTEGER,                  -- Image height (if applicable)
+      has_thumbnail INTEGER DEFAULT 0, -- Whether a thumbnail was generated
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
+    );
+
     -- Index for listing decks by updated time
     CREATE INDEX IF NOT EXISTS idx_decks_updated_at ON decks(updated_at DESC);
+    
+    -- Index for listing assets by deck
+    CREATE INDEX IF NOT EXISTS idx_assets_deck_id ON assets(deck_id);
   `);
 
   console.log('[DB] Schema initialized');
@@ -87,4 +96,19 @@ export interface YDocStateRow {
   deck_id: string;
   data: Buffer;
   updated_at: string;
+}
+
+/**
+ * Asset row from database
+ */
+export interface AssetRow {
+  id: string;
+  deck_id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  has_thumbnail: number;
+  created_at: string;
 }

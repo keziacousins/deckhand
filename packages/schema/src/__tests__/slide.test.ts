@@ -6,10 +6,14 @@ import {
   SpacingSchema,
   GridSchema,
   SlideLayoutSchema,
+  SlideStyleSchema,
+  BackgroundSizeSchema,
   defaultSlideLayout,
   generateSlideId,
   createBlankSlide,
   layoutToCssProperties,
+  styleToCssProperties,
+  backgroundSizeToCss,
 } from '../slide';
 
 describe('PositionSchema', () => {
@@ -98,10 +102,6 @@ describe('SlideLayoutSchema', () => {
       justifyContent: 'space-between',
       direction: 'row',
       gap: '16px',
-      backgroundColor: '#ffffff',
-      backgroundImage: '/images/bg.jpg',
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
     };
     expect(SlideLayoutSchema.parse(layout)).toEqual(layout);
   });
@@ -127,12 +127,7 @@ describe('SlideLayoutSchema', () => {
     expect(() => SlideLayoutSchema.parse({ direction: 'diagonal' })).toThrow();
   });
 
-  it('validates backgroundSize values', () => {
-    expect(SlideLayoutSchema.parse({ backgroundSize: 'cover' }).backgroundSize).toBe('cover');
-    expect(SlideLayoutSchema.parse({ backgroundSize: 'contain' }).backgroundSize).toBe('contain');
-    expect(SlideLayoutSchema.parse({ backgroundSize: 'auto' }).backgroundSize).toBe('auto');
-    expect(() => SlideLayoutSchema.parse({ backgroundSize: '100%' })).toThrow();
-  });
+  // backgroundSize moved to SlideStyleSchema
 });
 
 describe('defaultSlideLayout', () => {
@@ -327,23 +322,105 @@ describe('layoutToCssProperties', () => {
     const css = layoutToCssProperties({ gap: '24px' });
     expect(css['gap']).toBe('24px');
   });
+});
 
-  it('applies background color', () => {
-    const css = layoutToCssProperties({ backgroundColor: '#f0f0f0' });
-    expect(css['background-color']).toBe('#f0f0f0');
+describe('SlideStyleSchema', () => {
+  it('validates empty style', () => {
+    expect(SlideStyleSchema.parse({})).toEqual({});
+  });
+
+  it('validates color overrides', () => {
+    const style = {
+      background: '#ffffff',
+      textPrimary: '#000000',
+      textSecondary: '#666666',
+      accent: '#0066cc',
+    };
+    expect(SlideStyleSchema.parse(style)).toEqual(style);
+  });
+
+  it('validates background image properties', () => {
+    const style = {
+      backgroundImage: '/images/bg.jpg',
+      backgroundSize: 'fill',
+      backgroundPosition: 'center',
+    };
+    expect(SlideStyleSchema.parse(style)).toEqual(style);
+  });
+
+  it('validates backgroundSize enum values', () => {
+    expect(SlideStyleSchema.parse({ backgroundSize: 'fill' }).backgroundSize).toBe('fill');
+    expect(SlideStyleSchema.parse({ backgroundSize: 'fit-width' }).backgroundSize).toBe('fit-width');
+    expect(SlideStyleSchema.parse({ backgroundSize: 'fit-height' }).backgroundSize).toBe('fit-height');
+    expect(() => SlideStyleSchema.parse({ backgroundSize: 'invalid' })).toThrow();
+    expect(() => SlideStyleSchema.parse({ backgroundSize: 'cover' })).toThrow();
+  });
+});
+
+describe('styleToCssProperties', () => {
+  it('returns empty object for empty style', () => {
+    const css = styleToCssProperties({});
+    expect(Object.keys(css)).toHaveLength(0);
+  });
+
+  it('maps color overrides to CSS custom properties', () => {
+    const css = styleToCssProperties({
+      background: '#ffffff',
+      textPrimary: '#000000',
+      textSecondary: '#666666',
+      accent: '#0066cc',
+    });
+    expect(css['--deck-color-background']).toBe('#ffffff');
+    expect(css['--deck-color-text-primary']).toBe('#000000');
+    expect(css['--deck-color-text-secondary']).toBe('#666666');
+    expect(css['--deck-color-accent']).toBe('#0066cc');
   });
 
   it('applies background image with url()', () => {
-    const css = layoutToCssProperties({ backgroundImage: '/images/bg.jpg' });
+    const css = styleToCssProperties({ backgroundImage: '/images/bg.jpg' });
     expect(css['background-image']).toBe('url(/images/bg.jpg)');
   });
 
   it('applies background size and position', () => {
-    const css = layoutToCssProperties({
-      backgroundSize: 'cover',
+    const css = styleToCssProperties({
+      backgroundSize: 'fill',
       backgroundPosition: 'center top',
     });
     expect(css['background-size']).toBe('cover');
     expect(css['background-position']).toBe('center top');
+  });
+
+  it('maps backgroundSize values to CSS correctly', () => {
+    expect(styleToCssProperties({ backgroundSize: 'fill' })['background-size']).toBe('cover');
+    expect(styleToCssProperties({ backgroundSize: 'fit-width' })['background-size']).toBe('100% auto');
+    expect(styleToCssProperties({ backgroundSize: 'fit-height' })['background-size']).toBe('auto 100%');
+  });
+});
+
+describe('backgroundSizeToCss', () => {
+  it('maps fill to cover', () => {
+    expect(backgroundSizeToCss('fill')).toBe('cover');
+  });
+
+  it('maps fit-width to 100% auto', () => {
+    expect(backgroundSizeToCss('fit-width')).toBe('100% auto');
+  });
+
+  it('maps fit-height to auto 100%', () => {
+    expect(backgroundSizeToCss('fit-height')).toBe('auto 100%');
+  });
+});
+
+describe('BackgroundSizeSchema', () => {
+  it('accepts valid values', () => {
+    expect(BackgroundSizeSchema.parse('fill')).toBe('fill');
+    expect(BackgroundSizeSchema.parse('fit-width')).toBe('fit-width');
+    expect(BackgroundSizeSchema.parse('fit-height')).toBe('fit-height');
+  });
+
+  it('rejects invalid values', () => {
+    expect(() => BackgroundSizeSchema.parse('cover')).toThrow();
+    expect(() => BackgroundSizeSchema.parse('contain')).toThrow();
+    expect(() => BackgroundSizeSchema.parse('auto')).toThrow();
   });
 });

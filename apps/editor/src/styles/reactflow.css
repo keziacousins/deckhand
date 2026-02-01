@@ -27,24 +27,39 @@
   padding: 0;
 }
 
-/* Edges */
+/* Edges - thicker and more visible */
 .react-flow__edge-path {
   stroke: var(--edge-stroke);
-  stroke-width: 2;
+  stroke-width: 3;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
   stroke: var(--edge-stroke-hover);
+  stroke-width: 4;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: var(--edge-stroke-selected);
+  stroke-width: 4;
+}
+
+/* Arrow markers */
+.react-flow__edge marker {
+  fill: var(--edge-stroke);
+}
+
+.react-flow__edge:hover marker {
+  fill: var(--edge-stroke-hover);
+}
+
+.react-flow__edge.selected marker {
+  fill: var(--edge-stroke-selected);
 }
 
 /* Connection line while dragging */
 .react-flow__connection-line {
   stroke: var(--edge-stroke-selected);
-  stroke-width: 2;
+  stroke-width: 3;
 }
 
 /* Controls */

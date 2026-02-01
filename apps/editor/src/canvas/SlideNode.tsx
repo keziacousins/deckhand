@@ -98,7 +98,18 @@ export const SlideNode = memo(function SlideNode({
 
       {/* Slide content */}
       <div className="slide-node-detail" style={themeStyle} onClick={handleDetailClick}>
-        <deck-slide grid-columns={effectiveGridColumns.toString()} show-grid={showGrid ? 'true' : undefined}>
+        <deck-slide
+          grid-columns={effectiveGridColumns.toString()}
+          show-grid={showGrid ? 'true' : undefined}
+          style-background={slide.style?.background}
+          style-text-primary={slide.style?.textPrimary}
+          style-text-secondary={slide.style?.textSecondary}
+          style-accent={slide.style?.accent}
+          background-image={slide.style?.backgroundImage}
+          background-size={slide.style?.backgroundSize}
+          background-darken={slide.style?.backgroundDarken?.toString()}
+          background-blur={slide.style?.backgroundBlur?.toString()}
+        >
           {slide.components.map((c) => renderComponent(c, c.id === selectedComponentId))}
         </deck-slide>
       </div>
@@ -117,6 +128,14 @@ declare global {
         React.HTMLAttributes<HTMLElement> & {
           'grid-columns'?: string;
           'show-grid'?: string;
+          'style-background'?: string;
+          'style-text-primary'?: string;
+          'style-text-secondary'?: string;
+          'style-accent'?: string;
+          'background-image'?: string;
+          'background-size'?: string;
+          'background-darken'?: string;
+          'background-blur'?: string;
         },
         HTMLElement
       >;

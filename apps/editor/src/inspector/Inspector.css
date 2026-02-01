@@ -130,6 +130,9 @@
 }
 
 .inspector-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
@@ -137,6 +140,25 @@
   letter-spacing: 0.5px;
   padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.inspector-section-action {
+  font-size: 11px;
+  font-weight: var(--font-weight-normal);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.inspector-section-action:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .inspector-section-content {
@@ -163,23 +185,31 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   overflow: hidden;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
 .component-card:hover {
   border-color: var(--border-strong);
 }
 
-.component-card-selected {
+.component-card-expanded {
   border-color: var(--border-focus);
+}
+
+.component-card-dragging {
+  opacity: 0.5;
+}
+
+.component-card-drag-over {
+  border-color: var(--border-focus);
+  border-style: dashed;
 }
 
 .component-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
   transition: background-color 0.15s ease;
 }
 
@@ -187,11 +217,67 @@
   background: var(--bg-surface-hover);
 }
 
+/* Drag handle */
+.component-card-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 24px;
+  color: var(--text-tertiary);
+  cursor: grab;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.component-card:hover .component-card-drag-handle {
+  opacity: 1;
+}
+
+.component-card-drag-handle:hover {
+  color: var(--text-secondary);
+}
+
+.component-card-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Expand/collapse button */
+.component-card-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 24px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.component-card-expand:hover {
+  color: var(--text-primary);
+}
+
+.component-card-expand svg {
+  transition: transform 0.15s ease;
+}
+
+.component-card-chevron-expanded {
+  transform: rotate(90deg);
+}
+
 .component-card-title {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
+  flex: 1;
+  cursor: pointer;
 }
 
 .component-card-name {
@@ -247,6 +333,21 @@
 .component-card-action-delete:hover:not(:disabled) {
   background: var(--bg-error);
   color: var(--text-on-error);
+}
+
+/* Animated expand/collapse using CSS grid */
+.component-card-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease-out;
+}
+
+.component-card-expanded .component-card-body {
+  grid-template-rows: 1fr;
+}
+
+.component-card-content-wrapper {
+  overflow: hidden;
 }
 
 .component-card-content {

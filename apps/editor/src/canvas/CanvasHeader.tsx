@@ -6,6 +6,8 @@ interface CanvasHeaderProps {
   onBack: () => void;
   onNameChange: (name: string) => void;
   onAddSlide: () => void;
+  onPlayFullscreen: () => void;
+  onPlayWindow: () => void;
   inspectorVisible: boolean;
   onToggleInspector: () => void;
 }
@@ -15,6 +17,8 @@ export function CanvasHeader({
   onBack,
   onNameChange,
   onAddSlide,
+  onPlayFullscreen,
+  onPlayWindow,
   inspectorVisible,
   onToggleInspector,
 }: CanvasHeaderProps) {
@@ -122,6 +126,34 @@ export function CanvasHeader({
               strokeWidth="1.5"
               strokeLinecap="round"
             />
+          </svg>
+        </button>
+
+        <div className="header-separator" />
+
+        {/* Play fullscreen button */}
+        <button
+          className="header-button"
+          onClick={onPlayFullscreen}
+          title="Present Fullscreen"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M5 3L11 8L5 13V3Z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+
+        {/* Play in window button */}
+        <button
+          className="header-button"
+          onClick={onPlayWindow}
+          title="Present in Window"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M6.5 6L10 8L6.5 10V6Z" fill="currentColor" />
           </svg>
         </button>
       </div>

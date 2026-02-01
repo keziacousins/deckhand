@@ -34,6 +34,10 @@ export const StandardTokensSchema = z.object({
 
   // Grid
   'grid-gap': z.string().optional().describe('Gap between grid items'),
+
+  // Content padding - space from slide edges to content
+  'content-padding-top': z.string().optional().describe('Padding from top/bottom edge to content'),
+  'content-padding-sides': z.string().optional().describe('Padding from left/right edges to content'),
 });
 
 export type StandardTokens = z.infer<typeof StandardTokensSchema>;
@@ -95,6 +99,10 @@ export const defaultTheme: Theme = {
 
     // Grid
     'grid-gap': '16px',
+
+    // Content padding
+    'content-padding-top': '48px',
+    'content-padding-sides': '64px',
   },
 };
 

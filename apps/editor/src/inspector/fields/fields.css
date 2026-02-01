@@ -40,6 +40,29 @@
   font-family: inherit;
 }
 
+/* Input wrapper for suffix support */
+.inspector-field-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inspector-field-input-wrapper .inspector-field-input {
+  flex: 1;
+}
+
+.inspector-field-input-wrapper.has-suffix .inspector-field-input {
+  padding-right: var(--space-6);
+}
+
+.inspector-field-suffix {
+  position: absolute;
+  right: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
 .inspector-field-select {
   cursor: pointer;
 }

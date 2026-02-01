@@ -1,0 +1,146 @@
+/* Presentation mode - fullscreen slide viewing */
+.presentation {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.presentation-loading,
+.presentation-error {
+  color: #fff;
+  text-align: center;
+  font-size: 1.25rem;
+}
+
+.presentation-error button {
+  margin-top: 1rem;
+  padding: 0.5rem 1.5rem;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.presentation-error button:hover {
+  background: #444;
+}
+
+/* Viewport container - scaled via CSS transform (like React Flow) */
+.presentation-viewport {
+  /* Size and transform are set via inline styles */
+  flex-shrink: 0;
+}
+
+/* Slide wrapper - contains theme tokens as CSS variables */
+.presentation-slide-wrapper {
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+}
+
+.presentation-slide-wrapper deck-slide {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Progress indicator - bottom center */
+.presentation-progress {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.presentation:hover .presentation-progress {
+  opacity: 1;
+}
+
+.presentation-progress-text {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(8px);
+}
+
+/* Navigation controls - left/right edges */
+.presentation-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.presentation:hover .presentation-controls {
+  opacity: 1;
+}
+
+.presentation-nav {
+  pointer-events: auto;
+  width: 48px;
+  height: 48px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+  backdrop-filter: blur(8px);
+}
+
+.presentation-nav:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
+}
+
+.presentation-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Exit button - top right */
+.presentation-exit {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.15s ease;
+  backdrop-filter: blur(8px);
+}
+
+.presentation:hover .presentation-exit {
+  opacity: 1;
+}
+
+.presentation-exit:hover {
+  background: rgba(255, 0, 0, 0.5);
+}

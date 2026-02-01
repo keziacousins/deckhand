@@ -9,6 +9,7 @@ interface NumberFieldProps {
   max?: number;
   step?: number;
   placeholder?: string;
+  suffix?: string;
 }
 
 export function NumberField({
@@ -19,6 +20,7 @@ export function NumberField({
   max,
   step = 1,
   placeholder,
+  suffix,
 }: NumberFieldProps) {
   // Local state for editing - allows empty string while typing
   const [localValue, setLocalValue] = useState(String(value));
@@ -62,20 +64,23 @@ export function NumberField({
   return (
     <div className="inspector-field">
       <label className="inspector-field-label">{label}</label>
-      <input
-        type="text"
-        inputMode="numeric"
-        className="inspector-field-input"
-        value={localValue}
-        onChange={handleChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        min={min}
-        max={max}
-        step={step}
-        placeholder={placeholder}
-      />
+      <div className={`inspector-field-input-wrapper ${suffix ? 'has-suffix' : ''}`}>
+        <input
+          type="text"
+          inputMode="numeric"
+          className="inspector-field-input"
+          value={localValue}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          min={min}
+          max={max}
+          step={step}
+          placeholder={placeholder}
+        />
+        {suffix && <span className="inspector-field-suffix">{suffix}</span>}
+      </div>
     </div>
   );
 }

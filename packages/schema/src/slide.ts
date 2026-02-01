@@ -37,6 +37,36 @@ export const GridSchema = z.object({
 export type Grid = z.infer<typeof GridSchema>;
 
 /**
+ * Background size options for slide background images
+ * - 'fill': Zoom to fill the slide (may crop) - maps to CSS 'cover'
+ * - 'fit-width': Fit to slide width (may have vertical gaps) - maps to CSS '100% auto'
+ * - 'fit-height': Fit to slide height (may have horizontal gaps) - maps to CSS 'auto 100%'
+ */
+export const BackgroundSizeSchema = z.enum(['fill', 'fit-width', 'fit-height']);
+
+export type BackgroundSize = z.infer<typeof BackgroundSizeSchema>;
+
+/**
+ * Slide style overrides - override theme tokens per slide
+ */
+export const SlideStyleSchema = z.object({
+  // Color overrides
+  background: z.string().optional(),
+  textPrimary: z.string().optional(),
+  textSecondary: z.string().optional(),
+  accent: z.string().optional(),
+  
+  // Background image
+  backgroundImage: z.string().optional(),
+  backgroundSize: BackgroundSizeSchema.optional(),
+  backgroundPosition: z.string().optional(),
+  backgroundDarken: z.number().min(0).max(100).optional(), // 0-100%
+  backgroundBlur: z.number().min(0).max(20).optional(), // 0-20px
+});
+
+export type SlideStyle = z.infer<typeof SlideStyleSchema>;
+
+/**
  * Slide layout configuration
  */
 export const SlideLayoutSchema = z.object({
@@ -58,12 +88,6 @@ export const SlideLayoutSchema = z.object({
   
   // Gap between components (if not using grid)
   gap: z.string().optional(),
-
-  // Background (can override theme)
-  backgroundColor: z.string().optional(),
-  backgroundImage: z.string().optional(),
-  backgroundSize: z.enum(['cover', 'contain', 'auto']).optional(),
-  backgroundPosition: z.string().optional(),
 });
 
 export type SlideLayout = z.infer<typeof SlideLayoutSchema>;
@@ -91,6 +115,7 @@ export const SlideSchema = z.object({
   id: z.string(),
   title: z.string(),
   layout: SlideLayoutSchema.optional(),
+  style: SlideStyleSchema.optional(),
   gridColumns: z.number().min(1).max(12).optional(), // Override deck default
   components: z.array(ComponentSchema),
   position: PositionSchema,
@@ -148,11 +173,39 @@ export function layoutToCssProperties(layout: SlideLayout): Record<string, strin
   if (layout.justifyContent) props['justify-content'] = layout.justifyContent;
   if (layout.gap) props['gap'] = layout.gap;
 
-  // Background
-  if (layout.backgroundColor) props['background-color'] = layout.backgroundColor;
-  if (layout.backgroundImage) props['background-image'] = `url(${layout.backgroundImage})`;
-  if (layout.backgroundSize) props['background-size'] = layout.backgroundSize;
-  if (layout.backgroundPosition) props['background-position'] = layout.backgroundPosition;
+  return props;
+}
+
+/**
+ * Map background size values to CSS background-size property values.
+ */
+export function backgroundSizeToCss(size: BackgroundSize): string {
+  switch (size) {
+    case 'fill':
+      return 'cover';
+    case 'fit-width':
+      return '100% auto';
+    case 'fit-height':
+      return 'auto 100%';
+  }
+}
+
+/**
+ * Convert slide style to CSS custom properties (theme token overrides).
+ */
+export function styleToCssProperties(style: SlideStyle): Record<string, string> {
+  const props: Record<string, string> = {};
+
+  // Color overrides - map to theme token CSS variables
+  if (style.background) props['--deck-color-background'] = style.background;
+  if (style.textPrimary) props['--deck-color-text-primary'] = style.textPrimary;
+  if (style.textSecondary) props['--deck-color-text-secondary'] = style.textSecondary;
+  if (style.accent) props['--deck-color-accent'] = style.accent;
+
+  // Background image
+  if (style.backgroundImage) props['background-image'] = `url(${style.backgroundImage})`;
+  if (style.backgroundSize) props['background-size'] = backgroundSizeToCss(style.backgroundSize);
+  if (style.backgroundPosition) props['background-position'] = style.backgroundPosition;
 
   return props;
 }

@@ -1,18 +1,33 @@
 import { useState, useEffect } from 'react';
 import { DeckList } from './pages/DeckList';
 import { DeckEditor } from './pages/DeckEditor';
+import { Presentation } from './pages/Presentation';
 import './styles/global.css';
 
 type Route =
   | { type: 'list' }
-  | { type: 'editor'; deckId: string };
+  | { type: 'editor'; deckId: string }
+  | { type: 'present'; deckId: string; startSlideId?: string };
 
 function parseRoute(): Route {
   const hash = window.location.hash;
-  const match = hash.match(/^#\/deck\/(.+)$/);
-  if (match) {
-    return { type: 'editor', deckId: match[1] };
+  
+  // Match /deck/:id/present or /deck/:id/present/:slideId
+  const presentMatch = hash.match(/^#\/deck\/([^/]+)\/present(?:\/(.+))?$/);
+  if (presentMatch) {
+    return { 
+      type: 'present', 
+      deckId: presentMatch[1], 
+      startSlideId: presentMatch[2] 
+    };
   }
+  
+  // Match /deck/:id
+  const editorMatch = hash.match(/^#\/deck\/([^/]+)$/);
+  if (editorMatch) {
+    return { type: 'editor', deckId: editorMatch[1] };
+  }
+  
   return { type: 'list' };
 }
 
@@ -34,6 +49,16 @@ export function App() {
       window.location.hash = `/deck/${newRoute.deckId}`;
     }
   };
+
+  if (route.type === 'present') {
+    return (
+      <Presentation
+        deckId={route.deckId}
+        startSlideId={route.startSlideId}
+        onExit={() => navigateTo({ type: 'editor', deckId: route.deckId })}
+      />
+    );
+  }
 
   if (route.type === 'editor') {
     return (

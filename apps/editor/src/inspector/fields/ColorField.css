@@ -1,0 +1,30 @@
+.color-field-inputs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-field-picker {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: none;
+}
+
+.color-field-picker::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.color-field-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+}
+
+.color-field-text {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

@@ -62,12 +62,13 @@
 
   /* Slide nodes on canvas */
   --node-bg: var(--color-white);
-  --node-border: var(--color-gray-300);
-  --node-border-hover: var(--color-gray-400);
+  --node-border: var(--color-gray-400);
+  --node-border-hover: var(--color-gray-500);
   --node-border-selected: var(--color-blue-500);
-  --node-shadow: var(--shadow-sm);
-  --node-shadow-hover: var(--shadow-md);
-  --node-shadow-selected: var(--shadow-lg);
+  --node-border-selected-strong: var(--color-blue-600);
+  --node-shadow: var(--shadow-md);
+  --node-shadow-hover: var(--shadow-lg);
+  --node-shadow-selected: 0 12px 32px rgba(59, 130, 246, 0.25), 0 8px 16px rgba(0, 0, 0, 0.15);
 
   /* Canvas */
   --canvas-bg: var(--color-gray-600);
@@ -83,10 +84,10 @@
   --canvas-overlay-bg: rgba(255, 255, 255, 0.1);
   --canvas-overlay-separator: rgba(255, 255, 255, 0.2);
 
-  /* Edges - visible on dark canvas */
-  --edge-stroke: var(--color-gray-400);
-  --edge-stroke-hover: var(--color-gray-300);
-  --edge-stroke-selected: var(--color-blue-400);
+  /* Edges - darker in light mode for visibility */
+  --edge-stroke: var(--color-gray-500);
+  --edge-stroke-hover: var(--color-gray-600);
+  --edge-stroke-selected: var(--color-blue-500);
 
   /* Scrollbar */
   --scrollbar-thumb: var(--color-gray-300);
@@ -161,12 +162,13 @@
 
     /* Nodes */
     --node-bg: var(--color-gray-800);
-    --node-border: var(--color-gray-600);
-    --node-border-hover: var(--color-gray-500);
+    --node-border: var(--color-gray-500);
+    --node-border-hover: var(--color-gray-400);
     --node-border-selected: var(--color-blue-400);
-    --node-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --node-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
-    --node-shadow-selected: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --node-border-selected-strong: var(--color-blue-300);
+    --node-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --node-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.5);
+    --node-shadow-selected: 0 12px 32px rgba(96, 165, 250, 0.3), 0 8px 16px rgba(0, 0, 0, 0.4);
 
     /* Canvas */
     --canvas-bg: var(--color-gray-600);
@@ -174,9 +176,9 @@
     --canvas-selection-bg: rgba(54, 159, 250, 0.15);
     --canvas-selection-border: rgba(54, 159, 250, 0.7);
 
-    /* Edges */
-    --edge-stroke: var(--color-gray-400);
-    --edge-stroke-hover: var(--color-gray-300);
+    /* Edges - brighter in dark mode for visibility */
+    --edge-stroke: var(--color-gray-300);
+    --edge-stroke-hover: var(--color-gray-200);
     --edge-stroke-selected: var(--color-blue-400);
 
     /* Scrollbar */

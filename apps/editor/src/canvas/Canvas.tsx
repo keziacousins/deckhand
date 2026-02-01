@@ -7,6 +7,7 @@ import {
   useEdgesState,
   useReactFlow,
   useStoreApi,
+  MarkerType,
   type Edge,
   type Connection,
   type OnSelectionChangeParams,
@@ -31,6 +32,8 @@ interface CanvasProps {
   onUpdateDeck: (updater: (deck: Deck) => Deck) => void;
   onBack: () => void;
   onNameChange: (name: string) => void;
+  onPlayFullscreen: () => void;
+  onPlayWindow: () => void;
   inspectorVisible: boolean;
   onToggleInspector: () => void;
   showGrid?: boolean;
@@ -41,6 +44,8 @@ export function Canvas({
   onUpdateDeck,
   onBack,
   onNameChange,
+  onPlayFullscreen,
+  onPlayWindow,
   inspectorVisible,
   onToggleInspector,
   showGrid,
@@ -53,6 +58,9 @@ export function Canvas({
 
   // Track connection start for drop-on-node
   const connectStartRef = useRef<{ nodeId: string; handleId: string | null } | null>(null);
+
+  // Flag to ignore selection changes during programmatic node updates
+  const isUpdatingNodesRef = useRef(false);
 
   // LOD (Level of Detail) - show overview when zoomed out
   const DETAIL_ZOOM_THRESHOLD = 0.4;
@@ -100,6 +108,9 @@ export function Canvas({
 
   // Sync nodes when deck changes - merge to preserve React Flow's internal state
   useEffect(() => {
+    // Set flag to ignore selection changes during this update
+    isUpdatingNodesRef.current = true;
+    
     setNodes((currentNodes) => {
       const currentById = new Map(currentNodes.map((n) => [n.id, n]));
       
@@ -128,6 +139,11 @@ export function Canvas({
       
       return newNodes;
     });
+    
+    // Clear flag after a microtask to allow React Flow to process the update
+    queueMicrotask(() => {
+      isUpdatingNodesRef.current = false;
+    });
   }, [deckNodes, setNodes]);
 
   // Sync edges when deck changes
@@ -147,6 +163,11 @@ export function Canvas({
 
   const onSelectionChange = useCallback(
     ({ nodes }: OnSelectionChangeParams) => {
+      // Ignore selection changes during programmatic node updates
+      if (isUpdatingNodesRef.current) {
+        return;
+      }
+      
       if (nodes.length === 1) {
         selectSlide(nodes[0].id);
       } else if (nodes.length === 0) {
@@ -506,6 +527,11 @@ export function Canvas({
         snapGrid={[10, 10]}
         defaultEdgeOptions={{
           type: 'smoothstep',
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,
+            height: 20,
+          },
         }}
       >
         <Background
@@ -521,6 +547,8 @@ export function Canvas({
           onBack={onBack}
           onNameChange={onNameChange}
           onAddSlide={() => addSlide()}
+          onPlayFullscreen={onPlayFullscreen}
+          onPlayWindow={onPlayWindow}
           inspectorVisible={inspectorVisible}
           onToggleInspector={onToggleInspector}
         />

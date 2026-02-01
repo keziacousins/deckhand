@@ -3,10 +3,14 @@ import type { Deck, Component, AspectRatio } from '@deckhand/schema';
 import { useSelection } from '../selection';
 import { registry } from '@deckhand/components';
 import type { InspectorContext, InspectorUpdate, InspectorTab } from './types';
+import { InspectorExpansionProvider } from './context/InspectorExpansionContext';
 import { SlidePropertiesSection } from './sections/SlidePropertiesSection';
-import { DeckPropertiesSection } from './sections/DeckPropertiesSection';
+import { BackgroundSection } from './sections/BackgroundSection';
+import { ColorsSection } from './sections/ColorsSection';
 import { ComponentList } from './sections/ComponentList';
 import { ComponentBrowser } from './sections/ComponentBrowser';
+import { ThemeSection } from './sections/ThemeSection';
+import { AssetsSection } from './sections/AssetsSection';
 import './Inspector.css';
 
 // Generate a simple unique ID
@@ -48,6 +52,27 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
               slides: {
                 ...d.slides,
                 [update.slideId]: newSlide,
+              },
+            };
+          }
+
+          // Handle style updates - merge with existing style
+          if (update.field === 'style') {
+            const newStyle = { ...slide.style, ...update.value };
+            // Clean up undefined values
+            for (const key of Object.keys(newStyle)) {
+              if (newStyle[key as keyof typeof newStyle] === undefined) {
+                delete newStyle[key as keyof typeof newStyle];
+              }
+            }
+            return {
+              ...d,
+              slides: {
+                ...d.slides,
+                [update.slideId]: {
+                  ...slide,
+                  style: Object.keys(newStyle).length > 0 ? newStyle : undefined,
+                },
               },
             };
           }
@@ -107,6 +132,36 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
               gridColumns: update.value as number,
             };
           }
+          if (update.field === 'assets') {
+            return {
+              ...d,
+              assets: update.value as typeof d.assets,
+            };
+          }
+        }
+
+        if (update.type === 'theme') {
+          // Handle theme name separately
+          if (update.field === 'name') {
+            return {
+              ...d,
+              theme: {
+                ...d.theme,
+                name: update.value as string,
+              },
+            };
+          }
+          // Handle token updates
+          return {
+            ...d,
+            theme: {
+              ...d.theme,
+              tokens: {
+                ...d.theme.tokens,
+                [update.field]: update.value,
+              },
+            },
+          };
         }
 
         return d;
@@ -247,114 +302,114 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
   const hasSlideSelected = context.selectedSlide !== null;
 
   return (
-    <div className={`inspector ${visible ? 'inspector-visible' : ''}`}>
-      <div className="inspector-header">
-        <div className="inspector-tabs">
-          <button
-            className={`inspector-tab ${activeTab === 'slide' ? 'inspector-tab-active' : ''}`}
-            onClick={() => setActiveTab('slide')}
-          >
-            Slide
-          </button>
-          <button
-            className={`inspector-tab ${activeTab === 'deck' ? 'inspector-tab-active' : ''}`}
-            onClick={() => setActiveTab('deck')}
-          >
-            Deck
-          </button>
-          <button
-            className={`inspector-tab ${activeTab === 'json' ? 'inspector-tab-active' : ''}`}
-            onClick={() => setActiveTab('json')}
-          >
-            JSON
-          </button>
-        </div>
-        <button className="inspector-close" onClick={onClose} title="Close Inspector">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M4 4l8 8M12 4l-8 8"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <div className="inspector-content">
-        {activeTab === 'slide' && (
-          <>
-            {!hasSlideSelected ? (
-              <div className="inspector-empty">Select a slide to edit</div>
-            ) : (
-              <>
-                <SlidePropertiesSection context={context} />
-                <ComponentList context={context} />
-              </>
-            )}
-          </>
-        )}
-
-        {activeTab === 'deck' && (
-          <>
-            <DeckPropertiesSection context={context} />
-            {onToggleShowGrid && (
-              <div className="inspector-section">
-                <div className="inspector-section-header">Debug</div>
-                <div className="inspector-section-content">
-                  <div className="inspector-field inspector-field-checkbox">
-                    <label className="inspector-checkbox-label">
-                      <input
-                        type="checkbox"
-                        className="inspector-checkbox-input"
-                        checked={showGrid ?? false}
-                        onChange={onToggleShowGrid}
-                      />
-                      <span className="inspector-checkbox-text">Show Grid Overlay</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {activeTab === 'json' && (
-          <div className="inspector-json">
-            <pre className="inspector-json-content">
-              {JSON.stringify(deck, null, 2)}
-            </pre>
+    <InspectorExpansionProvider>
+      <div className={`inspector ${visible ? 'inspector-visible' : ''}`}>
+        <div className="inspector-header">
+          <div className="inspector-tabs">
+            <button
+              className={`inspector-tab ${activeTab === 'slide' ? 'inspector-tab-active' : ''}`}
+              onClick={() => setActiveTab('slide')}
+            >
+              Slide
+            </button>
+            <button
+              className={`inspector-tab ${activeTab === 'theme' ? 'inspector-tab-active' : ''}`}
+              onClick={() => setActiveTab('theme')}
+            >
+              Theme
+            </button>
+            <button
+              className={`inspector-tab ${activeTab === 'assets' ? 'inspector-tab-active' : ''}`}
+              onClick={() => setActiveTab('assets')}
+            >
+              Assets
+            </button>
           </div>
-        )}
-      </div>
-
-      {/* Add Component Button - only show on slide tab when slide is selected */}
-      {activeTab === 'slide' && hasSlideSelected && (
-        <div className="inspector-footer">
-          <button
-            className="inspector-add-button"
-            onClick={() => setShowComponentBrowser(true)}
-          >
+          <button className="inspector-close" onClick={onClose} title="Close Inspector">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path
-                d="M8 3v10M3 8h10"
+                d="M4 4l8 8M12 4l-8 8"
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
               />
             </svg>
-            Add Component
           </button>
         </div>
-      )}
 
-      {/* Component Browser Modal */}
-      {showComponentBrowser && (
-        <ComponentBrowser
-          onSelect={handleAddComponent}
-          onClose={() => setShowComponentBrowser(false)}
-        />
-      )}
-    </div>
+        <div className="inspector-content">
+          {activeTab === 'slide' && (
+            <>
+              {!hasSlideSelected ? (
+                <div className="inspector-empty">Select a slide to edit</div>
+              ) : (
+                <>
+                  <SlidePropertiesSection context={context} />
+                  <BackgroundSection context={context} />
+                  <ColorsSection context={context} />
+                  <ComponentList context={context} />
+                </>
+              )}
+            </>
+          )}
+
+          {activeTab === 'theme' && (
+            <>
+              <ThemeSection context={context} />
+              {onToggleShowGrid && (
+                <div className="inspector-section">
+                  <div className="inspector-section-header">Debug</div>
+                  <div className="inspector-section-content">
+                    <div className="inspector-field inspector-field-checkbox">
+                      <label className="inspector-checkbox-label">
+                        <input
+                          type="checkbox"
+                          className="inspector-checkbox-input"
+                          checked={showGrid ?? false}
+                          onChange={onToggleShowGrid}
+                        />
+                        <span className="inspector-checkbox-text">Show Grid Overlay</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === 'assets' && (
+            <AssetsSection context={context} />
+          )}
+        </div>
+
+        {/* Add Component Button - only show on slide tab when slide is selected */}
+        {activeTab === 'slide' && hasSlideSelected && (
+          <div className="inspector-footer">
+            <button
+              className="inspector-add-button"
+              onClick={() => setShowComponentBrowser(true)}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 3v10M3 8h10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Add Component
+            </button>
+          </div>
+        )}
+
+        {/* Component Browser Modal */}
+        {showComponentBrowser && (
+          <ComponentBrowser
+            onSelect={handleAddComponent}
+            onClose={() => setShowComponentBrowser(false)}
+          />
+        )}
+      </div>
+    </InspectorExpansionProvider>
   );
 }

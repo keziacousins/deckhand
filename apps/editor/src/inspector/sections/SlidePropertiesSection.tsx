@@ -2,6 +2,10 @@ import type { InspectorSectionProps } from '../types';
 import { DEFAULT_GRID_COLUMNS } from '@deckhand/schema';
 import { TextField, NumberField, CheckboxField } from '../fields';
 
+/**
+ * SlidePropertiesSection - Always visible slide properties (title, notes, grid)
+ * Background and Colors are now separate CollapsibleSection components
+ */
 export function SlidePropertiesSection({ context }: InspectorSectionProps) {
   const { deck, selectedSlide, onUpdate, selection } = context;
   if (!selectedSlide || !selection.slideId) return null;
@@ -31,10 +35,8 @@ export function SlidePropertiesSection({ context }: InspectorSectionProps) {
           value={hasCustomGrid}
           onChange={(value) => {
             if (value) {
-              // Set to deck default when enabling override
               onUpdate({ type: 'slide', slideId, field: 'gridColumns', value: deck.gridColumns ?? DEFAULT_GRID_COLUMNS });
             } else {
-              // Clear override to use deck default
               onUpdate({ type: 'slide', slideId, field: 'gridColumns', value: undefined });
             }
           }}

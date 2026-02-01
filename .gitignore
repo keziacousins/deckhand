@@ -26,3 +26,16 @@ npm-debug.log*
 
 # Reference code (not part of project)
 reference-code/
+
+# Data directories
+apps/server/data/
+apps/server/deck-data/
+
+# Database files
+*.db
+*.db-journal
+
+# Test compilation artifacts
+**/__tests__/*.js
+**/__tests__/*.d.ts
+**/__tests__/*.d.ts.map

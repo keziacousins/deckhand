@@ -287,6 +287,9 @@ export function Canvas({
   // Track connection start for drop-on-node
   const onConnectStart = useCallback(
     (_: unknown, { nodeId, handleId }: { nodeId: string | null; handleId: string | null }) => {
+      // Don't track if we're reconnecting an existing edge
+      if (isReconnectingRef.current) return;
+      
       if (nodeId) {
         connectStartRef.current = { nodeId, handleId };
       }
@@ -297,6 +300,9 @@ export function Canvas({
   // Handle drop-on-node connections
   const onConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent) => {
+      // Don't handle if we're reconnecting an existing edge
+      if (isReconnectingRef.current) return;
+      
       const startInfo = connectStartRef.current;
       connectStartRef.current = null;
       if (!startInfo) return;

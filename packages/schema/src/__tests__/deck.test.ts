@@ -5,13 +5,19 @@ import {
   AspectRatioSchema,
   EdgeSchema,
   FlowSchema,
+  TransitionTypeSchema,
+  StartPointSchema,
+  StartPointsMapSchema,
   DEFAULT_GRID_COLUMNS,
+  DEFAULT_TRANSITION_DURATION,
   SLIDE_WIDTH,
   SLIDE_HEIGHTS,
   getSlideHeight,
   createEmptyDeck,
   generateDeckId,
   generateEdgeId,
+  generateStartPointId,
+  createStartPoint,
   validateDeck,
 } from '../deck';
 import { defaultTheme } from '../theme';
@@ -68,6 +74,24 @@ describe('AspectRatioSchema', () => {
   });
 });
 
+describe('TransitionTypeSchema', () => {
+  it('accepts all valid transition types', () => {
+    expect(TransitionTypeSchema.parse('instant')).toBe('instant');
+    expect(TransitionTypeSchema.parse('slide-left')).toBe('slide-left');
+    expect(TransitionTypeSchema.parse('slide-right')).toBe('slide-right');
+    expect(TransitionTypeSchema.parse('slide-up')).toBe('slide-up');
+    expect(TransitionTypeSchema.parse('slide-down')).toBe('slide-down');
+    expect(TransitionTypeSchema.parse('cross-fade')).toBe('cross-fade');
+    expect(TransitionTypeSchema.parse('fade-through-black')).toBe('fade-through-black');
+  });
+
+  it('rejects invalid transition types', () => {
+    expect(() => TransitionTypeSchema.parse('fade')).toThrow();
+    expect(() => TransitionTypeSchema.parse('dissolve')).toThrow();
+    expect(() => TransitionTypeSchema.parse('')).toThrow();
+  });
+});
+
 describe('EdgeSchema', () => {
   it('validates default trigger', () => {
     const edge = {
@@ -99,6 +123,102 @@ describe('EdgeSchema', () => {
     };
     expect(() => EdgeSchema.parse(edge)).toThrow();
   });
+
+  it('validates edge with transition override', () => {
+    const edge = {
+      id: 'edge-1',
+      from: 'slide-1',
+      to: 'slide-2',
+      trigger: 'default',
+      transition: 'cross-fade',
+      transitionDuration: 0.5,
+    };
+    const result = EdgeSchema.parse(edge);
+    expect(result.transition).toBe('cross-fade');
+    expect(result.transitionDuration).toBe(0.5);
+  });
+
+  it('allows fractional transition durations', () => {
+    const edge = {
+      id: 'edge-1',
+      from: 'slide-1',
+      to: 'slide-2',
+      trigger: 'default',
+      transitionDuration: 0.1,
+    };
+    expect(EdgeSchema.parse(edge).transitionDuration).toBe(0.1);
+  });
+
+  it('rejects negative transition durations', () => {
+    const edge = {
+      id: 'edge-1',
+      from: 'slide-1',
+      to: 'slide-2',
+      trigger: 'default',
+      transitionDuration: -0.5,
+    };
+    expect(() => EdgeSchema.parse(edge)).toThrow();
+  });
+});
+
+describe('StartPointSchema', () => {
+  it('validates a valid start point', () => {
+    const startPoint = {
+      id: 'start-1',
+      name: 'Full Presentation',
+      position: { x: 100, y: 200 },
+    };
+    expect(StartPointSchema.parse(startPoint)).toEqual(startPoint);
+  });
+
+  it('rejects name longer than 50 characters', () => {
+    const startPoint = {
+      id: 'start-1',
+      name: 'A'.repeat(51),
+      position: { x: 0, y: 0 },
+    };
+    expect(() => StartPointSchema.parse(startPoint)).toThrow();
+  });
+
+  it('accepts name at exactly 50 characters', () => {
+    const startPoint = {
+      id: 'start-1',
+      name: 'A'.repeat(50),
+      position: { x: 0, y: 0 },
+    };
+    expect(StartPointSchema.parse(startPoint).name.length).toBe(50);
+  });
+
+  it('rejects missing position', () => {
+    const startPoint = {
+      id: 'start-1',
+      name: 'Test',
+    };
+    expect(() => StartPointSchema.parse(startPoint)).toThrow();
+  });
+});
+
+describe('StartPointsMapSchema', () => {
+  it('validates a map of start points', () => {
+    const startPoints = {
+      'start-1': {
+        id: 'start-1',
+        name: 'Full Demo',
+        position: { x: 0, y: 0 },
+      },
+      'start-2': {
+        id: 'start-2',
+        name: 'Quick Overview',
+        position: { x: 200, y: 0 },
+      },
+    };
+    const result = StartPointsMapSchema.parse(startPoints);
+    expect(Object.keys(result)).toHaveLength(2);
+  });
+
+  it('validates empty map', () => {
+    expect(StartPointsMapSchema.parse({})).toEqual({});
+  });
 });
 
 describe('FlowSchema', () => {
@@ -123,6 +243,53 @@ describe('FlowSchema', () => {
       entrySlide: 'slide-1',
     };
     expect(FlowSchema.parse(flow)).toEqual(flow);
+  });
+
+  it('validates flow with start points', () => {
+    const flow = {
+      edges: {},
+      entrySlide: 'slide-1',
+      startPoints: {
+        'start-1': {
+          id: 'start-1',
+          name: 'Full Demo',
+          position: { x: -200, y: 0 },
+        },
+      },
+    };
+    const result = FlowSchema.parse(flow);
+    expect(result.startPoints?.['start-1'].name).toBe('Full Demo');
+  });
+
+  it('validates flow with default transition settings', () => {
+    const flow = {
+      edges: {},
+      entrySlide: 'slide-1',
+      defaultTransition: 'cross-fade',
+      defaultTransitionDuration: 0.5,
+    };
+    const result = FlowSchema.parse(flow);
+    expect(result.defaultTransition).toBe('cross-fade');
+    expect(result.defaultTransitionDuration).toBe(0.5);
+  });
+
+  it('allows optional transition settings', () => {
+    const flow = {
+      edges: {},
+      entrySlide: 'slide-1',
+    };
+    const result = FlowSchema.parse(flow);
+    expect(result.defaultTransition).toBeUndefined();
+    expect(result.defaultTransitionDuration).toBeUndefined();
+  });
+
+  it('rejects negative default transition duration', () => {
+    const flow = {
+      edges: {},
+      entrySlide: 'slide-1',
+      defaultTransitionDuration: -1,
+    };
+    expect(() => FlowSchema.parse(flow)).toThrow();
   });
 });
 
@@ -241,6 +408,48 @@ describe('generateEdgeId', () => {
   it('generates ID with edge- prefix', () => {
     const id = generateEdgeId();
     expect(id).toMatch(/^edge-[a-f0-9]{8}$/);
+  });
+});
+
+describe('generateStartPointId', () => {
+  it('generates ID with start- prefix', () => {
+    const id = generateStartPointId();
+    expect(id).toMatch(/^start-[a-f0-9]{8}$/);
+  });
+
+  it('generates unique IDs', () => {
+    const ids = new Set(Array.from({ length: 100 }, () => generateStartPointId()));
+    expect(ids.size).toBe(100);
+  });
+});
+
+describe('createStartPoint', () => {
+  it('creates a start point with given name', () => {
+    const sp = createStartPoint('Full Demo');
+    expect(sp.name).toBe('Full Demo');
+    expect(sp.id).toMatch(/^start-/);
+  });
+
+  it('creates a start point with default position', () => {
+    const sp = createStartPoint('Test');
+    expect(sp.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('creates a start point with custom position', () => {
+    const sp = createStartPoint('Test', { x: 100, y: 200 });
+    expect(sp.position).toEqual({ x: 100, y: 200 });
+  });
+
+  it('creates a valid start point', () => {
+    const sp = createStartPoint('Valid Point');
+    const result = StartPointSchema.safeParse(sp);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('DEFAULT_TRANSITION_DURATION', () => {
+  it('is 0.3 seconds', () => {
+    expect(DEFAULT_TRANSITION_DURATION).toBe(0.3);
   });
 });
 

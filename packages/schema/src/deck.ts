@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SlideSchema, SlidesMapSchema } from './slide';
+import { SlideSchema, SlidesMapSchema, PositionSchema } from './slide';
 import { ThemeSchema, defaultTheme } from './theme';
 
 /**
@@ -16,6 +16,21 @@ export const DeckMetaSchema = z.object({
 export type DeckMeta = z.infer<typeof DeckMetaSchema>;
 
 /**
+ * Transition types for slide navigation
+ */
+export const TransitionTypeSchema = z.enum([
+  'instant',           // No animation (default)
+  'slide-left',        // New slide enters from right
+  'slide-right',       // New slide enters from left
+  'slide-up',          // New slide enters from bottom
+  'slide-down',        // New slide enters from top
+  'cross-fade',        // Simultaneous fade out/in
+  'fade-through-black', // Fade to black, then fade in
+]);
+
+export type TransitionType = z.infer<typeof TransitionTypeSchema>;
+
+/**
  * Edge trigger types
  */
 export const EdgeTriggerSchema = z.union([
@@ -26,24 +41,47 @@ export const EdgeTriggerSchema = z.union([
 export type EdgeTrigger = z.infer<typeof EdgeTriggerSchema>;
 
 /**
- * Navigation edge between slides
+ * Navigation edge between slides (or from start point to slide)
  */
 export const EdgeSchema = z.object({
   id: z.string(),
-  from: z.string(), // Slide ID
+  from: z.string(), // Slide ID or StartPoint ID
   to: z.string(), // Slide ID
   trigger: EdgeTriggerSchema,
   label: z.string().optional(),
+  transition: TransitionTypeSchema.optional(),        // Overrides deck default
+  transitionDuration: z.number().min(0).optional(),   // Seconds, overrides deck default
 });
 
 export type Edge = z.infer<typeof EdgeSchema>;
 
 /**
- * Flow definition - edges and entry point
+ * Start point - named entry point for presentations
+ */
+export const StartPointSchema = z.object({
+  id: z.string(),
+  name: z.string().max(50),
+  position: PositionSchema, // Canvas position
+});
+
+export type StartPoint = z.infer<typeof StartPointSchema>;
+
+/**
+ * Start points map
+ */
+export const StartPointsMapSchema = z.record(z.string(), StartPointSchema);
+
+export type StartPointsMap = z.infer<typeof StartPointsMapSchema>;
+
+/**
+ * Flow definition - edges, entry point, start points, and transition defaults
  */
 export const FlowSchema = z.object({
   edges: z.record(z.string(), EdgeSchema),
   entrySlide: z.string(),
+  startPoints: StartPointsMapSchema.optional(),
+  defaultTransition: TransitionTypeSchema.optional(),     // Defaults to 'instant'
+  defaultTransitionDuration: z.number().min(0).optional(), // Seconds, defaults to 0.3
 });
 
 export type Flow = z.infer<typeof FlowSchema>;
@@ -122,6 +160,32 @@ export function generateDeckId(): string {
 export function generateEdgeId(): string {
   return `edge-${crypto.randomUUID().slice(0, 8)}`;
 }
+
+/**
+ * Generate a new start point ID
+ */
+export function generateStartPointId(): string {
+  return `start-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+/**
+ * Create a new start point
+ */
+export function createStartPoint(
+  name: string,
+  position: { x: number; y: number } = { x: 0, y: 0 }
+): StartPoint {
+  return {
+    id: generateStartPointId(),
+    name,
+    position,
+  };
+}
+
+/**
+ * Default transition duration in seconds
+ */
+export const DEFAULT_TRANSITION_DURATION = 0.3;
 
 /**
  * Create a new empty deck

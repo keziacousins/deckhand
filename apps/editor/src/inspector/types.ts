@@ -23,6 +23,7 @@ export type InspectorUpdate =
   | { type: 'deck'; field: 'aspectRatio'; value: AspectRatio }
   | { type: 'deck'; field: 'gridColumns'; value: number }
   | { type: 'deck'; field: 'assets'; value: Record<string, unknown> }
+  | { type: 'addAsset'; asset: unknown }
   | { type: 'theme'; field: string; value: string | number | undefined };
 
 export interface InspectorSectionProps {

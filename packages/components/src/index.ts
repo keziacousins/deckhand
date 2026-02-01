@@ -21,12 +21,16 @@ export { DeckSlide } from './components/deck-slide';
 export { DeckTitle } from './components/deck-title';
 export { DeckHeadlineSubhead } from './components/deck-headline-subhead';
 export { DeckText } from './components/deck-text';
+export { DeckList } from './components/deck-list';
+export { DeckImage } from './components/deck-image';
 
 // Import components for registration
 import { DeckSlide } from './components/deck-slide';
 import { DeckTitle } from './components/deck-title';
 import { DeckHeadlineSubhead } from './components/deck-headline-subhead';
 import { DeckText } from './components/deck-text';
+import { DeckList } from './components/deck-list';
+import { DeckImage } from './components/deck-image';
 import { registry } from './registry';
 
 /**
@@ -39,6 +43,8 @@ export function registerComponents(): void {
   registry.add(DeckTitle);
   registry.add(DeckHeadlineSubhead);
   registry.add(DeckText);
+  registry.add(DeckList);
+  registry.add(DeckImage);
   
   // Define custom elements
   registry.registerAll();

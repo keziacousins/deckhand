@@ -6,11 +6,13 @@
  */
 
 import type { PropertyDescriptor } from '@deckhand/components';
+import type { Asset } from '@deckhand/schema';
 import { TextField } from './TextField';
 import { SelectField } from './SelectField';
 import { NumberField } from './NumberField';
 import { CheckboxField } from './CheckboxField';
 import { ColorField } from './ColorField';
+import { AssetPickerField } from './AssetPickerField';
 
 /** Rich text span type matching the schema */
 interface RichTextSpan {
@@ -42,6 +44,8 @@ interface PropertyEditorProps {
   value: unknown;
   /** Called when value changes */
   onChange: (value: unknown) => void;
+  /** Assets map for asset picker (required for 'asset' type) */
+  assets?: Record<string, Asset>;
 }
 
 export function PropertyEditor({
@@ -49,6 +53,7 @@ export function PropertyEditor({
   descriptor,
   value,
   onChange,
+  assets,
 }: PropertyEditorProps) {
   const { type, label, placeholder, options, min, max, step, description } = descriptor;
 
@@ -149,14 +154,12 @@ export function PropertyEditor({
       );
 
     case 'asset':
-      // For now, fall back to text input for asset ID/URL
-      // TODO: Implement asset picker
       return (
-        <TextField
+        <AssetPickerField
           label={label}
           value={(value as string) ?? ''}
-          onChange={onChange}
-          placeholder="Asset ID or URL"
+          assets={assets ?? {}}
+          onChange={(v) => onChange(v)}
         />
       );
 

@@ -1,111 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useYDoc } from '../sync';
-import type { Deck, Slide, Component, TransitionType } from '@deckhand/schema';
+import type { Deck, Slide, TransitionType } from '@deckhand/schema';
 import { DEFAULT_GRID_COLUMNS, SLIDE_WIDTH, getSlideHeight, themeToCssProperties, DEFAULT_TRANSITION_DURATION } from '@deckhand/schema';
+import { renderComponent } from '../utils/renderComponent';
 import './Presentation.css';
-
-/**
- * Render a component as a web component element
- */
-function renderComponent(component: Component): JSX.Element | null {
-  const gridWidth = component.props.gridWidth?.toString();
-  
-  switch (component.type) {
-    case 'deck-title':
-      return (
-        <deck-title
-          key={component.id}
-          text={component.props.text}
-          level={component.props.level}
-          align={component.props.align}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-subtitle':
-      return (
-        <deck-subtitle
-          key={component.id}
-          text={component.props.text}
-          align={component.props.align}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-headline-subhead':
-      return (
-        <deck-headline-subhead
-          key={component.id}
-          headline={component.props.headline}
-          subheading={component.props.subheading}
-          category={component.props.category}
-          is-hero={component.props.isHero ? 'true' : undefined}
-          variant={component.props.variant}
-          align={component.props.align}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-text':
-      return (
-        <deck-text
-          key={component.id}
-          content={JSON.stringify(component.props.content)}
-          align={component.props.align}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-image':
-      return (
-        <deck-image
-          key={component.id}
-          asset-id={component.props.assetId}
-          alt={component.props.alt}
-          caption={component.props.caption}
-          fit={component.props.fit}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-list':
-      return (
-        <deck-list
-          key={component.id}
-          items={JSON.stringify(component.props.items)}
-          ordered={component.props.ordered ? 'true' : undefined}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-code':
-      return (
-        <deck-code
-          key={component.id}
-          code={component.props.code}
-          language={component.props.language}
-          show-line-numbers={component.props.showLineNumbers ? 'true' : undefined}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-quote':
-      return (
-        <deck-quote
-          key={component.id}
-          text={component.props.text}
-          attribution={component.props.attribution}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-spacer':
-      return (
-        <deck-spacer
-          key={component.id}
-          height={component.props.height}
-          grid-width={gridWidth}
-        />
-      );
-    case 'deck-columns':
-      // Columns are complex - for now just skip in presentation
-      return null;
-    default:
-      return null;
-  }
-}
 
 interface PresentationProps {
   deckId: string;
@@ -196,6 +94,8 @@ function SlideRenderer({
   const gridColumns = slide.gridColumns ?? deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
   const style = slide.style ?? {};
   const slideHeight = getSlideHeight(deck.aspectRatio);
+  const assets = deck.assets ?? {};
+  const assetsJson = JSON.stringify(assets);
 
   // Apply theme tokens as CSS custom properties (same as SlideNode in editor)
   const themeStyle = themeToCssProperties(deck.theme) as React.CSSProperties;
@@ -214,12 +114,13 @@ function SlideRenderer({
         style-text-primary={style.textPrimary}
         style-text-secondary={style.textSecondary}
         style-accent={style.accent}
-        background-image={style.backgroundImage}
+        background-asset-id={style.backgroundAssetId}
+        assets={assetsJson}
         background-size={style.backgroundSize}
         background-darken={style.backgroundDarken?.toString()}
         background-blur={style.backgroundBlur?.toString()}
       >
-        {slide.components.map((component) => renderComponent(component))}
+        {slide.components.map((component) => renderComponent(component, { assets }))}
       </deck-slide>
     </div>
   );
@@ -562,69 +463,4 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   );
 }
 
-// JSX type declarations for web components
-// Note: Some types are already declared in SlideNode.tsx, so we only add the missing ones
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'deck-subtitle': React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          text?: string;
-          align?: string;
-          'grid-width'?: string;
-        },
-        HTMLElement
-      >;
-      'deck-text': React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          content?: string;
-          align?: string;
-          'grid-width'?: string;
-        },
-        HTMLElement
-      >;
-      'deck-image': React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          'asset-id'?: string;
-          alt?: string;
-          caption?: string;
-          fit?: string;
-          'grid-width'?: string;
-        },
-        HTMLElement
-      >;
-      'deck-list': React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          items?: string;
-          ordered?: string;
-          'grid-width'?: string;
-        },
-        HTMLElement
-      >;
-      'deck-code': React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          code?: string;
-          language?: string;
-          'show-line-numbers'?: string;
-          'grid-width'?: string;
-        },
-        HTMLElement
-      >;
-      'deck-quote': React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          text?: string;
-          attribution?: string;
-          'grid-width'?: string;
-        },
-        HTMLElement
-      >;
-      'deck-spacer': React.DetailedHTMLProps<
-        React.HTMLAttributes<HTMLElement> & {
-          height?: string;
-          'grid-width'?: string;
-        },
-        HTMLElement
-      >;
-    }
-  }
-}
+

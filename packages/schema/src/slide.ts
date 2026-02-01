@@ -56,8 +56,8 @@ export const SlideStyleSchema = z.object({
   textSecondary: z.string().optional(),
   accent: z.string().optional(),
   
-  // Background image
-  backgroundImage: z.string().optional(),
+  // Background image (references deck.assets by ID)
+  backgroundAssetId: z.string().optional(),
   backgroundSize: BackgroundSizeSchema.optional(),
   backgroundPosition: z.string().optional(),
   backgroundDarken: z.number().min(0).max(100).optional(), // 0-100%
@@ -202,8 +202,8 @@ export function styleToCssProperties(style: SlideStyle): Record<string, string> 
   if (style.textSecondary) props['--deck-color-text-secondary'] = style.textSecondary;
   if (style.accent) props['--deck-color-accent'] = style.accent;
 
-  // Background image
-  if (style.backgroundImage) props['background-image'] = `url(${style.backgroundImage})`;
+  // Note: backgroundAssetId is resolved to URL at the component level (deck-slide)
+  // since it requires access to the deck's assets map
   if (style.backgroundSize) props['background-size'] = backgroundSizeToCss(style.backgroundSize);
   if (style.backgroundPosition) props['background-position'] = style.backgroundPosition;
 

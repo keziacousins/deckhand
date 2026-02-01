@@ -341,7 +341,7 @@ describe('SlideStyleSchema', () => {
 
   it('validates background image properties', () => {
     const style = {
-      backgroundImage: '/images/bg.jpg',
+      backgroundAssetId: 'asset-123',
       backgroundSize: 'fill',
       backgroundPosition: 'center',
     };
@@ -376,9 +376,9 @@ describe('styleToCssProperties', () => {
     expect(css['--deck-color-accent']).toBe('#0066cc');
   });
 
-  it('applies background image with url()', () => {
-    const css = styleToCssProperties({ backgroundImage: '/images/bg.jpg' });
-    expect(css['background-image']).toBe('url(/images/bg.jpg)');
+  it('does not include backgroundAssetId in CSS (resolved at component level)', () => {
+    const css = styleToCssProperties({ backgroundAssetId: 'asset-123' });
+    expect(css['background-image']).toBeUndefined();
   });
 
   it('applies background size and position', () => {

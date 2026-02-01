@@ -5,12 +5,12 @@ import './AssetPickerModal.css';
 
 interface AssetPickerModalProps {
   assets: Asset[];
-  selectedUrl: string;
+  selectedAssetId: string;
   onSelect: (asset: Asset) => void;
   onClose: () => void;
 }
 
-export function AssetPickerModal({ assets, selectedUrl, onSelect, onClose }: AssetPickerModalProps) {
+export function AssetPickerModal({ assets, selectedAssetId, onSelect, onClose }: AssetPickerModalProps) {
   // Close on escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,7 +57,7 @@ export function AssetPickerModal({ assets, selectedUrl, onSelect, onClose }: Ass
               {assets.map((asset) => (
                 <button
                   key={asset.id}
-                  className={`asset-picker-modal-item ${asset.url === selectedUrl ? 'asset-picker-modal-item-selected' : ''}`}
+                  className={`asset-picker-modal-item ${asset.id === selectedAssetId ? 'asset-picker-modal-item-selected' : ''}`}
                   onClick={() => onSelect(asset)}
                   title={asset.filename}
                   type="button"

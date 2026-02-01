@@ -88,6 +88,7 @@ export function Canvas({
   // Derive slide nodes from deck state
   const slideNodes = useMemo(() => {
     const deckGridColumns = deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
+    const assets = deck.assets ?? {};
     return Object.values(deck.slides).map((slide): SlideNodeType => ({
       id: slide.id,
       type: 'slide',
@@ -97,12 +98,13 @@ export function Canvas({
         theme: deck.theme,
         aspectRatio: deck.aspectRatio,
         gridColumns: deckGridColumns,
+        assets,
         showGrid,
         selectedComponentId: slide.id === selectedSlideId ? selectedComponentId : null,
       },
       selected: slide.id === selectedSlideId,
     }));
-  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, showGrid, selectedSlideId, selectedComponentId]);
+  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, deck.assets, showGrid, selectedSlideId, selectedComponentId]);
 
   // Derive start point nodes from deck state
   const startPointNodes = useMemo(() => {

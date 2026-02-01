@@ -14,7 +14,8 @@ import { PropertyEditor } from '../fields';
 import { PropertyGroups } from '@deckhand/components';
 
 export function ComponentInspector({ context }: InspectorSectionProps) {
-  const { selectedComponent, onUpdate, selection } = context;
+  const { deck, selectedComponent, onUpdate, selection } = context;
+  const assets = deck.assets ?? {};
   
   if (!selectedComponent || !selection.slideId || !selection.componentId) {
     return null;
@@ -90,6 +91,7 @@ export function ComponentInspector({ context }: InspectorSectionProps) {
                 descriptor={descriptor}
                 value={(selectedComponent.props as Record<string, unknown>)[key]}
                 onChange={(value) => updateProp(key, value)}
+                assets={assets}
               />
             ))}
           </div>

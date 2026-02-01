@@ -5,7 +5,7 @@ import './AssetPickerField.css';
 
 interface AssetPickerFieldProps {
   label: string;
-  value: string; // Asset URL or empty string
+  value: string; // Asset ID or empty string
   assets: Record<string, Asset>;
   onChange: (value: string) => void;
 }
@@ -13,11 +13,11 @@ interface AssetPickerFieldProps {
 export function AssetPickerField({ label, value, assets, onChange }: AssetPickerFieldProps) {
   const [showModal, setShowModal] = useState(false);
 
-  // Find the asset that matches the current value (URL)
-  const selectedAsset = Object.values(assets).find((a) => a.url === value);
+  // Find the asset by ID
+  const selectedAsset = value ? assets[value] : undefined;
 
   const handleSelect = useCallback((asset: Asset) => {
-    onChange(asset.url);
+    onChange(asset.id);
     setShowModal(false);
   }, [onChange]);
 
@@ -86,7 +86,7 @@ export function AssetPickerField({ label, value, assets, onChange }: AssetPicker
       {showModal && (
         <AssetPickerModal
           assets={imageAssets}
-          selectedUrl={value}
+          selectedAssetId={value}
           onSelect={handleSelect}
           onClose={handleCloseModal}
         />

@@ -13,6 +13,7 @@
 import { DeckComponent } from '../../base';
 import type { ComponentMeta } from '../../types';
 import { styles } from './styles';
+import { generateImageBackgroundHtml, resolveAssetUrl, sizeToCss } from '../../utils/image-renderer';
 
 export class DeckSlide extends DeckComponent {
   static meta: ComponentMeta = {
@@ -29,7 +30,8 @@ export class DeckSlide extends DeckComponent {
     'direction',
     'gap',
     'background-color',
-    'background-image',
+    'background-asset-id',
+    'assets',
     'background-size',
     'background-darken',
     'background-blur',
@@ -53,19 +55,23 @@ export class DeckSlide extends DeckComponent {
     const paddingTop = 'var(--deck-content-padding-top, 48px)';
     const paddingSides = 'var(--deck-content-padding-sides, 64px)';
     const padding = `${paddingTop} ${paddingSides}`;
-    const bgImage = this.getAttr('background-image');
+    
+    // Background image using shared renderer
+    const bgAssetId = this.getAttr('background-asset-id');
+    const assetsJson = this.getAttr('assets');
     const bgSizeAttr = this.getAttr('background-size', 'fill');
     const bgDarken = this.getAttrNumber('background-darken', 0);
     const bgBlur = this.getAttrNumber('background-blur', 0);
     const showGrid = this.getAttrBool('show-grid');
     
-    // Map background size values to CSS
-    const bgSizeMap: Record<string, string> = {
-      'fill': 'cover',
-      'fit-width': '100% auto',
-      'fit-height': 'auto 100%',
-    };
-    const bgSize = bgSizeMap[bgSizeAttr] || 'cover';
+    // Use shared image renderer
+    const bgUrl = resolveAssetUrl(bgAssetId, assetsJson);
+    const { html: bgImageElement, styles: bgImageStyles } = generateImageBackgroundHtml({
+      url: bgUrl,
+      size: bgSizeAttr as 'fill' | 'fit-width' | 'fit-height',
+      darken: bgDarken,
+      blur: bgBlur,
+    });
 
     // Style overrides - these override theme tokens for this slide
     const styleBackground = this.getAttr('style-background');
@@ -88,31 +94,6 @@ export class DeckSlide extends DeckComponent {
 
     // Token overrides CSS (injected into :host)
     const tokenOverridesCSS = tokenOverrides.length > 0 ? tokenOverrides.join(';\n          ') + ';' : '';
-
-    // Background image element (renders behind content)
-    const bgImageStyles = bgImage ? `
-        .background-image {
-          position: absolute;
-          inset: 0;
-          background-image: url(${bgImage});
-          background-size: ${bgSize};
-          background-position: center;
-          background-repeat: no-repeat;
-          z-index: 0;
-          pointer-events: none;
-          ${bgBlur > 0 ? `filter: blur(${bgBlur}px);` : ''}
-        }
-        ${bgDarken > 0 ? `
-        .background-overlay {
-          position: absolute;
-          inset: 0;
-          background: rgba(0, 0, 0, ${bgDarken / 100});
-          z-index: 0;
-          pointer-events: none;
-        }
-        ` : ''}
-      ` : '';
-    const bgImageElement = bgImage ? `<div class="background-image"></div>${bgDarken > 0 ? '<div class="background-overlay"></div>' : ''}` : '';
 
     if (gridColumns > 0) {
       // Grid layout mode

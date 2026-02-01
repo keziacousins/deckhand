@@ -143,6 +143,17 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
           }
         }
 
+        if (update.type === 'addAsset') {
+          const asset = update.asset as { id: string };
+          return {
+            ...d,
+            assets: {
+              ...d.assets,
+              [asset.id]: asset,
+            },
+          };
+        }
+
         if (update.type === 'theme') {
           // Handle theme name separately
           if (update.field === 'name') {

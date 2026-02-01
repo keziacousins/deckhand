@@ -16,10 +16,8 @@ export function BackgroundSection({ context }: InspectorSectionProps) {
   const style = selectedSlide.style ?? {};
   const assets = deck.assets ?? {};
   
-  // Find asset filename for subtitle
-  const selectedAsset = style.backgroundImage 
-    ? Object.values(assets).find(a => a.url === style.backgroundImage)
-    : null;
+  // Find asset for subtitle display
+  const selectedAsset = style.backgroundAssetId ? assets[style.backgroundAssetId] : null;
   const subtitle = selectedAsset?.filename;
 
   const handleStyleChange = (field: string, value: string | number | undefined) => {
@@ -41,12 +39,12 @@ export function BackgroundSection({ context }: InspectorSectionProps) {
     >
       <AssetPickerField
         label="Image"
-        value={style.backgroundImage ?? ''}
+        value={style.backgroundAssetId ?? ''}
         assets={assets}
-        onChange={(value) => handleStyleChange('backgroundImage', value)}
+        onChange={(value) => handleStyleChange('backgroundAssetId', value)}
       />
       
-      {style.backgroundImage && (
+      {style.backgroundAssetId && (
         <>
           <SelectField
             label="Sizing"

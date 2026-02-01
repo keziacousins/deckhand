@@ -70,6 +70,9 @@ export const ImageComponentSchema = BaseComponentSchema.extend({
     alt: z.string().optional(),
     caption: z.string().optional(),
     fit: z.enum(['contain', 'cover', 'fill']).optional(),
+    darken: z.number().min(0).max(100).optional(),
+    blur: z.number().min(0).max(20).optional(),
+    maxHeight: z.number().min(0).max(1000).optional(),
   }),
 });
 

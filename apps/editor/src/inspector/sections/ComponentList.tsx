@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import type { InspectorSectionProps } from '../types';
-import type { Component } from '@deckhand/schema';
+import type { Component, Asset } from '@deckhand/schema';
 import { registry } from '@deckhand/components';
 import type { PropertyDescriptor } from '@deckhand/components';
 import { PropertyGroups } from '@deckhand/components';
@@ -14,6 +14,7 @@ interface ComponentCardProps {
   index: number;
   totalCount: number;
   isExpanded: boolean;
+  assets: Record<string, Asset>;
   onToggleExpand: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -31,6 +32,7 @@ function ComponentCard({
   index,
   totalCount,
   isExpanded,
+  assets,
   onToggleExpand,
   onDelete,
   onMoveUp,
@@ -188,6 +190,7 @@ function ComponentCard({
                       descriptor={descriptor}
                       value={(component.props as Record<string, unknown>)[key]}
                       onChange={(value) => onUpdateProp(key, value)}
+                      assets={assets}
                     />
                   ))}
                 </div>
@@ -201,7 +204,8 @@ function ComponentCard({
 }
 
 export function ComponentList({ context }: InspectorSectionProps) {
-  const { selectedSlide, selection, onUpdate, onDeleteComponent, onReorderComponent } = context;
+  const { deck, selectedSlide, selection, onUpdate, onDeleteComponent, onReorderComponent } = context;
+  const assets = deck.assets ?? {};
   const { selectComponent } = useSelection();
   const { expandedComponentId, setExpandedComponentId } = useInspectorExpansion();
   
@@ -339,6 +343,7 @@ export function ComponentList({ context }: InspectorSectionProps) {
                 index={originalIndex}
                 totalCount={components.length}
                 isExpanded={expandedComponentId === component.id}
+                assets={assets}
                 onToggleExpand={() => toggleExpanded(component.id)}
                 onDelete={() => onDeleteComponent?.(slideId, component.id)}
                 onMoveUp={() => onReorderComponent?.(slideId, component.id, 'up')}

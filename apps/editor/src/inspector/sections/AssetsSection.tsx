@@ -5,6 +5,9 @@ import './AssetsSection.css';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
+// Counter for unique upload IDs when multiple files are uploaded simultaneously
+let uploadCounter = 0;
+
 interface UploadingAsset {
   id: string;
   filename: string;
@@ -22,7 +25,7 @@ export function AssetsSection({ context }: InspectorSectionProps) {
   const [dragOver, setDragOver] = useState(false);
 
   const uploadFile = useCallback(async (file: File) => {
-    const tempId = `uploading-${Date.now()}`;
+    const tempId = `uploading-${Date.now()}-${uploadCounter++}`;
     
     setUploading((prev) => [...prev, { id: tempId, filename: file.name, progress: 0 }]);
 
@@ -43,19 +46,15 @@ export function AssetsSection({ context }: InspectorSectionProps) {
 
       // Add asset to deck
       onUpdate({
-        type: 'deck',
-        field: 'assets',
-        value: {
-          ...assets,
-          [asset.id]: {
-            id: asset.id,
-            filename: asset.filename,
-            mimeType: asset.mimeType,
-            size: asset.size,
-            url: `${API_BASE}${asset.url}`,
-            uploaded: new Date().toISOString(),
-          } as Asset,
-        },
+        type: 'addAsset',
+        asset: {
+          id: asset.id,
+          filename: asset.filename,
+          mimeType: asset.mimeType,
+          size: asset.size,
+          url: `${API_BASE}${asset.url}`,
+          uploaded: new Date().toISOString(),
+        } as Asset,
       });
 
     } catch (error) {
@@ -63,7 +62,7 @@ export function AssetsSection({ context }: InspectorSectionProps) {
     } finally {
       setUploading((prev) => prev.filter((u) => u.id !== tempId));
     }
-  }, [deckId, assets, onUpdate]);
+  }, [deckId, onUpdate]);
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files) return;

@@ -20,11 +20,13 @@ export { registry, registerComponent } from './registry';
 export { DeckSlide } from './components/deck-slide';
 export { DeckTitle } from './components/deck-title';
 export { DeckHeadlineSubhead } from './components/deck-headline-subhead';
+export { DeckText } from './components/deck-text';
 
 // Import components for registration
 import { DeckSlide } from './components/deck-slide';
 import { DeckTitle } from './components/deck-title';
 import { DeckHeadlineSubhead } from './components/deck-headline-subhead';
+import { DeckText } from './components/deck-text';
 import { registry } from './registry';
 
 /**
@@ -36,6 +38,7 @@ export function registerComponents(): void {
   registry.add(DeckSlide);
   registry.add(DeckTitle);
   registry.add(DeckHeadlineSubhead);
+  registry.add(DeckText);
   
   // Define custom elements
   registry.registerAll();

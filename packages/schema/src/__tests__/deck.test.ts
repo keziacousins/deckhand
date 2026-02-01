@@ -497,8 +497,11 @@ describe('createEmptyDeck', () => {
     const slideId = Object.keys(deck.slides)[0];
     const slide = deck.slides[slideId];
     expect(slide.components).toHaveLength(1);
-    expect(slide.components[0].type).toBe('deck-title');
-    expect(slide.components[0].props.text).toBe('Test');
+    const comp = slide.components[0];
+    expect(comp.type).toBe('deck-title');
+    if (comp.type === 'deck-title') {
+      expect(comp.props.text).toBe('Test');
+    }
   });
 });
 

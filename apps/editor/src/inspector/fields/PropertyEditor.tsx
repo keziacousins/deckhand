@@ -12,6 +12,27 @@ import { NumberField } from './NumberField';
 import { CheckboxField } from './CheckboxField';
 import { ColorField } from './ColorField';
 
+/** Rich text span type matching the schema */
+interface RichTextSpan {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  code?: boolean;
+  href?: string;
+}
+
+/** Convert rich text array to plain string for display */
+function richTextToString(content: RichTextSpan[]): string {
+  if (!Array.isArray(content)) return '';
+  return content.map(span => span.text).join('');
+}
+
+/** Convert plain string to rich text array */
+function stringToRichText(text: string): RichTextSpan[] {
+  return [{ text }];
+}
+
 interface PropertyEditorProps {
   /** Property key name */
   name: string;
@@ -114,13 +135,14 @@ export function PropertyEditor({
       );
 
     case 'richtext':
-      // For now, fall back to multiline text
-      // TODO: Implement rich text editor
+      // Convert rich text array to plain string for editing
+      // When saved, convert back to rich text array (loses formatting for now)
+      // TODO: Implement proper rich text editor that preserves formatting
       return (
         <TextField
           label={label}
-          value={(value as string) ?? ''}
-          onChange={onChange}
+          value={richTextToString(value as RichTextSpan[])}
+          onChange={(text) => onChange(stringToRichText(text as string))}
           placeholder={placeholder}
           multiline
         />

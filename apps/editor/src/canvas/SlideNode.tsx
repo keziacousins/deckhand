@@ -49,6 +49,17 @@ function renderComponent(component: Component, isSelected: boolean): JSX.Element
           grid-width={gridWidth}
         />
       );
+    case 'deck-text':
+      return (
+        <deck-text
+          key={component.id}
+          data-component-id={component.id}
+          class={selectedClass}
+          content={JSON.stringify(component.props.content)}
+          align={component.props.align}
+          grid-width={gridWidth}
+        />
+      );
     default:
       return null;
   }
@@ -159,6 +170,16 @@ declare global {
           category?: string;
           'is-hero'?: string;
           variant?: string;
+          align?: string;
+          'grid-width'?: string;
+        },
+        HTMLElement
+      >;
+      'deck-text': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement> & {
+          'data-component-id'?: string;
+          class?: string;
+          content?: string;
           align?: string;
           'grid-width'?: string;
         },

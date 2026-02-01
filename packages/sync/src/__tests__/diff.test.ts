@@ -183,23 +183,9 @@ describe('diffDeck', () => {
     it('detects component prop change', () => {
       const prev = createTestDeck();
       const slideId = Object.keys(prev.slides)[0];
-      const compId = prev.slides[slideId].components[0].id;
       
-      const next = {
-        ...prev,
-        slides: {
-          ...prev.slides,
-          [slideId]: {
-            ...prev.slides[slideId],
-            components: [
-              {
-                ...prev.slides[slideId].components[0],
-                props: { ...prev.slides[slideId].components[0].props, text: 'Updated Title' },
-              },
-            ],
-          },
-        },
-      };
+      const next = JSON.parse(JSON.stringify(prev));
+      (next.slides[slideId].components[0].props as { text: string }).text = 'Updated Title';
       
       const patches = diffDeck(prev, next);
       // The diff produces a patch for the 'text' property change
@@ -264,23 +250,9 @@ describe('diffDeck', () => {
     it('detects gridWidth added to component', () => {
       const prev = createTestDeck();
       const slideId = Object.keys(prev.slides)[0];
-      const compId = prev.slides[slideId].components[0].id;
       
-      const next = {
-        ...prev,
-        slides: {
-          ...prev.slides,
-          [slideId]: {
-            ...prev.slides[slideId],
-            components: [
-              {
-                ...prev.slides[slideId].components[0],
-                props: { ...prev.slides[slideId].components[0].props, gridWidth: 6 },
-              },
-            ],
-          },
-        },
-      };
+      const next = JSON.parse(JSON.stringify(prev));
+      next.slides[slideId].components[0].props.gridWidth = 6;
       
       const patches = diffDeck(prev, next);
       expect(patches.some(p => 

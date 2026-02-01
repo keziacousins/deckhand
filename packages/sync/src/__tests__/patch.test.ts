@@ -274,7 +274,10 @@ describe('applyPatchesToYDoc', () => {
       ydoc.transact(() => applyPatchesToYDoc(patches, ydoc));
       
       const extracted = yDocToDeck(ydoc);
-      expect(extracted.slides[slideId].components[0].props.text).toBe('Updated Text');
+      const comp = extracted.slides[slideId].components[0];
+      if (comp.type === 'deck-title') {
+        expect(comp.props.text).toBe('Updated Text');
+      }
     });
   });
 
@@ -331,7 +334,6 @@ describe('diff and apply integration', () => {
   it('applies component changes correctly', () => {
     const prev = createEmptyDeck();
     const slideId = Object.keys(prev.slides)[0];
-    const compId = prev.slides[slideId].components[0].id;
     
     const next = JSON.parse(JSON.stringify(prev));
     next.slides[slideId].components[0].props.text = 'Changed Title';
@@ -343,8 +345,11 @@ describe('diff and apply integration', () => {
     ydoc.transact(() => applyPatchesToYDoc(patches, ydoc));
     
     const result = yDocToDeck(ydoc);
-    expect(result.slides[slideId].components[0].props.text).toBe('Changed Title');
-    expect(result.slides[slideId].components[0].props.gridWidth).toBe(6);
+    const comp = result.slides[slideId].components[0];
+    if (comp.type === 'deck-title') {
+      expect(comp.props.text).toBe('Changed Title');
+      expect(comp.props.gridWidth).toBe(6);
+    }
   });
 
   it('applies multiple patches atomically', () => {

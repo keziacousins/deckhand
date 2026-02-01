@@ -14,6 +14,7 @@ import {
   type NodeMouseHandler,
   type XYPosition,
   type Viewport,
+  type OnReconnect,
   BackgroundVariant,
 } from '@xyflow/react';
 import { SlideNode, type SlideNodeType } from './SlideNode';
@@ -234,6 +235,35 @@ export function Canvas({
           },
         },
       }));
+    },
+    [onUpdateDeck]
+  );
+
+  // Edge reconnection - drag edge endpoint to new handle/node
+  const onReconnect: OnReconnect = useCallback(
+    (oldEdge, newConnection) => {
+      if (!newConnection.source || !newConnection.target) return;
+      if (newConnection.source === newConnection.target) return; // No self-loops
+
+      onUpdateDeck((d) => {
+        const existingEdge = d.flow.edges[oldEdge.id];
+        if (!existingEdge) return d;
+
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            edges: {
+              ...d.flow.edges,
+              [oldEdge.id]: {
+                ...existingEdge,
+                from: newConnection.source!,
+                to: newConnection.target!,
+              },
+            },
+          },
+        };
+      });
     },
     [onUpdateDeck]
   );
@@ -509,6 +539,8 @@ export function Canvas({
         onNodeDragStop={onNodeDragStop}
         onSelectionChange={onSelectionChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
+        edgesReconnectable
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
         onMoveEnd={onMoveEnd}

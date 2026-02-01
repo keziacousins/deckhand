@@ -179,7 +179,7 @@
     /* Edges - brighter in dark mode for visibility */
     --edge-stroke: var(--color-gray-300);
     --edge-stroke-hover: var(--color-gray-200);
-    --edge-stroke-selected: var(--color-blue-400);
+    --edge-stroke-selected: var(--color-white);
 
     /* Scrollbar */
     --scrollbar-thumb: var(--color-gray-600);

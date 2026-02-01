@@ -8,6 +8,7 @@ interface ContextMenuProps {
   selectedNodes: Node[];
   onClose: () => void;
   onAddSlide: (position: XYPosition) => void;
+  onAddStartPoint: (position: XYPosition) => void;
   onDuplicateSlide: (nodeId: string) => void;
   onDeleteSlide: (nodeIds: string[]) => void;
 }
@@ -18,6 +19,7 @@ export function ContextMenu({
   selectedNodes,
   onClose,
   onAddSlide,
+  onAddStartPoint,
   onDuplicateSlide,
   onDeleteSlide,
 }: ContextMenuProps) {
@@ -66,6 +68,16 @@ export function ContextMenu({
       >
         <span className="context-menu-label">Add Slide</span>
         <span className="context-menu-shortcut">⌘N</span>
+      </button>
+
+      <button
+        className="context-menu-item"
+        onClick={() => {
+          onAddStartPoint(position);
+          onClose();
+        }}
+      >
+        <span className="context-menu-label">Add Start Point</span>
       </button>
 
       <div className="context-menu-separator" />

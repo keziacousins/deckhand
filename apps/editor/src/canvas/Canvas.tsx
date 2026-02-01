@@ -18,15 +18,20 @@ import {
   BackgroundVariant,
 } from '@xyflow/react';
 import { SlideNode, type SlideNodeType } from './SlideNode';
+import { StartPointNode, type StartPointNodeType } from './StartPointNode';
 import { ContextMenu } from './ContextMenu';
 import { CanvasHeader } from './CanvasHeader';
 import { useSelection } from '../selection';
-import type { Deck, Slide } from '@deckhand/schema';
-import { generateSlideId, generateEdgeId, DEFAULT_GRID_COLUMNS } from '@deckhand/schema';
+import type { Deck, Slide, StartPoint } from '@deckhand/schema';
+import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS } from '@deckhand/schema';
 
 const nodeTypes = {
   slide: SlideNode,
+  startPoint: StartPointNode,
 };
+
+// Union type for all node types
+type CanvasNodeType = SlideNodeType | StartPointNodeType;
 
 interface CanvasProps {
   deck: Deck;
@@ -70,11 +75,11 @@ export function Canvas({
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     position: XYPosition;
-    targetNode: SlideNodeType | null;
+    targetNode: CanvasNodeType | null;
   } | null>(null);
 
-  // Derive nodes from deck state
-  const deckNodes = useMemo(() => {
+  // Derive slide nodes from deck state
+  const slideNodes = useMemo(() => {
     const deckGridColumns = deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
     return Object.values(deck.slides).map((slide): SlideNodeType => ({
       id: slide.id,
@@ -92,6 +97,23 @@ export function Canvas({
     }));
   }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, showGrid, selectedSlideId, selectedComponentId]);
 
+  // Derive start point nodes from deck state
+  const startPointNodes = useMemo(() => {
+    const startPoints = deck.flow.startPoints ?? {};
+    return Object.values(startPoints).map((startPoint): StartPointNodeType => ({
+      id: startPoint.id,
+      type: 'startPoint',
+      position: startPoint.position,
+      data: { startPoint },
+      selected: false, // TODO: Add start point selection
+    }));
+  }, [deck.flow.startPoints]);
+
+  // Combine all nodes
+  const deckNodes = useMemo(() => {
+    return [...slideNodes, ...startPointNodes];
+  }, [slideNodes, startPointNodes]);
+
   // Derive edges from deck state
   const deckEdges = useMemo(() => {
     return Object.values(deck.flow.edges).map((edge): Edge => ({
@@ -104,7 +126,7 @@ export function Canvas({
   }, [deck.flow.edges]);
 
   // Use React Flow's state management - initialize with empty, sync via effect
-  const [nodes, setNodes, onNodesChange] = useNodesState<SlideNodeType>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNodeType>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   // Sync nodes when deck changes - merge to preserve React Flow's internal state
@@ -116,7 +138,7 @@ export function Canvas({
       const currentById = new Map(currentNodes.map((n) => [n.id, n]));
       
       // Build new array, preserving existing node objects where possible
-      const newNodes: SlideNodeType[] = [];
+      const newNodes: CanvasNodeType[] = [];
       for (const deckNode of deckNodes) {
         const current = currentById.get(deckNode.id);
         if (current) {
@@ -128,7 +150,7 @@ export function Canvas({
             current.selected !== deckNode.selected;
           
           if (needsUpdate) {
-            newNodes.push({ ...current, ...deckNode });
+            newNodes.push({ ...current, ...deckNode } as CanvasNodeType);
           } else {
             newNodes.push(current);
           }
@@ -180,23 +202,38 @@ export function Canvas({
 
   // Persist positions to deck when drag ends (handles single and multi-select)
   const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, _node: SlideNodeType, draggedNodes: SlideNodeType[]) => {
+    (_event: React.MouseEvent, _node: CanvasNodeType, draggedNodes: CanvasNodeType[]) => {
       onUpdateDeck((d) => {
         let hasChanges = false;
         const updatedSlides = { ...d.slides };
+        const updatedStartPoints = { ...d.flow.startPoints };
 
         for (const node of draggedNodes) {
-          const slide = d.slides[node.id];
-          if (!slide) continue;
-          // Only update if position actually changed
-          if (slide.position.x === node.position.x && slide.position.y === node.position.y) {
-            continue;
+          if (node.type === 'slide') {
+            const slide = d.slides[node.id];
+            if (!slide) continue;
+            // Only update if position actually changed
+            if (slide.position.x === node.position.x && slide.position.y === node.position.y) {
+              continue;
+            }
+            hasChanges = true;
+            updatedSlides[node.id] = {
+              ...slide,
+              position: { x: node.position.x, y: node.position.y },
+            };
+          } else if (node.type === 'startPoint') {
+            const startPoint = d.flow.startPoints?.[node.id];
+            if (!startPoint) continue;
+            // Only update if position actually changed
+            if (startPoint.position.x === node.position.x && startPoint.position.y === node.position.y) {
+              continue;
+            }
+            hasChanges = true;
+            updatedStartPoints[node.id] = {
+              ...startPoint,
+              position: { x: node.position.x, y: node.position.y },
+            };
           }
-          hasChanges = true;
-          updatedSlides[node.id] = {
-            ...slide,
-            position: { x: node.position.x, y: node.position.y },
-          };
         }
 
         if (!hasChanges) return d;
@@ -204,6 +241,10 @@ export function Canvas({
         return {
           ...d,
           slides: updatedSlides,
+          flow: {
+            ...d.flow,
+            startPoints: updatedStartPoints,
+          },
         };
       });
     },
@@ -222,22 +263,40 @@ export function Canvas({
       const edgeId = generateEdgeId();
 
       // Update deck state - edges will update via deckEdges memo
-      onUpdateDeck((d) => ({
-        ...d,
-        flow: {
-          ...d.flow,
-          edges: {
-            ...d.flow.edges,
-            [edgeId]: {
-              id: edgeId,
-              from: connection.source!,
-              to: connection.target!,
-              trigger: 'default',
-              label: undefined,
-            },
+      onUpdateDeck((d) => {
+        const sourceId = connection.source!;
+        const targetId = connection.target!;
+        
+        // Check if source is a start point - enforce single outgoing edge
+        const isStartPoint = d.flow.startPoints?.[sourceId] !== undefined;
+        let newEdges = { ...d.flow.edges };
+        
+        if (isStartPoint) {
+          // Remove any existing edges from this start point
+          for (const [existingEdgeId, edge] of Object.entries(newEdges)) {
+            if (edge.from === sourceId) {
+              delete newEdges[existingEdgeId];
+            }
+          }
+        }
+        
+        // Add the new edge
+        newEdges[edgeId] = {
+          id: edgeId,
+          from: sourceId,
+          to: targetId,
+          trigger: 'default',
+          label: undefined,
+        };
+        
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            edges: newEdges,
           },
-        },
-      }));
+        };
+      });
     },
     [onUpdateDeck]
   );
@@ -445,6 +504,40 @@ export function Canvas({
       selectSlide(newSlide.id);
     },
     [deck.slides, onUpdateDeck, selectSlide, screenToFlowPosition]
+  );
+
+  // Add start point
+  const addStartPoint = useCallback(
+    (screenPosition?: XYPosition) => {
+      const position = screenPosition
+        ? screenToFlowPosition(screenPosition)
+        : { x: -200, y: 0 };
+
+      // Generate unique name
+      const existingNames = new Set(
+        Object.values(deck.flow.startPoints ?? {}).map((sp) => sp.name)
+      );
+      let name = 'Start';
+      let counter = 1;
+      while (existingNames.has(name)) {
+        counter++;
+        name = `Start ${counter}`;
+      }
+
+      const newStartPoint = createStartPoint(name, position);
+
+      onUpdateDeck((d) => ({
+        ...d,
+        flow: {
+          ...d.flow,
+          startPoints: {
+            ...d.flow.startPoints,
+            [newStartPoint.id]: newStartPoint,
+          },
+        },
+      }));
+    },
+    [deck.flow.startPoints, onUpdateDeck, screenToFlowPosition]
   );
 
   const duplicateSlide = useCallback(
@@ -664,6 +757,7 @@ export function Canvas({
         selectedNodes={selectedNodes}
         onClose={closeContextMenu}
         onAddSlide={addSlide}
+        onAddStartPoint={addStartPoint}
         onDuplicateSlide={duplicateSlide}
         onDeleteSlide={deleteSlides}
       />

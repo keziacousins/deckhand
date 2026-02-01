@@ -1,0 +1,91 @@
+/**
+ * StartPointNode.css
+ *
+ * Styles for start point nodes on the canvas.
+ * Pill-shaped nodes that represent named entry points into presentations.
+ * Width fits content, consistent height.
+ */
+
+/* ===========================================
+   Base Node Styles
+   =========================================== */
+
+.start-point-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  height: 36px;
+  padding: 0 16px;
+  background: var(--interactive-primary);
+  border: 2px solid var(--interactive-primary);
+  border-radius: 18px; /* Pill shape */
+  box-shadow: var(--shadow-sm);
+  cursor: grab;
+  transition:
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal),
+    background var(--transition-normal);
+}
+
+.start-point-node:hover {
+  background: var(--interactive-primary-hover);
+  border-color: var(--interactive-primary-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.start-point-node.selected {
+  border-color: var(--color-white);
+  box-shadow: var(--shadow-lg), 0 0 0 2px var(--interactive-primary);
+}
+
+/* ===========================================
+   Name Label
+   =========================================== */
+
+.start-point-name {
+  color: var(--color-white);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  user-select: none;
+}
+
+/* ===========================================
+   Connection Handle
+   Single source handle on right side
+   =========================================== */
+
+.start-point-node .react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: var(--color-white);
+  border: 2px solid var(--interactive-primary);
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.start-point-node:hover .react-flow__handle,
+.start-point-node.selected .react-flow__handle {
+  opacity: 1;
+}
+
+.start-point-node .react-flow__handle:hover {
+  background: var(--interactive-primary-hover);
+  border-color: var(--color-white);
+}
+
+/* ===========================================
+   Zoom Overview (LOD)
+   Keep visible but smaller when zoomed out
+   =========================================== */
+
+.react-flow.zoom-overview .start-point-node .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}

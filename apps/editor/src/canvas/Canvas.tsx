@@ -278,11 +278,59 @@ export function Canvas({
     [onUpdateDeck]
   );
 
-  const onReconnectEnd = useCallback((_event: MouseEvent | TouchEvent, edge: Edge) => {
-    // If the edge was dropped without connecting to a valid target,
-    // we could optionally delete it here. For now, just reset the flag.
-    isReconnectingRef.current = false;
-  }, []);
+  const onReconnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, edge: Edge) => {
+      isReconnectingRef.current = false;
+
+      const clientX = 'clientX' in event ? event.clientX : event.touches?.[0]?.clientX;
+      const clientY = 'clientY' in event ? event.clientY : event.touches?.[0]?.clientY;
+      if (clientX === undefined || clientY === undefined) return;
+
+      // Check if dropped on a handle (onReconnect already handled it)
+      const elementsAtPoint = document.elementsFromPoint(clientX, clientY);
+      for (const el of elementsAtPoint) {
+        if (el.classList.contains('react-flow__handle')) return;
+      }
+
+      // Find target node at drop point
+      const { nodeLookup } = store.getState();
+      let targetNodeId: string | null = null;
+
+      for (const el of elementsAtPoint) {
+        const nodeEl = el.closest('.react-flow__node[data-id]');
+        if (nodeEl) {
+          const nodeId = nodeEl.getAttribute('data-id');
+          if (nodeId && nodeLookup.has(nodeId) && nodeId !== edge.source) {
+            targetNodeId = nodeId;
+            break;
+          }
+        }
+      }
+
+      if (targetNodeId) {
+        // Reconnect edge to dropped node
+        onUpdateDeck((d) => {
+          const existingEdge = d.flow.edges[edge.id];
+          if (!existingEdge) return d;
+
+          return {
+            ...d,
+            flow: {
+              ...d.flow,
+              edges: {
+                ...d.flow.edges,
+                [edge.id]: {
+                  ...existingEdge,
+                  to: targetNodeId!,
+                },
+              },
+            },
+          };
+        });
+      }
+    },
+    [store, onUpdateDeck]
+  );
 
   // Track connection start for drop-on-node
   const onConnectStart = useCallback(

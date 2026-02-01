@@ -31,6 +31,11 @@
 .react-flow__edge-path {
   stroke: var(--edge-stroke);
   stroke-width: 3;
+  transition: none !important;
+}
+
+.react-flow__edge {
+  transition: none !important;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
@@ -38,9 +43,10 @@
   stroke-width: 4;
 }
 
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--edge-stroke-selected);
-  stroke-width: 4;
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--edge-stroke-selected) !important;
+  stroke-width: 4 !important;
 }
 
 /* Arrow markers */
@@ -52,8 +58,14 @@
   fill: var(--edge-stroke-hover);
 }
 
-.react-flow__edge.selected marker {
-  fill: var(--edge-stroke-selected);
+.react-flow__edge.selected marker,
+.react-flow .react-flow__edge.selected marker {
+  fill: var(--edge-stroke-selected) !important;
+}
+
+/* Selected edge path - ensure visibility */
+.react-flow__edge.selected path {
+  stroke: var(--edge-stroke-selected) !important;
 }
 
 /* Connection line while dragging */

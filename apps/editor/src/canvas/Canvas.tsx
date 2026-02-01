@@ -213,6 +213,9 @@ export function Canvas({
   // Connection handling
   const onConnect = useCallback(
     (connection: Connection) => {
+      // Skip if this is a reconnection (handled by onReconnect)
+      if (isReconnectingRef.current) return;
+      
       if (!connection.source || !connection.target) return;
       if (connection.source === connection.target) return; // No self-loops
 
@@ -239,7 +242,14 @@ export function Canvas({
     [onUpdateDeck]
   );
 
+  // Track if we're in the middle of a reconnect to prevent onConnect from firing
+  const isReconnectingRef = useRef(false);
+
   // Edge reconnection - drag edge endpoint to new handle/node
+  const onReconnectStart = useCallback(() => {
+    isReconnectingRef.current = true;
+  }, []);
+
   const onReconnect: OnReconnect = useCallback(
     (oldEdge, newConnection) => {
       if (!newConnection.source || !newConnection.target) return;
@@ -267,6 +277,12 @@ export function Canvas({
     },
     [onUpdateDeck]
   );
+
+  const onReconnectEnd = useCallback((_event: MouseEvent | TouchEvent, edge: Edge) => {
+    // If the edge was dropped without connecting to a valid target,
+    // we could optionally delete it here. For now, just reset the flag.
+    isReconnectingRef.current = false;
+  }, []);
 
   // Track connection start for drop-on-node
   const onConnectStart = useCallback(
@@ -539,7 +555,9 @@ export function Canvas({
         onNodeDragStop={onNodeDragStop}
         onSelectionChange={onSelectionChange}
         onConnect={onConnect}
+        onReconnectStart={onReconnectStart}
         onReconnect={onReconnect}
+        onReconnectEnd={onReconnectEnd}
         edgesReconnectable
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}

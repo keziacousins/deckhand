@@ -144,3 +144,139 @@
 .presentation-exit:hover {
   background: rgba(255, 0, 0, 0.5);
 }
+
+/* ===========================================
+   Slide Transitions
+   =========================================== */
+
+.presentation-transition {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.transition-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Slide Left: new slide enters from right */
+.transition-slide-left .transition-from {
+  transform: translateX(0);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-left.active .transition-from {
+  transform: translateX(-100%);
+}
+
+.transition-slide-left .transition-to {
+  transform: translateX(100%);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-left.active .transition-to {
+  transform: translateX(0);
+}
+
+/* Slide Right: new slide enters from left */
+.transition-slide-right .transition-from {
+  transform: translateX(0);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-right.active .transition-from {
+  transform: translateX(100%);
+}
+
+.transition-slide-right .transition-to {
+  transform: translateX(-100%);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-right.active .transition-to {
+  transform: translateX(0);
+}
+
+/* Slide Up: new slide enters from bottom */
+.transition-slide-up .transition-from {
+  transform: translateY(0);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-up.active .transition-from {
+  transform: translateY(-100%);
+}
+
+.transition-slide-up .transition-to {
+  transform: translateY(100%);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-up.active .transition-to {
+  transform: translateY(0);
+}
+
+/* Slide Down: new slide enters from top */
+.transition-slide-down .transition-from {
+  transform: translateY(0);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-down.active .transition-from {
+  transform: translateY(100%);
+}
+
+.transition-slide-down .transition-to {
+  transform: translateY(-100%);
+  transition: transform var(--transition-duration) ease-out;
+}
+
+.transition-slide-down.active .transition-to {
+  transform: translateY(0);
+}
+
+/* Cross Fade: simultaneous fade out/in */
+.transition-cross-fade .transition-from {
+  opacity: 1;
+  z-index: 1;
+  transition: opacity var(--transition-duration) ease-out;
+}
+
+.transition-cross-fade.active .transition-from {
+  opacity: 0;
+}
+
+.transition-cross-fade .transition-to {
+  opacity: 0;
+  z-index: 2;
+  transition: opacity var(--transition-duration) ease-out;
+}
+
+.transition-cross-fade.active .transition-to {
+  opacity: 1;
+}
+
+/* Fade Through Black: fade to black, then fade in */
+.transition-fade-through-black .transition-from {
+  opacity: 1;
+  z-index: 2;
+  transition: opacity calc(var(--transition-duration) / 2) ease-out;
+}
+
+.transition-fade-through-black.active .transition-from {
+  opacity: 0;
+}
+
+.transition-fade-through-black .transition-to {
+  opacity: 0;
+  z-index: 1;
+  transition: opacity calc(var(--transition-duration) / 2) ease-out calc(var(--transition-duration) / 2);
+}
+
+.transition-fade-through-black.active .transition-to {
+  opacity: 1;
+}

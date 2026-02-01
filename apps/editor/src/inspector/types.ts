@@ -1,7 +1,7 @@
 import type { Deck, Slide, Component, AspectRatio } from '@deckhand/schema';
 import type { Selection } from '../selection';
 
-export type InspectorTab = 'slide' | 'theme' | 'assets';
+export type InspectorTab = 'selection' | 'theme' | 'assets';
 
 export interface InspectorContext {
   deck: Deck;

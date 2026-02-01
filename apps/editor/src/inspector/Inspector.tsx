@@ -11,6 +11,9 @@ import { ComponentList } from './sections/ComponentList';
 import { ComponentBrowser } from './sections/ComponentBrowser';
 import { ThemeSection } from './sections/ThemeSection';
 import { AssetsSection } from './sections/AssetsSection';
+import { EdgePropertiesSection } from './sections/EdgePropertiesSection';
+import { StartPointPropertiesSection } from './sections/StartPointPropertiesSection';
+import { isEdgeSelected, isStartPointSelected } from '../selection';
 import './Inspector.css';
 
 // Generate a simple unique ID
@@ -29,7 +32,7 @@ interface InspectorProps {
 
 export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onToggleShowGrid }: InspectorProps) {
   const { selection, selectComponent, clearSelection } = useSelection();
-  const [activeTab, setActiveTab] = useState<InspectorTab>('slide');
+  const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
   const [showComponentBrowser, setShowComponentBrowser] = useState(false);
 
   const handleUpdate = useCallback(
@@ -280,6 +283,121 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
     [onUpdateDeck]
   );
 
+  const handleUpdateEdge = useCallback(
+    (edgeId: string, updates: Partial<{ transition: string; transitionDuration: number }>) => {
+      onUpdateDeck((d) => {
+        const edge = d.flow.edges[edgeId];
+        if (!edge) return d;
+
+        const newEdge = { ...edge };
+        
+        // Handle transition update
+        if ('transition' in updates) {
+          if (updates.transition === undefined) {
+            delete newEdge.transition;
+          } else {
+            newEdge.transition = updates.transition as typeof edge.transition;
+          }
+        }
+        
+        // Handle transitionDuration update
+        if ('transitionDuration' in updates) {
+          if (updates.transitionDuration === undefined) {
+            delete newEdge.transitionDuration;
+          } else {
+            newEdge.transitionDuration = updates.transitionDuration;
+          }
+        }
+
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            edges: {
+              ...d.flow.edges,
+              [edgeId]: newEdge,
+            },
+          },
+        };
+      });
+    },
+    [onUpdateDeck]
+  );
+
+  const handleDeleteEdge = useCallback(
+    (edgeId: string) => {
+      onUpdateDeck((d) => {
+        const { [edgeId]: _, ...remainingEdges } = d.flow.edges;
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            edges: remainingEdges,
+          },
+        };
+      });
+      // Clear selection if we deleted the selected edge
+      if (selection.edgeId === edgeId) {
+        clearSelection();
+      }
+    },
+    [onUpdateDeck, selection.edgeId, clearSelection]
+  );
+
+  const handleUpdateStartPoint = useCallback(
+    (startPointId: string, updates: Partial<{ name: string }>) => {
+      onUpdateDeck((d) => {
+        const startPoints = d.flow.startPoints;
+        if (!startPoints || !startPoints[startPointId]) return d;
+
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            startPoints: {
+              ...startPoints,
+              [startPointId]: {
+                ...startPoints[startPointId],
+                ...updates,
+              },
+            },
+          },
+        };
+      });
+    },
+    [onUpdateDeck]
+  );
+
+  const handleDeleteStartPoint = useCallback(
+    (startPointId: string) => {
+      onUpdateDeck((d) => {
+        const startPoints = d.flow.startPoints;
+        if (!startPoints) return d;
+
+        const { [startPointId]: _, ...remainingStartPoints } = startPoints;
+        
+        // Also delete any edges from this start point
+        const remainingEdges = Object.fromEntries(
+          Object.entries(d.flow.edges).filter(([, edge]) => edge.from !== startPointId)
+        );
+
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            startPoints: Object.keys(remainingStartPoints).length > 0 ? remainingStartPoints : undefined,
+            edges: remainingEdges,
+          },
+        };
+      });
+      // Clear selection if we deleted the selected start point
+      if (selection.startPointId === startPointId) {
+        clearSelection();
+      }
+    },
+    [onUpdateDeck, selection.startPointId, clearSelection]
+  );
+
   const context: InspectorContext = useMemo(() => {
     const selectedSlide = selection.slideId ? deck.slides[selection.slideId] : null;
     const selectedComponent =
@@ -300,6 +418,10 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
   }, [deck, selection, handleUpdate, handleAddComponent, handleDeleteComponent, handleReorderComponent]);
 
   const hasSlideSelected = context.selectedSlide !== null;
+  const selectedEdge = isEdgeSelected(selection) ? deck.flow.edges[selection.edgeId] : null;
+  const selectedStartPoint = isStartPointSelected(selection) && deck.flow.startPoints 
+    ? deck.flow.startPoints[selection.startPointId] 
+    : null;
 
   return (
     <InspectorExpansionProvider>
@@ -307,10 +429,10 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
         <div className="inspector-header">
           <div className="inspector-tabs">
             <button
-              className={`inspector-tab ${activeTab === 'slide' ? 'inspector-tab-active' : ''}`}
-              onClick={() => setActiveTab('slide')}
+              className={`inspector-tab ${activeTab === 'selection' ? 'inspector-tab-active' : ''}`}
+              onClick={() => setActiveTab('selection')}
             >
-              Slide
+              Selection
             </button>
             <button
               className={`inspector-tab ${activeTab === 'theme' ? 'inspector-tab-active' : ''}`}
@@ -338,10 +460,24 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
         </div>
 
         <div className="inspector-content">
-          {activeTab === 'slide' && (
+          {activeTab === 'selection' && (
             <>
-              {!hasSlideSelected ? (
-                <div className="inspector-empty">Select a slide to edit</div>
+              {selectedEdge ? (
+                <EdgePropertiesSection
+                  edge={selectedEdge}
+                  deckDefaultTransition={deck.flow.defaultTransition}
+                  deckDefaultDuration={deck.flow.defaultTransitionDuration}
+                  onUpdateEdge={handleUpdateEdge}
+                  onDeleteEdge={handleDeleteEdge}
+                />
+              ) : selectedStartPoint ? (
+                <StartPointPropertiesSection
+                  startPoint={selectedStartPoint}
+                  onUpdateStartPoint={handleUpdateStartPoint}
+                  onDeleteStartPoint={handleDeleteStartPoint}
+                />
+              ) : !hasSlideSelected ? (
+                <div className="inspector-empty">Select an object to edit</div>
               ) : (
                 <>
                   <SlidePropertiesSection context={context} />
@@ -382,8 +518,8 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
           )}
         </div>
 
-        {/* Add Component Button - only show on slide tab when slide is selected */}
-        {activeTab === 'slide' && hasSlideSelected && (
+        {/* Add Component Button - only show on selection tab when slide is selected (not edge/start point) */}
+        {activeTab === 'selection' && hasSlideSelected && !selectedEdge && !selectedStartPoint && (
           <div className="inspector-footer">
             <button
               className="inspector-add-button"

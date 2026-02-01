@@ -25,6 +25,11 @@
   border: none;
   border-radius: 0;
   padding: 0;
+  box-shadow: none;
+}
+
+.react-flow__node.selected {
+  box-shadow: var(--node-shadow-selected) !important;
 }
 
 /* Edges - thicker and more visible */
@@ -153,4 +158,23 @@
 
 .react-flow__handle-connecting {
   background: var(--interactive-primary);
+}
+
+/* Edge transition badge */
+.edge-transition-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: var(--bg-accent);
+  color: var(--text-on-accent);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.edge-transition-badge.selected {
+  background: var(--edge-stroke-selected);
+  color: var(--bg-surface);
 }

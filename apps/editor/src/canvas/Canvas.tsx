@@ -19,6 +19,7 @@ import {
 } from '@xyflow/react';
 import { SlideNode, type SlideNodeType } from './SlideNode';
 import { StartPointNode, type StartPointNodeType } from './StartPointNode';
+import { TransitionEdge } from './TransitionEdge';
 import { ContextMenu } from './ContextMenu';
 import { CanvasHeader } from './CanvasHeader';
 import { useSelection } from '../selection';
@@ -28,6 +29,10 @@ import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint
 const nodeTypes = {
   slide: SlideNode,
   startPoint: StartPointNode,
+};
+
+const edgeTypes = {
+  transition: TransitionEdge,
 };
 
 // Union type for all node types
@@ -58,9 +63,11 @@ export function Canvas({
 }: CanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const store = useStoreApi();
-  const { selection, selectSlide } = useSelection();
+  const { selection, selectSlide, selectEdge, selectStartPoint } = useSelection();
   const selectedSlideId = selection.slideId;
   const selectedComponentId = selection.componentId;
+  const selectedEdgeId = selection.edgeId;
+  const selectedStartPointId = selection.startPointId;
 
   // Track connection start for drop-on-node
   const connectStartRef = useRef<{ nodeId: string; handleId: string | null } | null>(null);
@@ -105,9 +112,9 @@ export function Canvas({
       type: 'startPoint',
       position: startPoint.position,
       data: { startPoint },
-      selected: false, // TODO: Add start point selection
+      selected: startPoint.id === selectedStartPointId,
     }));
-  }, [deck.flow.startPoints]);
+  }, [deck.flow.startPoints, selectedStartPointId]);
 
   // Combine all nodes
   const deckNodes = useMemo(() => {
@@ -115,13 +122,16 @@ export function Canvas({
   }, [slideNodes, startPointNodes]);
 
   // Derive edges from deck state
-  const deckEdges = useMemo(() => {
-    return Object.values(deck.flow.edges).map((edge): Edge => ({
+  const deckEdges = useMemo((): Edge[] => {
+    return Object.values(deck.flow.edges).map((edge) => ({
       id: edge.id,
       source: edge.from,
       target: edge.to,
-      label: edge.label,
-      type: 'smoothstep',
+      type: 'transition',
+      data: {
+        transition: edge.transition,
+        label: edge.label,
+      },
     }));
   }, [deck.flow.edges]);
 
@@ -169,9 +179,15 @@ export function Canvas({
     });
   }, [deckNodes, setNodes]);
 
-  // Sync edges when deck changes
+  // Sync edges when deck changes - preserve selection state
   useEffect(() => {
-    setEdges(deckEdges);
+    setEdges((currentEdges) => {
+      const selectedIds = new Set(currentEdges.filter(e => e.selected).map(e => e.id));
+      return deckEdges.map(edge => ({
+        ...edge,
+        selected: selectedIds.has(edge.id),
+      }));
+    });
   }, [deckEdges, setEdges]);
 
   const selectedNodes = useMemo(
@@ -185,19 +201,31 @@ export function Canvas({
   );
 
   const onSelectionChange = useCallback(
-    ({ nodes }: OnSelectionChangeParams) => {
+    ({ nodes, edges: selectedEdgesList }: OnSelectionChangeParams) => {
       // Ignore selection changes during programmatic node updates
       if (isUpdatingNodesRef.current) {
         return;
       }
       
+      // Handle edge selection
+      if (selectedEdgesList.length === 1 && nodes.length === 0) {
+        selectEdge(selectedEdgesList[0].id);
+        return;
+      }
+      
+      // Handle node selection
       if (nodes.length === 1) {
-        selectSlide(nodes[0].id);
-      } else if (nodes.length === 0) {
+        const node = nodes[0];
+        if (node.type === 'startPoint') {
+          selectStartPoint(node.id);
+        } else {
+          selectSlide(node.id);
+        }
+      } else if (nodes.length === 0 && selectedEdgesList.length === 0) {
         selectSlide(null);
       }
     },
-    [selectSlide]
+    [selectSlide, selectEdge, selectStartPoint]
   );
 
   // Persist positions to deck when drag ends (handles single and multi-select)
@@ -464,7 +492,7 @@ export function Canvas({
     []
   );
 
-  const onNodeContextMenu: NodeMouseHandler<SlideNodeType> = useCallback(
+  const onNodeContextMenu: NodeMouseHandler<CanvasNodeType> = useCallback(
     (event, node) => {
       event.preventDefault();
       setContextMenu({
@@ -632,8 +660,15 @@ export function Canvas({
 
   // Handle node deletion from React Flow
   const onNodesDelete = useCallback(
-    (nodesToDelete: SlideNodeType[]) => {
-      deleteSlides(nodesToDelete.map((n) => n.id));
+    (nodesToDelete: CanvasNodeType[]) => {
+      // Only delete slide nodes, not start points (yet)
+      const slideIds = nodesToDelete
+        .filter((n): n is SlideNodeType => n.type === 'slide')
+        .map((n) => n.id);
+      if (slideIds.length > 0) {
+        deleteSlides(slideIds);
+      }
+      // TODO: Handle start point deletion
     },
     [deleteSlides]
   );
@@ -712,6 +747,7 @@ export function Canvas({
         onPaneContextMenu={onPaneContextMenu}
         onNodeContextMenu={onNodeContextMenu}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1.0 }}
         minZoom={0.1}
@@ -721,9 +757,9 @@ export function Canvas({
         selectionOnDrag
         zoomOnScroll
         snapToGrid
-        snapGrid={[10, 10]}
+        snapGrid={[25, 25]}
         defaultEdgeOptions={{
-          type: 'smoothstep',
+          type: 'transition',
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 20,

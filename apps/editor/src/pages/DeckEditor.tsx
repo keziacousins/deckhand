@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Canvas } from '../canvas/Canvas';
 import { Inspector } from '../inspector/Inspector';
+import { StartPresentationModal } from '../components/StartPresentationModal';
 import { SelectionProvider, useSelection } from '../selection';
 import { useYDoc } from '../sync';
 import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
@@ -72,71 +73,102 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   // Get current selection for presentation start slide
   const { selection } = useSelection();
 
+  // Modal state for start presentation
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [pendingPlayMode, setPendingPlayMode] = useState<'fullscreen' | 'window' | null>(null);
+
+  const hasStartPoints = deck && deck.flow.startPoints && Object.keys(deck.flow.startPoints).length > 0;
+
+  const startPresentation = useCallback((slideId: string | undefined, mode: 'fullscreen' | 'window') => {
+    if (!deck) return;
+
+    const startSlide = slideId || '';
+    
+    if (mode === 'fullscreen') {
+      const presentUrl = `/deck/${deckId}/present${startSlide ? `/${startSlide}` : ''}`;
+      
+      // Navigate to presentation route
+      window.location.hash = presentUrl;
+      
+      // Request fullscreen on document element after a short delay to let React render
+      setTimeout(() => {
+        document.documentElement.requestFullscreen?.().catch(() => {
+          // Fullscreen request failed (e.g., not triggered by user gesture)
+          // Presentation still works, just not in fullscreen
+        });
+      }, 100);
+    } else {
+      const presentUrl = `${window.location.origin}${window.location.pathname}#/deck/${deckId}/present${startSlide ? `/${startSlide}` : ''}`;
+      
+      // Calculate window size based on aspect ratio
+      const screenHeight = window.screen.availHeight;
+      const screenWidth = window.screen.availWidth;
+      
+      // Parse aspect ratio (e.g., "16:9" -> 16/9)
+      const [w, h] = deck.aspectRatio.split(':').map(Number);
+      const aspectRatio = w / h;
+      
+      // Size to 80% of available screen height
+      const windowHeight = Math.floor(screenHeight * 0.8);
+      const windowWidth = Math.floor(windowHeight * aspectRatio);
+      
+      // Center on screen
+      const left = Math.floor((screenWidth - windowWidth) / 2);
+      const top = Math.floor((screenHeight - windowHeight) / 2);
+      
+      // Chromeless popup features
+      const features = [
+        `width=${windowWidth}`,
+        `height=${windowHeight}`,
+        `left=${left}`,
+        `top=${top}`,
+        'menubar=no',
+        'toolbar=no',
+        'location=no',
+        'status=no',
+        'resizable=yes',
+      ].join(',');
+      
+      // Reuse existing presentation window or open new one
+      if (presentationWindow && !presentationWindow.closed) {
+        presentationWindow.location.href = presentUrl;
+        presentationWindow.focus();
+      } else {
+        presentationWindow = window.open(presentUrl, 'deckhand-presentation', features);
+      }
+    }
+  }, [deck, deckId]);
+
   const handlePlayFullscreen = useCallback(() => {
-    const startSlide = selection.slideId || '';
-    const presentUrl = `#/deck/${deckId}/present${startSlide ? `/${startSlide}` : ''}`;
-    
-    // Navigate to presentation in fullscreen
-    const presentationContainer = document.createElement('div');
-    presentationContainer.id = 'fullscreen-presentation';
-    document.body.appendChild(presentationContainer);
-    
-    // Request fullscreen then navigate
-    presentationContainer.requestFullscreen?.()
-      .then(() => {
-        window.location.hash = presentUrl.slice(1);
-      })
-      .catch(() => {
-        // Fullscreen failed, just navigate
-        document.body.removeChild(presentationContainer);
-        window.location.hash = presentUrl.slice(1);
-      });
-  }, [deckId, selection.slideId]);
+    if (hasStartPoints) {
+      setPendingPlayMode('fullscreen');
+      setShowStartModal(true);
+    } else {
+      startPresentation(selection.slideId || undefined, 'fullscreen');
+    }
+  }, [hasStartPoints, selection.slideId, startPresentation]);
 
   const handlePlayWindow = useCallback(() => {
-    if (!deck) return;
-    
-    const startSlide = selection.slideId || '';
-    const presentUrl = `${window.location.origin}${window.location.pathname}#/deck/${deckId}/present${startSlide ? `/${startSlide}` : ''}`;
-    
-    // Calculate window size based on aspect ratio
-    // Use 80% of screen height as base, calculate width from aspect ratio
-    const screenHeight = window.screen.availHeight;
-    const screenWidth = window.screen.availWidth;
-    
-    // Parse aspect ratio (e.g., "16:9" -> 16/9)
-    const [w, h] = deck.aspectRatio.split(':').map(Number);
-    const aspectRatio = w / h;
-    
-    // Size to 80% of available screen height
-    const windowHeight = Math.floor(screenHeight * 0.8);
-    const windowWidth = Math.floor(windowHeight * aspectRatio);
-    
-    // Center on screen
-    const left = Math.floor((screenWidth - windowWidth) / 2);
-    const top = Math.floor((screenHeight - windowHeight) / 2);
-    
-    // Chromeless popup features
-    const features = [
-      `width=${windowWidth}`,
-      `height=${windowHeight}`,
-      `left=${left}`,
-      `top=${top}`,
-      'menubar=no',
-      'toolbar=no',
-      'location=no',
-      'status=no',
-      'resizable=yes',
-    ].join(',');
-    
-    // Reuse existing presentation window or open new one
-    if (presentationWindow && !presentationWindow.closed) {
-      presentationWindow.location.href = presentUrl;
-      presentationWindow.focus();
+    if (hasStartPoints) {
+      setPendingPlayMode('window');
+      setShowStartModal(true);
     } else {
-      presentationWindow = window.open(presentUrl, 'deckhand-presentation', features);
+      startPresentation(selection.slideId || undefined, 'window');
     }
-  }, [deck, deckId, selection.slideId]);
+  }, [hasStartPoints, selection.slideId, startPresentation]);
+
+  const handleModalStart = useCallback((slideId: string | undefined) => {
+    setShowStartModal(false);
+    if (pendingPlayMode) {
+      startPresentation(slideId, pendingPlayMode);
+    }
+    setPendingPlayMode(null);
+  }, [pendingPlayMode, startPresentation]);
+
+  const handleModalClose = useCallback(() => {
+    setShowStartModal(false);
+    setPendingPlayMode(null);
+  }, []);
 
   // Show loading while connecting or waiting for initial data
   if (status === 'connecting' || (status === 'connected' && !deck)) {
@@ -185,6 +217,15 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         showGrid={showGrid}
         onToggleShowGrid={() => setShowGrid((v) => !v)}
       />
+      
+      {showStartModal && deck && (
+        <StartPresentationModal
+          deck={deck}
+          currentSlideId={selection.slideId}
+          onStart={handleModalStart}
+          onClose={handleModalClose}
+        />
+      )}
     </div>
   );
 }

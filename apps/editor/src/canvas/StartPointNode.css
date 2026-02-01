@@ -14,13 +14,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 80px;
-  height: 36px;
-  padding: 0 16px;
+  min-width: 120px;
+  height: 50px;
+  padding: 0 24px;
   background: var(--interactive-primary);
   border: 2px solid var(--interactive-primary);
-  border-radius: 18px; /* Pill shape */
-  box-shadow: var(--shadow-sm);
+  border-radius: 25px; /* Pill shape */
+  box-shadow: var(--shadow-md);
   cursor: grab;
   transition:
     box-shadow var(--transition-normal),
@@ -45,12 +45,12 @@
 
 .start-point-name {
   color: var(--color-white);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 240px;
   user-select: none;
 }
 

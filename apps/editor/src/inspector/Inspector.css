@@ -591,3 +591,22 @@
   overflow: auto;
   background: transparent;
 }
+
+/* Delete Button */
+.inspector-delete-button {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--border-error);
+  border-radius: var(--radius-md);
+  color: var(--text-error);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.inspector-delete-button:hover {
+  background: var(--bg-error);
+  color: var(--text-on-error);
+}

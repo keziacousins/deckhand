@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useYDoc } from '../sync';
-import type { Deck, Slide, Component } from '@deckhand/schema';
-import { DEFAULT_GRID_COLUMNS, SLIDE_WIDTH, getSlideHeight, themeToCssProperties } from '@deckhand/schema';
+import type { Deck, Slide, Component, TransitionType } from '@deckhand/schema';
+import { DEFAULT_GRID_COLUMNS, SLIDE_WIDTH, getSlideHeight, themeToCssProperties, DEFAULT_TRANSITION_DURATION } from '@deckhand/schema';
 import './Presentation.css';
 
 /**
@@ -114,28 +114,73 @@ interface PresentationProps {
 }
 
 /**
+ * Play order entry - includes slide ID and the edge used to reach it
+ */
+interface PlayOrderEntry {
+  slideId: string;
+  /** The edge that leads TO this slide (null for first slide) */
+  incomingEdgeId: string | null;
+}
+
+/**
  * Compute the play order by traversing edges from a starting slide.
- * Returns an array of slide IDs in presentation order.
+ * Returns an array of entries with slide IDs and their incoming edges.
  * Slides not reachable from the start slide are excluded.
  */
-function computePlayOrder(deck: Deck, startSlideId: string): string[] {
-  const order: string[] = [];
+function computePlayOrder(deck: Deck, startSlideId: string): PlayOrderEntry[] {
+  const order: PlayOrderEntry[] = [];
   const visited = new Set<string>();
   
   let currentId: string | null = startSlideId;
+  let incomingEdgeId: string | null = null;
   
   while (currentId && !visited.has(currentId)) {
     if (!deck.slides[currentId]) break;
     
     visited.add(currentId);
-    order.push(currentId);
+    order.push({ slideId: currentId, incomingEdgeId });
     
     // Find outgoing edge (take first one if multiple)
     const outgoingEdge = Object.values(deck.flow.edges).find(e => e.from === currentId);
+    incomingEdgeId = outgoingEdge?.id ?? null;
     currentId = outgoingEdge?.to ?? null;
   }
   
   return order;
+}
+
+/**
+ * Get transition info for navigating between slides
+ */
+function getTransitionInfo(
+  deck: Deck,
+  edgeId: string | null,
+  direction: 'forward' | 'backward'
+): { type: TransitionType; duration: number } {
+  const defaultType = deck.flow.defaultTransition ?? 'instant';
+  const defaultDuration = deck.flow.defaultTransitionDuration ?? DEFAULT_TRANSITION_DURATION;
+  
+  if (!edgeId) {
+    return { type: defaultType, duration: defaultDuration };
+  }
+  
+  const edge = deck.flow.edges[edgeId];
+  if (!edge) {
+    return { type: defaultType, duration: defaultDuration };
+  }
+  
+  let type = edge.transition ?? defaultType;
+  const duration = edge.transitionDuration ?? defaultDuration;
+  
+  // Reverse slide direction for backward navigation
+  if (direction === 'backward') {
+    if (type === 'slide-left') type = 'slide-right';
+    else if (type === 'slide-right') type = 'slide-left';
+    else if (type === 'slide-up') type = 'slide-down';
+    else if (type === 'slide-down') type = 'slide-up';
+  }
+  
+  return { type, duration };
 }
 
 /**
@@ -180,11 +225,21 @@ function SlideRenderer({
   );
 }
 
+interface TransitionState {
+  isTransitioning: boolean;
+  type: TransitionType;
+  duration: number;
+  fromIndex: number;
+  toIndex: number;
+  phase: 'enter' | 'active' | 'done';
+}
+
 export function Presentation({ deckId, startSlideId, onExit }: PresentationProps) {
   const { deck, status, error } = useYDoc(deckId);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [transition, setTransition] = useState<TransitionState | null>(null);
 
   // Calculate scale to fit slide in viewport while maintaining aspect ratio
   useEffect(() => {
@@ -228,23 +283,108 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     return computePlayOrder(deck, start);
   }, [deck, startSlideId]);
 
-  const currentSlideId = playOrder[currentIndex];
+  const currentEntry = playOrder[currentIndex];
+  const currentSlideId = currentEntry?.slideId;
   const currentSlide = deck?.slides[currentSlideId];
   
-  const canGoNext = currentIndex < playOrder.length - 1;
-  const canGoPrev = currentIndex > 0;
+  const canGoNext = currentIndex < playOrder.length - 1 && !transition?.isTransitioning;
+  const canGoPrev = currentIndex > 0 && !transition?.isTransitioning;
 
   const goNext = useCallback(() => {
-    if (canGoNext) {
-      setCurrentIndex(i => i + 1);
+    if (!canGoNext || !deck) return;
+    
+    const nextIndex = currentIndex + 1;
+    const nextEntry = playOrder[nextIndex];
+    const { type, duration } = getTransitionInfo(deck, nextEntry.incomingEdgeId, 'forward');
+    
+    if (type === 'instant' || duration === 0) {
+      setCurrentIndex(nextIndex);
+    } else {
+      // Start transition
+      setTransition({
+        isTransitioning: true,
+        type,
+        duration,
+        fromIndex: currentIndex,
+        toIndex: nextIndex,
+        phase: 'enter',
+      });
+      
+      // Trigger animation after a frame
+      requestAnimationFrame(() => {
+        setTransition(t => t ? { ...t, phase: 'active' } : null);
+      });
+      
+      // Complete transition after duration
+      setTimeout(() => {
+        setCurrentIndex(nextIndex);
+        setTransition(null);
+      }, duration * 1000);
     }
-  }, [canGoNext]);
+  }, [canGoNext, currentIndex, deck, playOrder]);
 
   const goPrev = useCallback(() => {
-    if (canGoPrev) {
-      setCurrentIndex(i => i - 1);
+    if (!canGoPrev || !deck) return;
+    
+    const prevIndex = currentIndex - 1;
+    // Use the edge that led to the current slide, but reverse direction
+    const { type, duration } = getTransitionInfo(deck, currentEntry.incomingEdgeId, 'backward');
+    
+    if (type === 'instant' || duration === 0) {
+      setCurrentIndex(prevIndex);
+    } else {
+      // Start transition
+      setTransition({
+        isTransitioning: true,
+        type,
+        duration,
+        fromIndex: currentIndex,
+        toIndex: prevIndex,
+        phase: 'enter',
+      });
+      
+      // Trigger animation after a frame
+      requestAnimationFrame(() => {
+        setTransition(t => t ? { ...t, phase: 'active' } : null);
+      });
+      
+      // Complete transition after duration
+      setTimeout(() => {
+        setCurrentIndex(prevIndex);
+        setTransition(null);
+      }, duration * 1000);
     }
-  }, [canGoPrev]);
+  }, [canGoPrev, currentIndex, currentEntry, deck]);
+
+  // Track if we were ever in fullscreen (to know if exiting fullscreen should exit presentation)
+  const wasInFullscreen = useRef(false);
+
+  // Detect initial fullscreen state after mount
+  useEffect(() => {
+    if (document.fullscreenElement) {
+      wasInFullscreen.current = true;
+    }
+  }, []);
+
+  // Exit presentation when fullscreen is exited (if we were in fullscreen)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (document.fullscreenElement) {
+        // Entered fullscreen
+        wasInFullscreen.current = true;
+      } else if (wasInFullscreen.current) {
+        // Exited fullscreen after being in it - also exit presentation
+        if (window.opener) {
+          window.close();
+        } else {
+          onExit();
+        }
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [onExit]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -263,13 +403,15 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
           goPrev();
           break;
         case 'Escape':
-          e.preventDefault();
-          // If this is a popup window (opened via window.open), close it
-          // Otherwise call onExit to navigate back
-          if (window.opener) {
-            window.close();
-          } else {
-            onExit();
+          // If in fullscreen, let browser handle it - fullscreenchange will exit presentation
+          // If not in fullscreen, exit presentation directly
+          if (!document.fullscreenElement) {
+            e.preventDefault();
+            if (window.opener) {
+              window.close();
+            } else {
+              onExit();
+            }
           }
           break;
         case 'Home':
@@ -339,10 +481,33 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     height: slideHeight,
   };
 
+  // Get slides for transition rendering
+  const fromSlide = transition ? deck.slides[playOrder[transition.fromIndex]?.slideId] : null;
+  const toSlide = transition ? deck.slides[playOrder[transition.toIndex]?.slideId] : null;
+
+  // CSS custom properties for transition duration
+  const transitionDuration = transition ? `${transition.duration}s` : '0s';
+
   return (
     <div className="presentation" ref={containerRef} onClick={handleClick}>
-      <div className="presentation-viewport" style={viewportStyle}>
-        <SlideRenderer slide={currentSlide} deck={deck} />
+      <div 
+        className="presentation-viewport" 
+        style={{ ...viewportStyle, '--transition-duration': transitionDuration } as React.CSSProperties}
+      >
+        {transition && fromSlide && toSlide ? (
+          // During transition: show both slides with animation
+          <div className={`presentation-transition transition-${transition.type} ${transition.phase}`}>
+            <div className="transition-slide transition-from">
+              <SlideRenderer slide={fromSlide} deck={deck} />
+            </div>
+            <div className="transition-slide transition-to">
+              <SlideRenderer slide={toSlide} deck={deck} />
+            </div>
+          </div>
+        ) : (
+          // Normal: show current slide
+          <SlideRenderer slide={currentSlide} deck={deck} />
+        )}
       </div>
       
       {/* Progress indicator */}

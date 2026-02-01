@@ -5,6 +5,8 @@ interface SelectionContextValue {
   selection: Selection;
   selectSlide: (slideId: string | null) => void;
   selectComponent: (slideId: string, componentId: string) => void;
+  selectEdge: (edgeId: string | null) => void;
+  selectStartPoint: (startPointId: string | null) => void;
   clearSelection: () => void;
 }
 
@@ -14,6 +16,8 @@ const emptySelection: Selection = {
   type: 'none',
   slideId: null,
   componentId: null,
+  edgeId: null,
+  startPointId: null,
 };
 
 export function SelectionProvider({ children }: { children: ReactNode }) {
@@ -22,13 +26,29 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
   const selectSlide = useCallback((slideId: string | null) => {
     setSelection(
       slideId
-        ? { type: 'slide', slideId, componentId: null }
+        ? { type: 'slide', slideId, componentId: null, edgeId: null, startPointId: null }
         : emptySelection
     );
   }, []);
 
   const selectComponent = useCallback((slideId: string, componentId: string) => {
-    setSelection({ type: 'component', slideId, componentId });
+    setSelection({ type: 'component', slideId, componentId, edgeId: null, startPointId: null });
+  }, []);
+
+  const selectEdge = useCallback((edgeId: string | null) => {
+    setSelection(
+      edgeId
+        ? { type: 'edge', slideId: null, componentId: null, edgeId, startPointId: null }
+        : emptySelection
+    );
+  }, []);
+
+  const selectStartPoint = useCallback((startPointId: string | null) => {
+    setSelection(
+      startPointId
+        ? { type: 'startPoint', slideId: null, componentId: null, edgeId: null, startPointId }
+        : emptySelection
+    );
   }, []);
 
   const clearSelection = useCallback(() => {
@@ -37,7 +57,7 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
 
   return (
     <SelectionContext.Provider
-      value={{ selection, selectSlide, selectComponent, clearSelection }}
+      value={{ selection, selectSlide, selectComponent, selectEdge, selectStartPoint, clearSelection }}
     >
       {children}
     </SelectionContext.Provider>

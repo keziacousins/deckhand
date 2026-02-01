@@ -68,7 +68,9 @@
   --node-border-selected-strong: var(--color-blue-600);
   --node-shadow: var(--shadow-md);
   --node-shadow-hover: var(--shadow-lg);
-  --node-shadow-selected: 0 12px 32px rgba(59, 130, 246, 0.25), 0 8px 16px rgba(0, 0, 0, 0.15);
+  --node-shadow-selected:
+    0 8px 20px -4px color-mix(in srgb, var(--color-black) 30%, transparent),
+    0 4px 8px -2px color-mix(in srgb, var(--color-black) 15%, transparent);
 
   /* Canvas */
   --canvas-bg: var(--color-gray-600);
@@ -168,7 +170,9 @@
     --node-border-selected-strong: var(--color-blue-300);
     --node-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     --node-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.5);
-    --node-shadow-selected: 0 12px 32px rgba(96, 165, 250, 0.3), 0 8px 16px rgba(0, 0, 0, 0.4);
+    --node-shadow-selected:
+      6px 12px 28px -3px color-mix(in srgb, var(--color-black) 60%, transparent),
+      3px 6px 12px -3px color-mix(in srgb, var(--color-black) 35%, transparent);
 
     /* Canvas */
     --canvas-bg: var(--color-gray-600);

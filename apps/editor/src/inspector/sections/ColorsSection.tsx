@@ -40,21 +40,25 @@ export function ColorsSection({ context }: InspectorSectionProps) {
         label="Background"
         value={style.background ?? ''}
         onChange={(value) => handleStyleChange('background', value)}
+        placeholder="Inherited"
       />
       <ColorField
         label="Text Primary"
         value={style.textPrimary ?? ''}
         onChange={(value) => handleStyleChange('textPrimary', value)}
+        placeholder="Inherited"
       />
       <ColorField
         label="Text Secondary"
         value={style.textSecondary ?? ''}
         onChange={(value) => handleStyleChange('textSecondary', value)}
+        placeholder="Inherited"
       />
       <ColorField
         label="Accent"
         value={style.accent ?? ''}
         onChange={(value) => handleStyleChange('accent', value)}
+        placeholder="Inherited"
       />
     </CollapsibleSection>
   );

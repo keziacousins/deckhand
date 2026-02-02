@@ -5,9 +5,13 @@ interface ColorFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  /** Placeholder shown when value is empty (e.g., "Inherited") */
+  placeholder?: string;
+  /** Show a clear button to reset to empty/inherited */
+  allowClear?: boolean;
 }
 
-export function ColorField({ label, value, onChange }: ColorFieldProps) {
+export function ColorField({ label, value, onChange, placeholder, allowClear = true }: ColorFieldProps) {
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,6 +50,13 @@ export function ColorField({ label, value, onChange }: ColorFieldProps) {
     e.target.select();
   }, []);
 
+  const handleClear = useCallback(() => {
+    setLocalValue('');
+    onChange('');
+  }, [onChange]);
+
+  const hasValue = localValue.length > 0;
+
   return (
     <div className="inspector-field color-field">
       <label className="inspector-field-label">{label}</label>
@@ -65,7 +76,18 @@ export function ColorField({ label, value, onChange }: ColorFieldProps) {
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
+          placeholder={placeholder}
         />
+        {allowClear && hasValue && (
+          <button
+            type="button"
+            className="color-field-clear"
+            onClick={handleClear}
+            title="Reset to inherited"
+          >
+            ×
+          </button>
+        )}
       </div>
     </div>
   );

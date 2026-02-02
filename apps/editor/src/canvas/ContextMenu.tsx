@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { Node, XYPosition } from '@xyflow/react';
 import './ContextMenu.css';
 
@@ -6,22 +6,28 @@ interface ContextMenuProps {
   position: XYPosition | null;
   targetNode: Node | null;
   selectedNodes: Node[];
+  selectedComponentId: string | null;
+  selectedSlideId: string | null;
   onClose: () => void;
   onAddSlide: (position: XYPosition) => void;
   onAddStartPoint: (position: XYPosition) => void;
   onDuplicateSlide: (nodeId: string) => void;
   onDeleteSlide: (nodeIds: string[]) => void;
+  onDeleteComponent: (slideId: string, componentId: string) => void;
 }
 
 export function ContextMenu({
   position,
   targetNode,
   selectedNodes,
+  selectedComponentId,
+  selectedSlideId,
   onClose,
   onAddSlide,
   onAddStartPoint,
   onDuplicateSlide,
   onDeleteSlide,
+  onDeleteComponent,
 }: ContextMenuProps) {
   // Close on escape
   useEffect(() => {
@@ -110,17 +116,34 @@ export function ContextMenu({
 
       <div className="context-menu-separator" />
 
-      <button
-        className="context-menu-item context-menu-item-danger"
-        disabled={!hasSelection}
-        onClick={() => {
-          onDeleteSlide(nodeIds);
-          onClose();
-        }}
-      >
-        <span className="context-menu-label">Delete</span>
-        <span className="context-menu-shortcut">⌫</span>
-      </button>
+      {/* Delete Component - shown when a component is selected */}
+      {selectedComponentId && selectedSlideId && (
+        <button
+          className="context-menu-item context-menu-item-danger"
+          onClick={() => {
+            onDeleteComponent(selectedSlideId, selectedComponentId);
+            onClose();
+          }}
+        >
+          <span className="context-menu-label">Delete Component</span>
+          <span className="context-menu-shortcut">⌫</span>
+        </button>
+      )}
+
+      {/* Delete Slide/Node - shown when no component is selected */}
+      {!selectedComponentId && (
+        <button
+          className="context-menu-item context-menu-item-danger"
+          disabled={!hasSelection}
+          onClick={() => {
+            onDeleteSlide(nodeIds);
+            onClose();
+          }}
+        >
+          <span className="context-menu-label">Delete</span>
+          <span className="context-menu-shortcut">⌫</span>
+        </button>
+      )}
     </div>
   );
 }

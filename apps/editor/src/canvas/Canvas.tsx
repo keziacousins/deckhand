@@ -69,7 +69,7 @@ export function Canvas({
 }: CanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const store = useStoreApi();
-  const { selection, selectSlide, selectEdge, selectStartPoint } = useSelection();
+  const { selection, selectSlide, selectEdge, selectStartPoint, clearSelection } = useSelection();
   const selectedSlideId = selection.slideId;
   const selectedComponentId = selection.componentId;
   const selectedEdgeId = selection.edgeId;
@@ -107,10 +107,12 @@ export function Canvas({
         assets,
         showGrid,
         selectedComponentId: slide.id === selectedSlideId ? selectedComponentId : null,
+        allSlides: deck.slides,
+        defaultBackdropSlideId: deck.defaultBackdropSlideId,
       },
       selected: slide.id === selectedSlideId,
     }));
-  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, deck.assets, showGrid, selectedSlideId, selectedComponentId]);
+  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, deck.assets, deck.defaultBackdropSlideId, showGrid, selectedSlideId, selectedComponentId]);
 
   // Derive start point nodes from deck state
   const startPointNodes = useMemo(() => {
@@ -624,20 +626,12 @@ export function Canvas({
           }
         }
 
-        // Update entry slide if needed
-        let entrySlide = d.flow.entrySlide;
-        if (slideIds.includes(entrySlide)) {
-          const remaining = Object.keys(newSlides);
-          entrySlide = remaining[0] || '';
-        }
-
         return {
           ...d,
           slides: newSlides,
           flow: {
             ...d.flow,
             edges: newEdges,
-            entrySlide,
           },
         };
       });
@@ -666,19 +660,58 @@ export function Canvas({
     [onUpdateDeck]
   );
 
+  const deleteStartPoints = useCallback(
+    (startPointIds: string[]) => {
+      onUpdateDeck((d) => {
+        const startPoints = d.flow.startPoints;
+        if (!startPoints) return d;
+
+        const newStartPoints = { ...startPoints };
+        const newEdges = { ...d.flow.edges };
+
+        for (const id of startPointIds) {
+          delete newStartPoints[id];
+          // Also delete edges from this start point
+          for (const [edgeId, edge] of Object.entries(newEdges)) {
+            if (edge.from === id) {
+              delete newEdges[edgeId];
+            }
+          }
+        }
+
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            startPoints: Object.keys(newStartPoints).length > 0 ? newStartPoints : undefined,
+            edges: newEdges,
+          },
+        };
+      });
+
+      clearSelection();
+    },
+    [onUpdateDeck, clearSelection]
+  );
+
   // Handle node deletion from React Flow
   const onNodesDelete = useCallback(
     (nodesToDelete: CanvasNodeType[]) => {
-      // Only delete slide nodes, not start points (yet)
       const slideIds = nodesToDelete
         .filter((n): n is SlideNodeType => n.type === 'slide')
         .map((n) => n.id);
       if (slideIds.length > 0) {
         deleteSlides(slideIds);
       }
-      // TODO: Handle start point deletion
+
+      const startPointIds = nodesToDelete
+        .filter((n): n is StartPointNodeType => n.type === 'startPoint')
+        .map((n) => n.id);
+      if (startPointIds.length > 0) {
+        deleteStartPoints(startPointIds);
+      }
     },
-    [deleteSlides]
+    [deleteSlides, deleteStartPoints]
   );
 
   // Handle edge deletion from React Flow
@@ -700,7 +733,32 @@ export function Canvas({
     [showDetails]
   );
 
-  // Keyboard shortcuts (non-delete)
+  // Delete component from slide
+  const deleteComponent = useCallback(
+    (slideId: string, componentId: string) => {
+      onUpdateDeck((d) => {
+        const slide = d.slides[slideId];
+        if (!slide) return d;
+
+        return {
+          ...d,
+          slides: {
+            ...d.slides,
+            [slideId]: {
+              ...slide,
+              components: slide.components.filter((c) => c.id !== componentId),
+            },
+          },
+        };
+      });
+
+      // Clear component selection, keep slide selected
+      selectSlide(slideId);
+    },
+    [onUpdateDeck, selectSlide]
+  );
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if typing in an input
@@ -715,6 +773,14 @@ export function Canvas({
 
       const isMod = e.metaKey || e.ctrlKey;
 
+      // Delete/Backspace: delete selected component if one is selected
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSlideId && selectedComponentId) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteComponent(selectedSlideId, selectedComponentId);
+        return;
+      }
+
       // Add slide: Cmd+N
       if (isMod && e.key === 'n') {
         e.preventDefault();
@@ -728,9 +794,10 @@ export function Canvas({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [addSlide, duplicateSlide, selectedSlideId]);
+    // Use capture phase to intercept before React Flow
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [addSlide, duplicateSlide, deleteComponent, selectedSlideId, selectedComponentId]);
 
   return (
     <>
@@ -801,11 +868,14 @@ export function Canvas({
         position={contextMenu?.position ?? null}
         targetNode={contextMenu?.targetNode ?? null}
         selectedNodes={selectedNodes}
+        selectedComponentId={selectedComponentId ?? null}
+        selectedSlideId={selectedSlideId ?? null}
         onClose={closeContextMenu}
         onAddSlide={addSlide}
         onAddStartPoint={addStartPoint}
         onDuplicateSlide={duplicateSlide}
         onDeleteSlide={deleteSlides}
+        onDeleteComponent={deleteComponent}
       />
     </>
   );

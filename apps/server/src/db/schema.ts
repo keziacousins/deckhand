@@ -53,11 +53,41 @@ export function initSchema(): void {
       FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
     );
 
+    -- Chat sessions table: groups chat messages into conversations
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      deck_id TEXT NOT NULL,
+      title TEXT,                      -- Auto-generated or user-provided title
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
+    );
+
+    -- Chat messages table: stores chat history per session
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,        -- References chat_sessions
+      deck_id TEXT NOT NULL,           -- Denormalized for easier queries
+      role TEXT NOT NULL,              -- 'user' or 'assistant'
+      content TEXT NOT NULL,
+      model TEXT,                      -- Model used (for assistant messages)
+      tool_results TEXT,               -- JSON array of tool results
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
+    );
+
     -- Index for listing decks by updated time
     CREATE INDEX IF NOT EXISTS idx_decks_updated_at ON decks(updated_at DESC);
     
     -- Index for listing assets by deck
     CREATE INDEX IF NOT EXISTS idx_assets_deck_id ON assets(deck_id);
+
+    -- Index for listing chat sessions by deck
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_deck_id ON chat_sessions(deck_id, updated_at DESC);
+
+    -- Index for listing chat messages by session
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id, created_at);
   `);
 
   console.log('[DB] Schema initialized');
@@ -110,5 +140,30 @@ export interface AssetRow {
   width: number | null;
   height: number | null;
   has_thumbnail: number;
+  created_at: string;
+}
+
+/**
+ * Chat session row from database
+ */
+export interface ChatSessionRow {
+  id: string;
+  deck_id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Chat message row from database
+ */
+export interface ChatMessageRow {
+  id: string;
+  session_id: string;
+  deck_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  model: string | null;
+  tool_results: string | null;
   created_at: string;
 }

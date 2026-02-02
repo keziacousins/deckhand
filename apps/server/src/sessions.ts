@@ -3,10 +3,11 @@
  */
 
 import * as Y from 'yjs';
+import type { WebSocket } from 'ws';
 
 interface Session {
   ydoc: Y.Doc;
-  clientCount: number;
+  clients: Set<WebSocket>;
   lastActivity: Date;
 }
 
@@ -21,7 +22,7 @@ export function getOrCreateSession(deckId: string): Session {
   if (!session) {
     session = {
       ydoc: new Y.Doc(),
-      clientCount: 0,
+      clients: new Set(),
       lastActivity: new Date(),
     };
     sessions.set(deckId, session);
@@ -34,43 +35,80 @@ export function getOrCreateSession(deckId: string): Session {
  */
 export function getActiveSession(deckId: string): Session | null {
   const session = sessions.get(deckId);
-  if (session && session.clientCount > 0) {
+  if (session && session.clients.size > 0) {
     return session;
   }
   return null;
 }
 
 /**
- * Increment client count for a session
+ * Add a client WebSocket to a session
  */
-export function addClient(deckId: string): void {
+export function addClient(deckId: string, ws: WebSocket): void {
   const session = getOrCreateSession(deckId);
-  session.clientCount++;
+  session.clients.add(ws);
   session.lastActivity = new Date();
-  console.log(`[Session] Client joined ${deckId} (${session.clientCount} clients)`);
+  console.log(`[Session] Client joined ${deckId} (${session.clients.size} clients)`);
 }
 
 /**
- * Decrement client count for a session
+ * Remove a client WebSocket from a session
  */
-export function removeClient(deckId: string): void {
+export function removeClient(deckId: string, ws: WebSocket): void {
   const session = sessions.get(deckId);
   if (session) {
-    session.clientCount = Math.max(0, session.clientCount - 1);
+    session.clients.delete(ws);
     session.lastActivity = new Date();
-    console.log(`[Session] Client left ${deckId} (${session.clientCount} clients)`);
+    console.log(`[Session] Client left ${deckId} (${session.clients.size} clients)`);
 
     // Clean up session after a delay if no clients
-    if (session.clientCount === 0) {
+    if (session.clients.size === 0) {
       setTimeout(() => {
         const current = sessions.get(deckId);
-        if (current && current.clientCount === 0) {
+        if (current && current.clients.size === 0) {
           sessions.delete(deckId);
           console.log(`[Session] Cleaned up ${deckId}`);
         }
       }, 30000); // 30 second delay before cleanup
     }
   }
+}
+
+/**
+ * Broadcast a YDoc update to all clients in a session
+ */
+export function broadcastUpdate(deckId: string, update: Uint8Array, excludeWs?: WebSocket): void {
+  const session = sessions.get(deckId);
+  if (!session) return;
+
+  for (const client of session.clients) {
+    if (client !== excludeWs && client.readyState === 1) { // 1 = OPEN
+      try {
+        client.send(update);
+      } catch (err) {
+        console.error(`[Session] Failed to send to client:`, err);
+      }
+    }
+  }
+}
+
+/**
+ * Broadcast the current YDoc state to all clients
+ */
+export function broadcastYDocState(deckId: string): void {
+  const session = sessions.get(deckId);
+  if (!session || session.clients.size === 0) return;
+
+  const update = Y.encodeStateAsUpdate(session.ydoc);
+  broadcastUpdate(deckId, update);
+}
+
+/**
+ * Get client count for a session
+ */
+export function getClientCount(deckId: string): number {
+  const session = sessions.get(deckId);
+  return session?.clients.size ?? 0;
 }
 
 /**
@@ -82,10 +120,10 @@ export function getAllSessions(): Array<{
   lastActivity: string;
 }> {
   return Array.from(sessions.entries())
-    .filter(([_, session]) => session.clientCount > 0)
+    .filter(([_, session]) => session.clients.size > 0)
     .map(([deckId, session]) => ({
       deckId,
-      clientCount: session.clientCount,
+      clientCount: session.clients.size,
       lastActivity: session.lastActivity.toISOString(),
     }));
 }

@@ -6,6 +6,8 @@
 import express, { type Express } from 'express';
 import { decksRouter } from './routes/decks.js';
 import assetsRouter from './routes/assets.js';
+import chatRouter from './routes/chat.js';
+import modelsRouter from './routes/models.js';
 import { getAllSessions } from './sessions.js';
 
 export function createApp(): Express {
@@ -40,6 +42,12 @@ export function createApp(): Express {
 
   // Asset routes (includes /api/decks/:deckId/assets paths)
   app.use('/api', assetsRouter);
+
+  // Chat routes
+  app.use('/api/decks', chatRouter);
+
+  // Models routes
+  app.use('/api/models', modelsRouter);
 
   return app;
 }

@@ -1,12 +1,15 @@
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
+import { config, isLLMEnabled } from './config.js';
 import { initSchema } from './db/schema.js';
 import { createApp } from './app.js';
 import {
   getOrCreateSession,
   addClient,
   removeClient,
+  broadcastUpdate,
+  getClientCount,
 } from './sessions.js';
 import { loadYDoc, debouncedSaveYDoc, flushSave } from './persistence.js';
 
@@ -17,7 +20,7 @@ const app = createApp();
 const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
-const PORT = process.env.PORT || 3001;
+const PORT = config.port;
 
 // WebSocket upgrade handling
 server.on('upgrade', (request, socket, head) => {
@@ -45,7 +48,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
   const session = getOrCreateSession(deckId);
 
   // Load YDoc if this is first client
-  if (session.clientCount === 0) {
+  if (session.clients.size === 0) {
     const loadedDoc = loadYDoc(deckId);
     if (loadedDoc) {
       // Apply loaded state to session doc
@@ -54,7 +57,8 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
     }
   }
 
-  addClient(deckId);
+  // Add client to session
+  addClient(deckId, ws);
 
   // Send initial state to client
   const initialState = Y.encodeStateAsUpdate(session.ydoc);
@@ -63,15 +67,13 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
   // Handle incoming updates from client
   ws.on('message', (data: Buffer) => {
     try {
+      const update = new Uint8Array(data);
+      
       // Apply update to YDoc
-      Y.applyUpdate(session.ydoc, new Uint8Array(data));
+      Y.applyUpdate(session.ydoc, update);
 
-      // Broadcast to other clients
-      wss.clients.forEach((client) => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(data);
-        }
-      });
+      // Broadcast to other clients (excluding sender)
+      broadcastUpdate(deckId, update, ws);
 
       // Debounced save to database
       debouncedSaveYDoc(deckId, session.ydoc);
@@ -82,11 +84,10 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
 
   // Handle disconnect
   ws.on('close', () => {
-    removeClient(deckId);
+    removeClient(deckId, ws);
 
     // If last client, flush save immediately
-    const currentSession = getOrCreateSession(deckId);
-    if (currentSession.clientCount === 0) {
+    if (getClientCount(deckId) === 0) {
       flushSave(deckId, session.ydoc);
     }
   });
@@ -99,4 +100,5 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
 server.listen(PORT, () => {
   console.log(`[Server] Running on http://localhost:${PORT}`);
   console.log(`[Server] WebSocket available at ws://localhost:${PORT}/ws/:deckId`);
+  console.log(`[Server] LLM chat: ${isLLMEnabled() ? 'enabled' : 'disabled (set ANTHROPIC_API_KEY)'}`);
 });

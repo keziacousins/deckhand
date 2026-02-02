@@ -153,7 +153,7 @@ decksRouter.delete('/:id', (req, res) => {
     if (session) {
       return res.status(409).json({
         error: 'Cannot delete deck with active editing session',
-        activeClients: session.clientCount,
+        activeClients: session.clients.size,
       });
     }
 

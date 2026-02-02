@@ -6,6 +6,12 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
+// Load .env file in development
+if (process.env.NODE_ENV !== 'production') {
+  const { config: dotenvConfig } = await import('dotenv');
+  dotenvConfig();
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Base data directory - can be overridden via environment
@@ -17,12 +23,12 @@ export const paths = {
   db: path.join(DATA_ROOT, 'db'),
   dbFile: path.join(DATA_ROOT, 'db', 'deckhand.db'),
   decks: path.join(DATA_ROOT, 'decks'),
-  
+
   // Get asset directory for a specific deck
   deckAssets: (deckId: string) => path.join(DATA_ROOT, 'decks', deckId, 'assets'),
-  
+
   // Get full path to an asset file
-  assetFile: (deckId: string, filename: string) => 
+  assetFile: (deckId: string, filename: string) =>
     path.join(DATA_ROOT, 'decks', deckId, 'assets', filename),
 };
 
@@ -48,4 +54,19 @@ export function ensureDeckAssetDir(deckId: string): string {
     fs.mkdirSync(assetDir, { recursive: true });
   }
   return assetDir;
+}
+
+/**
+ * Server configuration from environment variables.
+ */
+export const config = {
+  port: parseInt(process.env.PORT || '3001', 10),
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+};
+
+/**
+ * Check if LLM features are available.
+ */
+export function isLLMEnabled(): boolean {
+  return !!config.anthropicApiKey;
 }

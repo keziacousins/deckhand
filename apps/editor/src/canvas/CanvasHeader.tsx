@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
+import { ConnectionStatus } from '../components/ConnectionStatus';
 import './CanvasHeader.css';
+
+type ConnectionStatusType = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 interface CanvasHeaderProps {
   deckName: string;
@@ -10,6 +13,8 @@ interface CanvasHeaderProps {
   onPlayWindow: () => void;
   inspectorVisible: boolean;
   onToggleInspector: () => void;
+  connectionStatus: ConnectionStatusType;
+  connectionError?: string | null;
 }
 
 export function CanvasHeader({
@@ -21,6 +26,8 @@ export function CanvasHeader({
   onPlayWindow,
   inspectorVisible,
   onToggleInspector,
+  connectionStatus,
+  connectionError,
 }: CanvasHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(deckName);
@@ -159,6 +166,9 @@ export function CanvasHeader({
       </div>
 
       <div className="canvas-header-right">
+        {/* Connection status */}
+        <ConnectionStatus status={connectionStatus} error={connectionError} />
+
         {/* Inspector toggle */}
         <button
           className={`header-button ${inspectorVisible ? 'active' : ''}`}

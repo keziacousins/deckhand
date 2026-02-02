@@ -18,7 +18,7 @@ interface DeckEditorProps {
 let presentationWindow: Window | null = null;
 
 function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
-  const { deck, status, error, updateDeck, undo, redo, canUndo, canRedo } = useYDoc(deckId);
+  const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo } = useYDoc(deckId);
   const [inspectorVisible, setInspectorVisible] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const { selectSlide } = useSelection();
@@ -170,8 +170,19 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
     setPendingPlayMode(null);
   }, []);
 
-  // Show loading while connecting or waiting for initial data
-  if (status === 'connecting' || (status === 'connected' && !deck)) {
+  // Show loading only on initial load (before we've ever synced)
+  if (!hasEverSynced && !deck) {
+    if (status === 'error') {
+      return (
+        <div className="editor-container">
+          <div className="error-state">
+            <p>{error || 'Failed to load deck'}</p>
+            <button onClick={onBack}>Back to Decks</button>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="editor-container">
         <div className="loading-state">
@@ -181,11 +192,12 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
     );
   }
 
-  if (status === 'error' || status === 'disconnected' || !deck) {
+  // Once we've synced, we should have a deck - but handle edge case
+  if (!deck) {
     return (
       <div className="editor-container">
         <div className="error-state">
-          <p>{error || (status === 'disconnected' ? 'Disconnected from server' : 'Deck not found')}</p>
+          <p>Deck not found</p>
           <button onClick={onBack}>Back to Decks</button>
         </div>
       </div>
@@ -206,6 +218,8 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
             inspectorVisible={inspectorVisible}
             onToggleInspector={toggleInspector}
             showGrid={showGrid}
+            connectionStatus={status}
+            connectionError={error}
           />
         </ReactFlowProvider>
       </div>
@@ -213,6 +227,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         visible={inspectorVisible}
         onClose={toggleInspector}
         deck={deck}
+        deckId={deckId}
         onUpdateDeck={handleUpdateDeck}
         showGrid={showGrid}
         onToggleShowGrid={() => setShowGrid((v) => !v)}

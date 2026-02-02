@@ -38,6 +38,8 @@ const edgeTypes = {
 // Union type for all node types
 type CanvasNodeType = SlideNodeType | StartPointNodeType;
 
+type ConnectionStatusType = 'connecting' | 'connected' | 'disconnected' | 'error';
+
 interface CanvasProps {
   deck: Deck;
   onUpdateDeck: (updater: (deck: Deck) => Deck) => void;
@@ -48,6 +50,8 @@ interface CanvasProps {
   inspectorVisible: boolean;
   onToggleInspector: () => void;
   showGrid?: boolean;
+  connectionStatus: ConnectionStatusType;
+  connectionError?: string | null;
 }
 
 export function Canvas({
@@ -60,6 +64,8 @@ export function Canvas({
   inspectorVisible,
   onToggleInspector,
   showGrid,
+  connectionStatus,
+  connectionError,
 }: CanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const store = useStoreApi();
@@ -786,6 +792,8 @@ export function Canvas({
           onPlayWindow={onPlayWindow}
           inspectorVisible={inspectorVisible}
           onToggleInspector={onToggleInspector}
+          connectionStatus={connectionStatus}
+          connectionError={connectionError}
         />
       </ReactFlow>
 

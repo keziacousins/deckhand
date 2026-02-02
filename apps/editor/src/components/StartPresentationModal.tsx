@@ -49,26 +49,16 @@ export function StartPresentationModal({
         
         <div className="start-modal-content">
           <div className="start-modal-section">
-            {hasCurrentSlide && (
-              <button 
-                className="start-modal-row"
-                onClick={() => onStart(currentSlideId)}
-              >
-                <PlayIcon />
-                <span className="start-modal-row-text">
-                  <span className="start-modal-row-label">Current slide</span>
-                  <span className="start-modal-row-desc">{deck.slides[currentSlideId].title}</span>
-                </span>
-              </button>
-            )}
-            
             <button 
               className="start-modal-row"
-              onClick={() => onStart(undefined)}
+              onClick={() => onStart(currentSlideId || undefined)}
             >
               <PlayIcon />
               <span className="start-modal-row-text">
-                <span className="start-modal-row-label">From beginning</span>
+                <span className="start-modal-row-label">Current slide</span>
+                {hasCurrentSlide && (
+                  <span className="start-modal-row-desc">{deck.slides[currentSlideId].title}</span>
+                )}
               </span>
             </button>
           </div>

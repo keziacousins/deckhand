@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { InspectorSectionProps } from '../types';
 import type { AspectRatio } from '@deckhand/schema';
 import { DEFAULT_GRID_COLUMNS } from '@deckhand/schema';
@@ -11,6 +12,17 @@ const aspectRatioOptions = [
 
 export function DeckPropertiesSection({ context }: InspectorSectionProps) {
   const { deck, onUpdate } = context;
+
+  // Build backdrop slide options
+  const backdropOptions = useMemo(() => {
+    const options = [{ value: '', label: 'None' }];
+    
+    Object.values(deck.slides).forEach(s => {
+      options.push({ value: s.id, label: s.title || 'Untitled' });
+    });
+    
+    return options;
+  }, [deck.slides]);
 
   return (
     <div className="inspector-section">
@@ -41,6 +53,12 @@ export function DeckPropertiesSection({ context }: InspectorSectionProps) {
           min={1}
           max={12}
           step={1}
+        />
+        <SelectField
+          label="Default Backdrop"
+          value={deck.defaultBackdropSlideId ?? ''}
+          options={backdropOptions}
+          onChange={(value) => onUpdate({ type: 'deck', field: 'defaultBackdropSlideId', value: value || undefined })}
         />
       </div>
     </div>

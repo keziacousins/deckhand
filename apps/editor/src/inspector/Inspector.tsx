@@ -11,6 +11,7 @@ import { ComponentList } from './sections/ComponentList';
 import { ComponentBrowser } from './sections/ComponentBrowser';
 import { ThemeSection } from './sections/ThemeSection';
 import { AssetsSection } from './sections/AssetsSection';
+import { ChatSection } from './sections/ChatSection';
 import { EdgePropertiesSection } from './sections/EdgePropertiesSection';
 import { StartPointPropertiesSection } from './sections/StartPointPropertiesSection';
 import { isEdgeSelected, isStartPointSelected } from '../selection';
@@ -25,12 +26,13 @@ interface InspectorProps {
   visible: boolean;
   onClose: () => void;
   deck: Deck;
+  deckId: string;
   onUpdateDeck: (updater: (deck: Deck) => Deck) => void;
   showGrid?: boolean;
   onToggleShowGrid?: () => void;
 }
 
-export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onToggleShowGrid }: InspectorProps) {
+export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGrid, onToggleShowGrid }: InspectorProps) {
   const { selection, selectComponent, clearSelection } = useSelection();
   const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
   const [showComponentBrowser, setShowComponentBrowser] = useState(false);
@@ -457,6 +459,12 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
             >
               Assets
             </button>
+            <button
+              className={`inspector-tab ${activeTab === 'chat' ? 'inspector-tab-active' : ''}`}
+              onClick={() => setActiveTab('chat')}
+            >
+              Chat
+            </button>
           </div>
           <button className="inspector-close" onClick={onClose} title="Close Inspector">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -526,6 +534,10 @@ export function Inspector({ visible, onClose, deck, onUpdateDeck, showGrid, onTo
 
           {activeTab === 'assets' && (
             <AssetsSection context={context} />
+          )}
+
+          {activeTab === 'chat' && (
+            <ChatSection context={context} deckId={deckId} />
           )}
         </div>
 

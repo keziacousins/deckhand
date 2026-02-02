@@ -74,11 +74,10 @@ export const StartPointsMapSchema = z.record(z.string(), StartPointSchema);
 export type StartPointsMap = z.infer<typeof StartPointsMapSchema>;
 
 /**
- * Flow definition - edges, entry point, start points, and transition defaults
+ * Flow definition - edges, start points, and transition defaults
  */
 export const FlowSchema = z.object({
   edges: z.record(z.string(), EdgeSchema),
-  entrySlide: z.string(),
   startPoints: StartPointsMapSchema.optional(),
   defaultTransition: TransitionTypeSchema.optional(),     // Defaults to 'instant'
   defaultTransitionDuration: z.number().min(0).optional(), // Seconds, defaults to 0.3
@@ -140,6 +139,7 @@ export const DeckSchema = z.object({
   theme: ThemeSchema,
   aspectRatio: AspectRatioSchema.default('16:9'),
   gridColumns: z.number().min(1).max(12).default(DEFAULT_GRID_COLUMNS),
+  defaultBackdropSlideId: z.string().optional(), // Default backdrop slide for all slides
   slides: SlidesMapSchema,
   flow: FlowSchema,
   assets: AssetsMapSchema.optional(),
@@ -221,7 +221,6 @@ export function createEmptyDeck(title: string = 'Untitled Deck'): Deck {
     },
     flow: {
       edges: {},
-      entrySlide: slideId,
     },
     assets: {},
   };

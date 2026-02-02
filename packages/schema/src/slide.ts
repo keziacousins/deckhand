@@ -62,6 +62,10 @@ export const SlideStyleSchema = z.object({
   backgroundPosition: z.string().optional(),
   backgroundDarken: z.number().min(0).max(100).optional(), // 0-100%
   backgroundBlur: z.number().min(0).max(20).optional(), // 0-20px
+  backgroundTransparent: z.boolean().optional(), // true = no background, allows backdrop to show through
+  
+  // Backdrop slide (renders behind this slide's content)
+  backdropSlideId: z.string().optional(),
 });
 
 export type SlideStyle = z.infer<typeof SlideStyleSchema>;

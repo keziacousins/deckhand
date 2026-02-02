@@ -17,11 +17,12 @@ export interface InspectorContext {
 export type InspectorUpdate =
   | { type: 'slide'; slideId: string; field: 'title' | 'notes'; value: string }
   | { type: 'slide'; slideId: string; field: 'gridColumns'; value: number | undefined }
-  | { type: 'slide'; slideId: string; field: 'style'; value: Record<string, string | number | undefined> }
+  | { type: 'slide'; slideId: string; field: 'style'; value: Record<string, string | number | boolean | undefined> }
   | { type: 'component'; slideId: string; componentId: string; field: string; value: unknown }
   | { type: 'deck'; field: 'title' | 'description'; value: string }
   | { type: 'deck'; field: 'aspectRatio'; value: AspectRatio }
   | { type: 'deck'; field: 'gridColumns'; value: number }
+  | { type: 'deck'; field: 'defaultBackdropSlideId'; value: string | undefined }
   | { type: 'deck'; field: 'assets'; value: Record<string, unknown> }
   | { type: 'addAsset'; asset: unknown }
   | { type: 'theme'; field: string; value: string | number | undefined };

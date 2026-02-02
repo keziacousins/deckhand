@@ -447,6 +447,7 @@ describe('componentTypes', () => {
     expect(componentTypes).toContain('deck-text');
     expect(componentTypes).toContain('deck-list');
     expect(componentTypes).toContain('deck-image');
+    expect(componentTypes).toContain('deck-floating-image');
     expect(componentTypes).toContain('deck-code');
     expect(componentTypes).toContain('deck-quote');
     expect(componentTypes).toContain('deck-columns');
@@ -454,13 +455,14 @@ describe('componentTypes', () => {
     expect(componentTypes).toContain('deck-headline-subhead');
   });
 
-  it('has 10 component types', () => {
-    expect(componentTypes).toHaveLength(10);
+  it('has 11 component types', () => {
+    expect(componentTypes).toHaveLength(11);
   });
 });
 
 describe('gridWidth across all components', () => {
-  const componentConfigs = [
+  // Grid-based components that support gridWidth
+  const gridComponentConfigs = [
     { type: 'deck-title', props: { text: 'T' } },
     { type: 'deck-subtitle', props: { text: 'S' } },
     { type: 'deck-text', props: { content: [{ text: 'C' }] } },
@@ -473,27 +475,44 @@ describe('gridWidth across all components', () => {
     { type: 'deck-headline-subhead', props: { headline: 'H' } },
   ];
 
-  it('all component types support optional gridWidth', () => {
-    for (const config of componentConfigs) {
+  // Floating components that use absolute positioning (no gridWidth)
+  const floatingComponentConfigs = [
+    { type: 'deck-floating-image', props: { assetId: 'a' } },
+  ];
+
+  it('grid component types support optional gridWidth', () => {
+    for (const config of gridComponentConfigs) {
       const withGridWidth = {
         id: 'test-id',
         type: config.type,
         props: { ...config.props, gridWidth: 6 },
       };
       const result = ComponentSchema.parse(withGridWidth);
-      expect(result.props.gridWidth).toBe(6);
+      expect((result.props as { gridWidth?: number }).gridWidth).toBe(6);
     }
   });
 
-  it('all component types work without gridWidth', () => {
-    for (const config of componentConfigs) {
+  it('grid component types work without gridWidth', () => {
+    for (const config of gridComponentConfigs) {
       const withoutGridWidth = {
         id: 'test-id',
         type: config.type,
         props: config.props,
       };
       const result = ComponentSchema.parse(withoutGridWidth);
-      expect(result.props.gridWidth).toBeUndefined();
+      expect((result.props as { gridWidth?: number }).gridWidth).toBeUndefined();
+    }
+  });
+
+  it('floating component types do not have gridWidth', () => {
+    for (const config of floatingComponentConfigs) {
+      const component = {
+        id: 'test-id',
+        type: config.type,
+        props: config.props,
+      };
+      const result = ComponentSchema.parse(component);
+      expect('gridWidth' in result.props).toBe(false);
     }
   });
 });

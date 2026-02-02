@@ -51,8 +51,9 @@
    =========================================== */
 
 .slide-node-detail {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
   background: var(--color-white);
   overflow: hidden;
   user-select: none;
@@ -60,7 +61,42 @@
   border-radius: inherit;
 }
 
-.slide-node-detail deck-slide {
+.slide-node-detail > deck-slide {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+}
+
+/* Background image layer - renders above bg color, below backdrop */
+.slide-node-detail .slide-background-image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-repeat: no-repeat;
+}
+
+.slide-node-detail .slide-background-darken {
+  position: absolute;
+  inset: 0;
+}
+
+/* Backdrop slide layer - renders above bg image, below main content */
+.slide-backdrop-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.slide-backdrop-layer deck-slide {
+  width: 100%;
+  height: 100%;
+}
+
+/* Nested backdrop layers also fill their container */
+.slide-backdrop-layer .slide-backdrop-layer {
   width: 100%;
   height: 100%;
 }

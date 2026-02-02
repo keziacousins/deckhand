@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { InspectorSectionProps } from '../types';
 import { TextField } from '../fields/TextField';
 import { ColorField } from '../fields/ColorField';
@@ -65,6 +66,15 @@ export function ThemeSection({ context }: InspectorSectionProps) {
     onUpdate({ type: 'deck', field, value });
   };
 
+  // Build backdrop slide options
+  const backdropOptions = useMemo(() => {
+    const options = [{ value: '', label: 'None' }];
+    Object.values(deck.slides).forEach(s => {
+      options.push({ value: s.id, label: s.title || 'Untitled' });
+    });
+    return options;
+  }, [deck.slides]);
+
   const renderTokenField = (token: { key: string; label: string; type: 'text' | 'color' | 'number' }) => {
     const value = theme.tokens[token.key as keyof typeof theme.tokens];
 
@@ -131,6 +141,12 @@ export function ThemeSection({ context }: InspectorSectionProps) {
             onChange={(v) => onUpdate({ type: 'deck', field: 'gridColumns', value: v })}
             min={4}
             max={16}
+          />
+          <SelectField
+            label="Default Backdrop"
+            value={deck.defaultBackdropSlideId ?? ''}
+            options={backdropOptions}
+            onChange={(v) => onUpdate({ type: 'deck', field: 'defaultBackdropSlideId', value: v || undefined })}
           />
         </div>
       </div>

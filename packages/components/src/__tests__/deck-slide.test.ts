@@ -77,9 +77,9 @@ describe('DeckSlide', () => {
     expect(overlay).toBeNull();
   });
 
-  it('applies background-color attribute', () => {
+  it('applies style-background attribute', () => {
     const el = document.createElement('deck-slide') as DeckSlide;
-    el.setAttribute('background-color', '#ff0000');
+    el.setAttribute('style-background', '#ff0000');
     document.body.appendChild(el);
     
     const style = el.shadowRoot?.querySelector('style');
@@ -95,21 +95,22 @@ describe('DeckSlide', () => {
     expect(style?.textContent).toContain('gap: 24px');
   });
 
-  it('applies padding attribute', () => {
+  it('uses theme token padding', () => {
     const el = document.createElement('deck-slide') as DeckSlide;
-    el.setAttribute('padding', '32px');
     document.body.appendChild(el);
     
     const style = el.shadowRoot?.querySelector('style');
-    expect(style?.textContent).toContain('padding: 32px');
+    // Padding is now controlled via theme tokens
+    expect(style?.textContent).toContain('var(--deck-content-padding-top');
+    expect(style?.textContent).toContain('var(--deck-content-padding-sides');
   });
 
   it('observes expected attributes', () => {
     expect(DeckSlide.observedAttributes).toContain('grid-columns');
     expect(DeckSlide.observedAttributes).toContain('show-grid');
-    expect(DeckSlide.observedAttributes).toContain('background-color');
+    expect(DeckSlide.observedAttributes).toContain('style-background');
     expect(DeckSlide.observedAttributes).toContain('gap');
-    expect(DeckSlide.observedAttributes).toContain('padding');
+    expect(DeckSlide.observedAttributes).toContain('background-transparent');
   });
 
   it('re-renders when attributes change', () => {
@@ -145,5 +146,25 @@ describe('DeckSlide', () => {
     const style = el.shadowRoot?.querySelector('style');
     expect(style?.textContent).toContain('::slotted(:not([grid-width]))');
     expect(style?.textContent).toContain('grid-column: 1 / -1');
+  });
+
+  it('applies transparent background when background-transparent is set', () => {
+    const el = document.createElement('deck-slide') as DeckSlide;
+    el.setAttribute('background-transparent', 'true');
+    document.body.appendChild(el);
+    
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('background-color: transparent');
+  });
+
+  it('ignores background image when background-transparent is set', () => {
+    const el = document.createElement('deck-slide') as DeckSlide;
+    el.setAttribute('background-transparent', 'true');
+    el.setAttribute('background-asset-id', 'some-asset');
+    document.body.appendChild(el);
+    
+    // Should not have background image element
+    const bgImage = el.shadowRoot?.querySelector('.background-image');
+    expect(bgImage).toBeNull();
   });
 });

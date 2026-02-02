@@ -136,20 +136,12 @@ export function deleteSlide(deck: Deck, slideId: string): Deck {
     )
   );
 
-  // Update entry slide if needed
-  let entrySlide = deck.flow.entrySlide;
-  if (entrySlide === slideId) {
-    const slideIds = Object.keys(remainingSlides);
-    entrySlide = slideIds[0] || '';
-  }
-
   return {
     ...deck,
     slides: remainingSlides,
     flow: {
       ...deck.flow,
       edges: remainingEdges,
-      entrySlide,
     },
   };
 }
@@ -575,23 +567,16 @@ export function deleteStartPoint(deck: Deck, startPointId: string): Deck {
 // ============================================================================
 
 export interface UpdateFlowSettingsOptions {
-  entrySlide?: string;
   defaultTransition?: TransitionType;
   defaultTransitionDuration?: number;
 }
 
 /**
- * Update flow-level settings (entry slide, default transitions)
+ * Update flow-level settings (default transitions)
  */
 export function updateFlowSettings(deck: Deck, updates: UpdateFlowSettingsOptions): Deck {
   const updatedFlow = { ...deck.flow };
 
-  if (updates.entrySlide !== undefined) {
-    if (!deck.slides[updates.entrySlide]) {
-      throw new Error(`Slide ${updates.entrySlide} not found`);
-    }
-    updatedFlow.entrySlide = updates.entrySlide;
-  }
   if (updates.defaultTransition !== undefined) {
     updatedFlow.defaultTransition = updates.defaultTransition;
   }
@@ -614,10 +599,11 @@ export interface UpdateDeckSettingsOptions {
   description?: string;
   aspectRatio?: AspectRatio;
   gridColumns?: number;
+  defaultBackdropSlideId?: string | null; // null to clear
 }
 
 /**
- * Update deck-level settings (title, aspect ratio, grid columns)
+ * Update deck-level settings (title, aspect ratio, grid columns, default backdrop)
  */
 export function updateDeckSettings(deck: Deck, updates: UpdateDeckSettingsOptions): Deck {
   const updatedDeck = { ...deck };
@@ -644,6 +630,16 @@ export function updateDeckSettings(deck: Deck, updates: UpdateDeckSettingsOption
       throw new Error('gridColumns must be between 1 and 12');
     }
     updatedDeck.gridColumns = updates.gridColumns;
+  }
+  if (updates.defaultBackdropSlideId !== undefined) {
+    if (updates.defaultBackdropSlideId === null) {
+      delete updatedDeck.defaultBackdropSlideId;
+    } else {
+      if (!deck.slides[updates.defaultBackdropSlideId]) {
+        throw new Error(`Slide ${updates.defaultBackdropSlideId} not found`);
+      }
+      updatedDeck.defaultBackdropSlideId = updates.defaultBackdropSlideId;
+    }
   }
 
   return updatedDeck;

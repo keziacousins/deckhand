@@ -1,7 +1,7 @@
 import type { InspectorSectionProps } from '../types';
 import { CollapsibleSection } from '../components/CollapsibleSection';
 import { AssetPickerField } from '../fields/AssetPickerField';
-import { SelectField, NumberField } from '../fields';
+import { SelectField, NumberField, CheckboxField } from '../fields';
 import { useInspectorExpansion } from '../context/InspectorExpansionContext';
 
 const SECTION_ID = 'background';
@@ -20,7 +20,7 @@ export function BackgroundSection({ context }: InspectorSectionProps) {
   const selectedAsset = style.backgroundAssetId ? assets[style.backgroundAssetId] : null;
   const subtitle = selectedAsset?.filename;
 
-  const handleStyleChange = (field: string, value: string | number | undefined) => {
+  const handleStyleChange = (field: string, value: string | number | boolean | undefined) => {
     onUpdate({
       type: 'slide',
       slideId,
@@ -29,51 +29,64 @@ export function BackgroundSection({ context }: InspectorSectionProps) {
     });
   };
 
+  const isTransparent = style.backgroundTransparent === true;
+
   return (
     <CollapsibleSection
       id={SECTION_ID}
       title="Background"
-      subtitle={subtitle}
+      subtitle={isTransparent ? 'Transparent' : subtitle}
       isExpanded={isExpanded(SECTION_ID)}
       onToggle={() => toggle(SECTION_ID)}
     >
-      <AssetPickerField
-        label="Image"
-        value={style.backgroundAssetId ?? ''}
-        assets={assets}
-        onChange={(value) => handleStyleChange('backgroundAssetId', value)}
+      <CheckboxField
+        label="Transparent"
+        value={isTransparent}
+        onChange={(value) => handleStyleChange('backgroundTransparent', value ? true : undefined)}
+        description="No background (useful for backdrop slides)"
       />
       
-      {style.backgroundAssetId && (
+      {!isTransparent && (
         <>
-          <SelectField
-            label="Sizing"
-            value={style.backgroundSize ?? 'fill'}
-            onChange={(value) => handleStyleChange('backgroundSize', value)}
-            options={[
-              { value: 'fill', label: 'Fill (zoom to cover)' },
-              { value: 'fit-width', label: 'Fit Width' },
-              { value: 'fit-height', label: 'Fit Height' },
-            ]}
+          <AssetPickerField
+            label="Image"
+            value={style.backgroundAssetId ?? ''}
+            assets={assets}
+            onChange={(value) => handleStyleChange('backgroundAssetId', value)}
           />
-          <NumberField
-            label="Darken"
-            value={style.backgroundDarken ?? 0}
-            onChange={(value) => handleStyleChange('backgroundDarken', value)}
-            min={0}
-            max={100}
-            step={5}
-            suffix="%"
-          />
-          <NumberField
-            label="Blur"
-            value={style.backgroundBlur ?? 0}
-            onChange={(value) => handleStyleChange('backgroundBlur', value)}
-            min={0}
-            max={20}
-            step={1}
-            suffix="px"
-          />
+          
+          {style.backgroundAssetId && (
+            <>
+              <SelectField
+                label="Sizing"
+                value={style.backgroundSize ?? 'fill'}
+                onChange={(value) => handleStyleChange('backgroundSize', value)}
+                options={[
+                  { value: 'fill', label: 'Fill (zoom to cover)' },
+                  { value: 'fit-width', label: 'Fit Width' },
+                  { value: 'fit-height', label: 'Fit Height' },
+                ]}
+              />
+              <NumberField
+                label="Darken"
+                value={style.backgroundDarken ?? 0}
+                onChange={(value) => handleStyleChange('backgroundDarken', value)}
+                min={0}
+                max={100}
+                step={5}
+                suffix="%"
+              />
+              <NumberField
+                label="Blur"
+                value={style.backgroundBlur ?? 0}
+                onChange={(value) => handleStyleChange('backgroundBlur', value)}
+                min={0}
+                max={20}
+                step={1}
+                suffix="px"
+              />
+            </>
+          )}
         </>
       )}
     </CollapsibleSection>

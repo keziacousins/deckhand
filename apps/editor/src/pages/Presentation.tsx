@@ -82,14 +82,24 @@ function getTransitionInfo(
 }
 
 /**
- * Render a single slide using web components
+ * Render a single slide using web components.
+ * Supports recursive backdrop slides that render behind the main content.
+ * 
+ * Rendering order:
+ * 1. Current slide's background (color/image)
+ * 2. Backdrop slides (each with their own backgrounds/content, rendered with transparent bg by default)
+ * 3. Current slide's content (components)
  */
 function SlideRenderer({ 
   slide, 
   deck,
+  visitedSlideIds = new Set(),
+  isBackdrop = false,
 }: { 
   slide: Slide; 
   deck: Deck;
+  visitedSlideIds?: Set<string>;
+  isBackdrop?: boolean;
 }) {
   const gridColumns = slide.gridColumns ?? deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
   const style = slide.style ?? {};
@@ -106,19 +116,94 @@ function SlideRenderer({
     height: slideHeight,
   };
 
+  // Resolve backdrop slide (per-slide override or deck default)
+  // '__none__' means explicitly no backdrop (override default)
+  const backdropSlideId = style.backdropSlideId === '__none__' 
+    ? undefined 
+    : (style.backdropSlideId ?? deck.defaultBackdropSlideId);
+  
+  // Get backdrop slide if it exists, isn't self-reference, and hasn't been visited (cycle prevention)
+  const backdropSlide = backdropSlideId && 
+    backdropSlideId !== slide.id && 
+    !visitedSlideIds.has(backdropSlideId) &&
+    visitedSlideIds.size < 10 // Max depth safety limit
+      ? deck.slides[backdropSlideId] 
+      : null;
+
+  // Track this slide as visited for cycle prevention
+  const newVisitedIds = new Set(visitedSlideIds);
+  newVisitedIds.add(slide.id);
+
+  // When this slide has a backdrop, render with transparent background so backdrop shows through.
+  // The background color/image is applied to the wrapper div instead.
+  // Backdrop slides use transparent bg if:
+  // 1. backgroundTransparent is explicitly true, OR
+  // 2. backgroundTransparent is undefined AND no background color/image is set
+  const hasBackdrop = !!backdropSlide;
+  const backdropUsesTransparentBg = isBackdrop && (
+    style.backgroundTransparent === true || 
+    (style.backgroundTransparent === undefined && !style.background && !style.backgroundAssetId)
+  );
+  const useTransparentBg = hasBackdrop || backdropUsesTransparentBg;
+
+  // Build wrapper style - includes background when we have a backdrop
+  const wrapperStyle: React.CSSProperties = {
+    ...containerStyle,
+    backgroundColor: hasBackdrop ? (style.background || 'var(--deck-color-background)') : undefined,
+  };
+
+  // When there's a backdrop, we render background on wrapper so backdrop can overlay it
+  // Otherwise, deck-slide handles its own background
+  const bgAsset = style.backgroundAssetId ? assets[style.backgroundAssetId] : undefined;
+  
   return (
-    <div className="presentation-slide-wrapper" style={containerStyle}>
+    <div className="presentation-slide-wrapper" style={wrapperStyle}>
+      {/* DEBUG: Background image layer */}
+      {bgAsset && (
+        <div 
+          className="slide-background-image"
+          style={{
+            backgroundImage: `url(${bgAsset.url})`,
+            backgroundSize: style.backgroundSize === 'fit-width' ? '100% auto' : 
+                           style.backgroundSize === 'fit-height' ? 'auto 100%' : 'cover',
+            backgroundPosition: 'center',
+            filter: style.backgroundBlur ? `blur(${style.backgroundBlur}px)` : undefined,
+          }}
+        >
+          {style.backgroundDarken && style.backgroundDarken > 0 && (
+            <div 
+              className="slide-background-darken"
+              style={{ backgroundColor: `rgba(0,0,0,${style.backgroundDarken / 100})` }}
+            />
+          )}
+        </div>
+      )}
+      
+      {/* Backdrop slide layer - renders on top of this slide's bg, below content */}
+      {backdropSlide && (
+        <div className="slide-backdrop">
+          <SlideRenderer 
+            slide={backdropSlide} 
+            deck={deck} 
+            visitedSlideIds={newVisitedIds}
+            isBackdrop={true}
+          />
+        </div>
+      )}
+      
+      {/* Main slide content */}
       <deck-slide
         grid-columns={gridColumns.toString()}
-        style-background={style.background}
+        style-background={hasBackdrop ? undefined : style.background}
         style-text-primary={style.textPrimary}
         style-text-secondary={style.textSecondary}
         style-accent={style.accent}
-        background-asset-id={style.backgroundAssetId}
+        background-asset-id={hasBackdrop ? undefined : style.backgroundAssetId}
         assets={assetsJson}
-        background-size={style.backgroundSize}
-        background-darken={style.backgroundDarken?.toString()}
-        background-blur={style.backgroundBlur?.toString()}
+        background-size={hasBackdrop ? undefined : style.backgroundSize}
+        background-darken={hasBackdrop ? undefined : style.backgroundDarken?.toString()}
+        background-blur={hasBackdrop ? undefined : style.backgroundBlur?.toString()}
+        background-transparent={useTransparentBg ? 'true' : undefined}
       >
         {slide.components.map((component) => renderComponent(component, { assets }))}
       </deck-slide>
@@ -169,15 +254,11 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   const playOrder = useMemo(() => {
     if (!deck) return [];
     
-    // Determine starting slide
+    // Determine starting slide - use provided slide or fall back to first slide
     let start = startSlideId;
     if (!start || !deck.slides[start]) {
-      // Fall back to entry slide or first slide
-      start = deck.flow.entrySlide;
-      if (!start || !deck.slides[start]) {
-        const slideIds = Object.keys(deck.slides);
-        start = slideIds[0];
-      }
+      const slideIds = Object.keys(deck.slides);
+      start = slideIds[0];
     }
     
     if (!start) return [];

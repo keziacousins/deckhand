@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
-import type { Slide, Theme, AspectRatio, Asset } from '@deckhand/schema';
+import type { Slide, Theme, AspectRatio, Asset, SlidesMap } from '@deckhand/schema';
 import { SLIDE_WIDTH, getSlideHeight, themeToCssProperties } from '@deckhand/schema';
 import { useSelection } from '../selection';
 import { renderComponent } from '../utils/renderComponent';
@@ -14,16 +14,104 @@ type SlideNodeData = {
   assets: Record<string, Asset>;
   showGrid?: boolean;
   selectedComponentId?: string | null;
+  // For backdrop slide rendering
+  allSlides: SlidesMap;
+  defaultBackdropSlideId?: string;
 };
 
 export type SlideNodeType = Node<SlideNodeData, 'slide'>;
+
+/**
+ * Render a backdrop slide (non-interactive, behind main content)
+ */
+function BackdropSlideRenderer({
+  slide,
+  allSlides,
+  defaultBackdropSlideId,
+  theme,
+  aspectRatio,
+  gridColumns,
+  assets,
+  visitedSlideIds = new Set(),
+}: {
+  slide: Slide;
+  allSlides: SlidesMap;
+  defaultBackdropSlideId?: string;
+  theme: Theme;
+  aspectRatio: AspectRatio;
+  gridColumns: number;
+  assets: Record<string, Asset>;
+  visitedSlideIds?: Set<string>;
+}) {
+  const effectiveGridColumns = slide.gridColumns ?? gridColumns;
+  const assetsJson = JSON.stringify(assets);
+  const themeStyle = themeToCssProperties(theme) as React.CSSProperties;
+
+  // Resolve this slide's backdrop
+  // '__none__' means explicitly no backdrop (override default)
+  const backdropSlideId = slide.style?.backdropSlideId === '__none__'
+    ? undefined
+    : (slide.style?.backdropSlideId ?? defaultBackdropSlideId);
+  
+  // Get backdrop slide if valid and not causing a cycle
+  const backdropSlide = backdropSlideId && 
+    backdropSlideId !== slide.id && 
+    !visitedSlideIds.has(backdropSlideId) &&
+    visitedSlideIds.size < 10
+      ? allSlides[backdropSlideId] 
+      : null;
+
+  const newVisitedIds = new Set(visitedSlideIds);
+  newVisitedIds.add(slide.id);
+
+  // Backdrop slides use transparent background if:
+  // 1. backgroundTransparent is explicitly true, OR
+  // 2. backgroundTransparent is undefined AND no background color/image is set
+  const style = slide.style ?? {};
+  const useTransparentBg = style.backgroundTransparent === true || 
+    (style.backgroundTransparent === undefined && !style.background && !style.backgroundAssetId);
+
+  return (
+    <div className="slide-backdrop-layer" style={themeStyle}>
+      {backdropSlide && (
+        <BackdropSlideRenderer
+          slide={backdropSlide}
+          allSlides={allSlides}
+          defaultBackdropSlideId={defaultBackdropSlideId}
+          theme={theme}
+          aspectRatio={aspectRatio}
+          gridColumns={gridColumns}
+          assets={assets}
+          visitedSlideIds={newVisitedIds}
+        />
+      )}
+      <deck-slide
+        grid-columns={effectiveGridColumns.toString()}
+        style-background={style.background}
+        style-text-primary={style.textPrimary}
+        style-text-secondary={style.textSecondary}
+        style-accent={style.accent}
+        background-asset-id={style.backgroundAssetId}
+        assets={assetsJson}
+        background-size={style.backgroundSize}
+        background-darken={style.backgroundDarken?.toString()}
+        background-blur={style.backgroundBlur?.toString()}
+        background-transparent={useTransparentBg ? 'true' : undefined}
+      >
+        {slide.components.map((c) => 
+          renderComponent(c, { editorMode: false, assets })
+        )}
+      </deck-slide>
+    </div>
+  );
+}
 
 export const SlideNode = memo(function SlideNode({
   data,
   selected,
   id,
 }: NodeProps<SlideNodeType>) {
-  const { slide, theme, aspectRatio, gridColumns, assets, showGrid, selectedComponentId } = data;
+  const { slide, theme, aspectRatio, gridColumns, assets, showGrid, selectedComponentId, allSlides, defaultBackdropSlideId } = data;
   const slideHeight = getSlideHeight(aspectRatio);
   // Use slide-specific gridColumns if set, otherwise use deck default
   const effectiveGridColumns = slide.gridColumns ?? gridColumns;
@@ -52,6 +140,24 @@ export const SlideNode = memo(function SlideNode({
   // Convert theme tokens to CSS custom properties (includes computed scales)
   const themeStyle = themeToCssProperties(theme) as React.CSSProperties;
 
+  // Resolve backdrop slide
+  // '__none__' means explicitly no backdrop (override default)
+  const backdropSlideId = slide.style?.backdropSlideId === '__none__'
+    ? undefined
+    : (slide.style?.backdropSlideId ?? defaultBackdropSlideId);
+  const backdropSlide = backdropSlideId && backdropSlideId !== slide.id 
+    ? allSlides[backdropSlideId] 
+    : null;
+  
+  const hasBackdrop = !!backdropSlide;
+  const style = slide.style ?? {};
+
+  // Build detail style - includes background when we have a backdrop
+  const detailStyle: React.CSSProperties = {
+    ...themeStyle,
+    backgroundColor: hasBackdrop ? (style.background || 'var(--deck-color-background)') : undefined,
+  };
+
   return (
     <div
       className={`slide-node ${selected ? 'selected' : ''}`}
@@ -62,19 +168,55 @@ export const SlideNode = memo(function SlideNode({
       <Handle type="target" position={Position.Top} id="target-top" />
 
       {/* Slide content */}
-      <div className="slide-node-detail" style={themeStyle} onClick={handleDetailClick}>
+      <div className="slide-node-detail" style={detailStyle} onClick={handleDetailClick}>
+        {/* Background image layer (when slide has backdrop) */}
+        {hasBackdrop && style.backgroundAssetId && assets[style.backgroundAssetId] && (
+          <div 
+            className="slide-background-image"
+            style={{
+              backgroundImage: `url(${assets[style.backgroundAssetId].url})`,
+              backgroundSize: style.backgroundSize === 'fit-width' ? '100% auto' : 
+                             style.backgroundSize === 'fit-height' ? 'auto 100%' : 'cover',
+              backgroundPosition: 'center',
+              filter: style.backgroundBlur ? `blur(${style.backgroundBlur}px)` : undefined,
+            }}
+          >
+            {style.backgroundDarken && style.backgroundDarken > 0 && (
+              <div 
+                className="slide-background-darken"
+                style={{ backgroundColor: `rgba(0,0,0,${style.backgroundDarken / 100})` }}
+              />
+            )}
+          </div>
+        )}
+        
+        {/* Backdrop slide layer */}
+        {backdropSlide && (
+          <BackdropSlideRenderer
+            slide={backdropSlide}
+            allSlides={allSlides}
+            defaultBackdropSlideId={defaultBackdropSlideId}
+            theme={theme}
+            aspectRatio={aspectRatio}
+            gridColumns={gridColumns}
+            assets={assets}
+          />
+        )}
+        
+        {/* Main slide content */}
         <deck-slide
           grid-columns={effectiveGridColumns.toString()}
           show-grid={showGrid ? 'true' : undefined}
-          style-background={slide.style?.background}
-          style-text-primary={slide.style?.textPrimary}
-          style-text-secondary={slide.style?.textSecondary}
-          style-accent={slide.style?.accent}
-          background-asset-id={slide.style?.backgroundAssetId}
+          style-background={hasBackdrop ? undefined : style.background}
+          style-text-primary={style.textPrimary}
+          style-text-secondary={style.textSecondary}
+          style-accent={style.accent}
+          background-asset-id={hasBackdrop ? undefined : style.backgroundAssetId}
           assets={assetsJson}
-          background-size={slide.style?.backgroundSize}
-          background-darken={slide.style?.backgroundDarken?.toString()}
-          background-blur={slide.style?.backgroundBlur?.toString()}
+          background-size={hasBackdrop ? undefined : style.backgroundSize}
+          background-darken={hasBackdrop ? undefined : style.backgroundDarken?.toString()}
+          background-blur={hasBackdrop ? undefined : style.backgroundBlur?.toString()}
+          background-transparent={hasBackdrop ? 'true' : undefined}
         >
           {slide.components.map((c) => 
             renderComponent(c, { 

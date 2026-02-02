@@ -355,6 +355,16 @@ describe('SlideStyleSchema', () => {
     expect(() => SlideStyleSchema.parse({ backgroundSize: 'invalid' })).toThrow();
     expect(() => SlideStyleSchema.parse({ backgroundSize: 'cover' })).toThrow();
   });
+
+  it('validates backdropSlideId', () => {
+    const style = { backdropSlideId: 'slide-backdrop-123' };
+    expect(SlideStyleSchema.parse(style).backdropSlideId).toBe('slide-backdrop-123');
+  });
+
+  it('allows optional backdropSlideId', () => {
+    const style = { background: '#fff' };
+    expect(SlideStyleSchema.parse(style).backdropSlideId).toBeUndefined();
+  });
 });
 
 describe('styleToCssProperties', () => {

@@ -232,7 +232,6 @@ describe('FlowSchema', () => {
           trigger: 'default',
         },
       },
-      entrySlide: 'slide-1',
     };
     expect(FlowSchema.parse(flow)).toEqual(flow);
   });
@@ -240,7 +239,6 @@ describe('FlowSchema', () => {
   it('validates empty edges', () => {
     const flow = {
       edges: {},
-      entrySlide: 'slide-1',
     };
     expect(FlowSchema.parse(flow)).toEqual(flow);
   });
@@ -248,7 +246,6 @@ describe('FlowSchema', () => {
   it('validates flow with start points', () => {
     const flow = {
       edges: {},
-      entrySlide: 'slide-1',
       startPoints: {
         'start-1': {
           id: 'start-1',
@@ -264,7 +261,6 @@ describe('FlowSchema', () => {
   it('validates flow with default transition settings', () => {
     const flow = {
       edges: {},
-      entrySlide: 'slide-1',
       defaultTransition: 'cross-fade',
       defaultTransitionDuration: 0.5,
     };
@@ -276,7 +272,6 @@ describe('FlowSchema', () => {
   it('allows optional transition settings', () => {
     const flow = {
       edges: {},
-      entrySlide: 'slide-1',
     };
     const result = FlowSchema.parse(flow);
     expect(result.defaultTransition).toBeUndefined();
@@ -286,7 +281,6 @@ describe('FlowSchema', () => {
   it('rejects negative default transition duration', () => {
     const flow = {
       edges: {},
-      entrySlide: 'slide-1',
       defaultTransitionDuration: -1,
     };
     expect(() => FlowSchema.parse(flow)).toThrow();
@@ -314,7 +308,6 @@ describe('DeckSchema', () => {
     },
     flow: {
       edges: {},
-      entrySlide: 'slide-1',
     },
   };
 
@@ -345,6 +338,17 @@ describe('DeckSchema', () => {
     expect(() => DeckSchema.parse({ ...validDeck, gridColumns: 0 })).toThrow();
     expect(() => DeckSchema.parse({ ...validDeck, gridColumns: 13 })).toThrow();
     expect(() => DeckSchema.parse({ ...validDeck, gridColumns: -1 })).toThrow();
+  });
+
+  it('validates optional defaultBackdropSlideId', () => {
+    const deckWithBackdrop = { ...validDeck, defaultBackdropSlideId: 'slide-backdrop' };
+    const result = DeckSchema.parse(deckWithBackdrop);
+    expect(result.defaultBackdropSlideId).toBe('slide-backdrop');
+  });
+
+  it('allows deck without defaultBackdropSlideId', () => {
+    const result = DeckSchema.parse(validDeck);
+    expect(result.defaultBackdropSlideId).toBeUndefined();
   });
 
   it('allows optional assets', () => {
@@ -474,12 +478,6 @@ describe('createEmptyDeck', () => {
     const deck = createEmptyDeck();
     const slideIds = Object.keys(deck.slides);
     expect(slideIds).toHaveLength(1);
-  });
-
-  it('creates a deck with entry slide matching the created slide', () => {
-    const deck = createEmptyDeck();
-    const slideIds = Object.keys(deck.slides);
-    expect(deck.flow.entrySlide).toBe(slideIds[0]);
   });
 
   it('creates a deck with default gridColumns', () => {

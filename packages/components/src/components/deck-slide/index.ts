@@ -37,6 +37,7 @@ export class DeckSlide extends DeckComponent {
     'background-blur',
     'grid-columns',
     'show-grid',
+    'background-transparent',
     // Style overrides (theme token overrides per slide)
     'style-background',
     'style-text-primary',
@@ -63,8 +64,10 @@ export class DeckSlide extends DeckComponent {
     const bgDarken = this.getAttrNumber('background-darken', 0);
     const bgBlur = this.getAttrNumber('background-blur', 0);
     const showGrid = this.getAttrBool('show-grid');
+    const bgTransparent = this.getAttrBool('background-transparent');
     
-    // Use shared image renderer
+    // Resolve background image URL - still render images even when background is transparent
+    // (the letterbox/pillarbox areas will be transparent, letting parent bg show through)
     const bgUrl = resolveAssetUrl(bgAssetId, assetsJson);
     const { html: bgImageElement, styles: bgImageStyles } = generateImageBackgroundHtml({
       url: bgUrl,
@@ -86,14 +89,27 @@ export class DeckSlide extends DeckComponent {
     if (styleTextSecondary) tokenOverrides.push(`--deck-color-text-secondary: ${styleTextSecondary}`);
     if (styleAccent) tokenOverrides.push(`--deck-color-accent: ${styleAccent}`);
     
-    // Use style override background or fall back to theme token
-    const bgColor = styleBackground || 'var(--deck-color-background)';
+    // Use transparent background if requested, otherwise use style override or fall back to theme token
+    const bgColor = bgTransparent ? 'transparent' : (styleBackground || 'var(--deck-color-background)');
 
     let layoutStyles: string;
     let gridOverlay = '';
 
     // Token overrides CSS (injected into :host)
     const tokenOverridesCSS = tokenOverrides.length > 0 ? tokenOverrides.join(';\n          ') + ';' : '';
+
+    // Floating layer styles - positioned outside content padding
+    const floatingLayerStyles = `
+      .floating-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 100;
+      }
+      .floating-layer ::slotted(*) {
+        pointer-events: auto;
+      }
+    `;
 
     if (gridColumns > 0) {
       // Grid layout mode
@@ -110,6 +126,7 @@ export class DeckSlide extends DeckComponent {
           position: relative;
         }
         ${bgImageStyles}
+        ${floatingLayerStyles}
         .grid-overlay {
           position: absolute;
           inset: 0;
@@ -125,7 +142,7 @@ export class DeckSlide extends DeckComponent {
           border: 1px dashed rgba(59, 130, 246, 0.3);
           border-radius: 2px;
         }
-        ::slotted(*) {
+        ::slotted(*:not([slot="floating"])) {
           position: relative;
           z-index: 1;
         }
@@ -156,7 +173,8 @@ export class DeckSlide extends DeckComponent {
           position: relative;
         }
         ${bgImageStyles}
-        ::slotted(*) {
+        ${floatingLayerStyles}
+        ::slotted(*:not([slot="floating"])) {
           position: relative;
           z-index: 1;
         }
@@ -172,6 +190,9 @@ export class DeckSlide extends DeckComponent {
       ${bgImageElement}
       ${gridOverlay}
       <slot></slot>
+      <div class="floating-layer">
+        <slot name="floating"></slot>
+      </div>
     `;
   }
 }

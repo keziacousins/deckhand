@@ -92,6 +92,9 @@ export function deckToYDoc(deck: Deck, ydoc?: Y.Doc): Y.Doc {
     root.set('theme', toYValue(deck.theme));
     root.set('aspectRatio', deck.aspectRatio);
     root.set('gridColumns', deck.gridColumns);
+    if (deck.defaultBackdropSlideId) {
+      root.set('defaultBackdropSlideId', deck.defaultBackdropSlideId);
+    }
     root.set('slides', toYValue(deck.slides));
     root.set('flow', toYValue(deck.flow));
     if (deck.assets) {
@@ -108,7 +111,7 @@ export function deckToYDoc(deck: Deck, ydoc?: Y.Doc): Y.Doc {
 export function yDocToDeck(ydoc: Y.Doc): Deck {
   const root = ydoc.getMap('root');
 
-  return {
+  const deck: Deck = {
     meta: fromYValue(root.get('meta')),
     theme: fromYValue(root.get('theme')),
     aspectRatio: (root.get('aspectRatio') as string) || '16:9',
@@ -117,6 +120,13 @@ export function yDocToDeck(ydoc: Y.Doc): Deck {
     flow: fromYValue(root.get('flow')),
     assets: fromYValue(root.get('assets')),
   } as Deck;
+
+  const defaultBackdropSlideId = root.get('defaultBackdropSlideId') as string | undefined;
+  if (defaultBackdropSlideId) {
+    deck.defaultBackdropSlideId = defaultBackdropSlideId;
+  }
+
+  return deck;
 }
 
 /**

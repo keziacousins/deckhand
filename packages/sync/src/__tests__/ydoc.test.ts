@@ -333,7 +333,7 @@ describe('yDocToDeck', () => {
     root.set('meta', toYValue({ id: 'deck-1', title: 'Test', created: new Date().toISOString(), updated: new Date().toISOString() }));
     root.set('theme', toYValue({ id: 'default', tokens: {} }));
     root.set('slides', toYValue({}));
-    root.set('flow', toYValue({ edges: {}, entrySlide: '' }));
+    root.set('flow', toYValue({ edges: {} }));
     // No aspectRatio set
     
     const deck = yDocToDeck(ydoc);
@@ -455,7 +455,7 @@ describe('deckToYDoc/yDocToDeck round-trip', () => {
     root.set('aspectRatio', '16:9');
     // gridColumns not set
     root.set('slides', toYValue({}));
-    root.set('flow', toYValue({ edges: {}, entrySlide: '' }));
+    root.set('flow', toYValue({ edges: {} }));
     
     const deck = yDocToDeck(ydoc);
     expect(deck.gridColumns).toBe(8);

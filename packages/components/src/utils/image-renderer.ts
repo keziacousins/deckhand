@@ -205,7 +205,6 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--deck-color-background);
       ` : ''}
     }
     .image {

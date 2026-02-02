@@ -97,6 +97,14 @@ function propsToAttributes(
 }
 
 /**
+ * Check if a component type is a "floating" component that should be
+ * rendered in the floating slot (outside content padding)
+ */
+function isFloatingComponent(type: string): boolean {
+  return type.includes('-floating-');
+}
+
+/**
  * Render a component to a React element
  * 
  * Uses the component's type to look up metadata from the registry,
@@ -110,6 +118,11 @@ export function renderComponent(
   
   // Even without meta, try to render - allows for components not yet in registry
   const attrs = propsToAttributes(component, meta, options);
+
+  // Floating components go in the "floating" slot (outside content padding)
+  if (isFloatingComponent(component.type)) {
+    attrs['slot'] = 'floating';
+  }
 
   // Use createElement to dynamically create the custom element
   return React.createElement(component.type, {

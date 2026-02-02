@@ -77,6 +77,27 @@ export const ImageComponentSchema = BaseComponentSchema.extend({
 });
 
 /**
+ * Floating image component - positioned at absolute coordinates
+ * Rendered in a separate layer outside the slide's content padding
+ */
+export const FloatingImageComponentSchema = BaseComponentSchema.extend({
+  type: z.literal('deck-floating-image'),
+  props: z.object({
+    assetId: z.string(),
+    alt: z.string().optional(),
+    anchorX: z.enum(['left', 'right']).optional(), // Which horizontal edge to anchor to
+    anchorY: z.enum(['top', 'bottom']).optional(), // Which vertical edge to anchor to
+    x: z.string().optional(), // Horizontal offset (e.g., "20", "20px", "5%")
+    y: z.string().optional(), // Vertical offset (e.g., "20", "20px", "5%")
+    width: z.string().optional(), // Width (e.g., "200", "200px", "25%")
+    height: z.string().optional(), // Height (e.g., "150", "150px", "20%")
+    fit: z.enum(['contain', 'cover', 'fill']).optional(),
+    opacity: z.number().min(0).max(100).optional(),
+    borderRadius: z.number().min(0).optional(),
+  }),
+});
+
+/**
  * Code component
  */
 export const CodeComponentSchema = BaseComponentSchema.extend({
@@ -149,6 +170,7 @@ export const ComponentSchema = z.discriminatedUnion('type', [
   TextComponentSchema,
   ListComponentSchema,
   ImageComponentSchema,
+  FloatingImageComponentSchema,
   CodeComponentSchema,
   QuoteComponentSchema,
   ColumnsComponentSchema,
@@ -161,6 +183,7 @@ export type SubtitleComponent = z.infer<typeof SubtitleComponentSchema>;
 export type TextComponent = z.infer<typeof TextComponentSchema>;
 export type ListComponent = z.infer<typeof ListComponentSchema>;
 export type ImageComponent = z.infer<typeof ImageComponentSchema>;
+export type FloatingImageComponent = z.infer<typeof FloatingImageComponentSchema>;
 export type CodeComponent = z.infer<typeof CodeComponentSchema>;
 export type QuoteComponent = z.infer<typeof QuoteComponentSchema>;
 export type ColumnsComponent = z.infer<typeof ColumnsComponentSchema>;
@@ -178,6 +201,7 @@ export const componentTypes = [
   'deck-text',
   'deck-list',
   'deck-image',
+  'deck-floating-image',
   'deck-code',
   'deck-quote',
   'deck-columns',

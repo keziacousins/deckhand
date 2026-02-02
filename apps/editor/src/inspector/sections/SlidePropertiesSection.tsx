@@ -1,9 +1,10 @@
+import { useMemo } from 'react';
 import type { InspectorSectionProps } from '../types';
 import { DEFAULT_GRID_COLUMNS } from '@deckhand/schema';
-import { TextField, NumberField, CheckboxField } from '../fields';
+import { TextField, NumberField, CheckboxField, SelectField } from '../fields';
 
 /**
- * SlidePropertiesSection - Always visible slide properties (title, notes, grid)
+ * SlidePropertiesSection - Always visible slide properties (title, notes, grid, backdrop)
  * Background and Colors are now separate CollapsibleSection components
  */
 export function SlidePropertiesSection({ context }: InspectorSectionProps) {
@@ -13,6 +14,39 @@ export function SlidePropertiesSection({ context }: InspectorSectionProps) {
   const slideId = selection.slideId;
   const hasCustomGrid = selectedSlide.gridColumns !== undefined;
   const effectiveGridColumns = selectedSlide.gridColumns ?? deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
+
+  // Build backdrop slide options (all slides except the current one)
+  // Values: '' = use default, '__none__' = explicitly no backdrop, slide ID = specific slide
+  const backdropOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
+    
+    // "Use Default" option - inherits from deck.defaultBackdropSlideId (or none if not set)
+    if (deck.defaultBackdropSlideId && deck.defaultBackdropSlideId !== slideId) {
+      const defaultSlide = deck.slides[deck.defaultBackdropSlideId];
+      options.push({ 
+        value: '', 
+        label: `Use default (${defaultSlide?.title || 'Untitled'})` 
+      });
+    } else {
+      options.push({ value: '', label: 'Use default (none)' });
+    }
+    
+    // "None" option - explicitly override to have no backdrop
+    options.push({ value: '__none__', label: 'None (override)' });
+    
+    // Add all other slides as options
+    Object.values(deck.slides)
+      .filter(s => s.id !== slideId)
+      .forEach(s => {
+        options.push({ value: s.id, label: s.title || 'Untitled' });
+      });
+    
+    return options;
+  }, [deck.slides, deck.defaultBackdropSlideId, slideId]);
+
+  // Determine current backdrop value for the select
+  // undefined = use default (''), '__none__' = explicitly no backdrop, other = slide ID
+  const currentBackdropValue = selectedSlide.style?.backdropSlideId ?? '';
 
   return (
     <div className="inspector-section">
@@ -29,6 +63,21 @@ export function SlidePropertiesSection({ context }: InspectorSectionProps) {
           onChange={(value) => onUpdate({ type: 'slide', slideId, field: 'notes', value })}
           multiline
           placeholder="Add speaker notes..."
+        />
+        <SelectField
+          label="Backdrop Slide"
+          value={currentBackdropValue}
+          options={backdropOptions}
+          onChange={(value) => {
+            // '' = use default (undefined), '__none__' = explicitly no backdrop, other = slide ID
+            const newValue = value === '' ? undefined : value;
+            onUpdate({ 
+              type: 'slide', 
+              slideId, 
+              field: 'style', 
+              value: { backdropSlideId: newValue } 
+            });
+          }}
         />
         <CheckboxField
           label="Override grid columns"

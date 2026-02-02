@@ -3,6 +3,8 @@
  *
  * Connects to the server's WebSocket endpoint and keeps a local YDoc
  * in sync. Provides the current deck state, update function, and undo/redo.
+ * 
+ * Handles disconnection gracefully with automatic reconnection.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -17,6 +19,8 @@ interface UseYDocResult {
   deck: Deck | null;
   /** Connection status */
   status: ConnectionStatus;
+  /** Whether we've ever successfully synced (for offline indicator) */
+  hasEverSynced: boolean;
   /** Error message if status is 'error' */
   error: string | null;
   /** Update the deck - applies diff and syncs via YDoc */
@@ -35,9 +39,15 @@ const WS_BASE = import.meta.env.DEV
   ? `ws://localhost:3001`
   : `ws://${window.location.host}`;
 
+// Reconnection settings
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+const INITIAL_SYNC_TIMEOUT_MS = 15000;
+
 export function useYDoc(deckId: string): UseYDocResult {
   const [deck, setDeck] = useState<Deck | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
+  const [hasEverSynced, setHasEverSynced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
@@ -46,22 +56,33 @@ export function useYDoc(deckId: string): UseYDocResult {
   const undoManagerRef = useRef<Y.UndoManager | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const deckRef = useRef<Deck | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasEverSyncedRef = useRef(false);
+  const initialSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep deckRef in sync with state for use in callbacks
   useEffect(() => {
     deckRef.current = deck;
   }, [deck]);
 
+  // Calculate reconnect delay with exponential backoff
+  const getReconnectDelay = useCallback(() => {
+    const delay = Math.min(
+      RECONNECT_BASE_MS * Math.pow(2, reconnectAttemptRef.current),
+      RECONNECT_MAX_MS
+    );
+    return delay;
+  }, []);
+
   useEffect(() => {
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
     // Set up UndoManager to track all changes from 'local' origin
-    // We track the root map - Y.UndoManager will capture all nested changes
     const root = ydoc.getMap('root');
     const undoManager = new Y.UndoManager([root], {
       trackedOrigins: new Set(['local']),
-      // Don't merge changes - each transaction is a separate undo item
       captureTimeout: 0,
     });
     undoManagerRef.current = undoManager;
@@ -75,66 +96,149 @@ export function useYDoc(deckId: string): UseYDocResult {
     undoManager.on('stack-item-added', updateStackCounts);
     undoManager.on('stack-item-popped', updateStackCounts);
 
-    const ws = new WebSocket(`${WS_BASE}/ws/${deckId}`);
-    ws.binaryType = 'arraybuffer';
-    wsRef.current = ws;
-
     // Update local state when YDoc changes
     const updateFromYDoc = () => {
       try {
         const newDeck = yDocToDeck(ydoc);
-        // Only update if we have valid data
         if (newDeck?.meta?.id) {
           setDeck(newDeck);
+          // Mark as synced once we have valid data
+          if (!hasEverSyncedRef.current) {
+            hasEverSyncedRef.current = true;
+            setHasEverSynced(true);
+            // Clear initial sync timeout
+            if (initialSyncTimeoutRef.current) {
+              clearTimeout(initialSyncTimeoutRef.current);
+              initialSyncTimeoutRef.current = null;
+            }
+          }
         }
       } catch {
         // Error converting YDoc to deck - ignore
       }
     };
 
-    // Listen for YDoc updates (from remote or local changes)
     ydoc.on('update', updateFromYDoc);
 
-    ws.onopen = () => {
-      setStatus('connected');
-      setError(null);
+    // WebSocket connection function (for initial connect and reconnect)
+    const connect = () => {
+      // Don't reconnect if we're already connected or connecting
+      if (wsRef.current?.readyState === WebSocket.OPEN ||
+          wsRef.current?.readyState === WebSocket.CONNECTING) {
+        return;
+      }
+
+      const ws = new WebSocket(`${WS_BASE}/ws/${deckId}`);
+      ws.binaryType = 'arraybuffer';
+      wsRef.current = ws;
+
+      setStatus('connecting');
+
+      ws.onopen = () => {
+        setStatus('connected');
+        setError(null);
+        reconnectAttemptRef.current = 0; // Reset backoff on successful connect
+        
+        // If we already have state, send it to sync
+        if (ydoc.store.clients.size > 0) {
+          const update = Y.encodeStateAsUpdate(ydoc);
+          ws.send(update);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const update = new Uint8Array(event.data);
+          Y.applyUpdate(ydoc, update);
+        } catch {
+          // Error applying update - ignore
+        }
+      };
+
+      ws.onclose = (event) => {
+        setStatus('disconnected');
+        wsRef.current = null;
+        
+        // Check for specific close codes
+        if (event.code === 4000) {
+          setError('Server unavailable - retrying...');
+        } else if (event.code === 4001) {
+          setError('Deck not found');
+          return; // Don't reconnect for not found
+        }
+        
+        // Schedule reconnect with backoff
+        reconnectAttemptRef.current++;
+        const delay = getReconnectDelay();
+        console.log(`[YDoc] Disconnected, reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current})`);
+        
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, delay);
+      };
+
+      ws.onerror = () => {
+        // onerror is always followed by onclose, so we handle reconnection there
+        if (!hasEverSyncedRef.current) {
+          setError('Connection failed');
+        }
+      };
     };
 
-    ws.onmessage = (event) => {
-      try {
-        const update = new Uint8Array(event.data);
-        Y.applyUpdate(ydoc, update);
-      } catch {
-        // Error applying update - ignore
+    // Initial connection
+    connect();
+
+    // Set up initial sync timeout (only for first connection)
+    initialSyncTimeoutRef.current = setTimeout(() => {
+      if (!hasEverSyncedRef.current) {
+        setStatus('error');
+        setError('Connection timeout - please check your network and try again');
+      }
+    }, INITIAL_SYNC_TIMEOUT_MS);
+
+    // Reconnect when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState === WebSocket.CLOSED) {
+          console.log('[YDoc] Tab visible, reconnecting...');
+          connect();
+        }
       }
     };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    ws.onclose = () => {
-      setStatus('disconnected');
-    };
-
-    ws.onerror = () => {
-      setStatus('error');
-      setError('Connection failed');
-    };
-
+    // Cleanup
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (initialSyncTimeoutRef.current) {
+        clearTimeout(initialSyncTimeoutRef.current);
+      }
+      
       ydoc.off('update', updateFromYDoc);
       undoManager.destroy();
       ydoc.destroy();
-      ws.close();
+      
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      
       ydocRef.current = null;
       undoManagerRef.current = null;
-      wsRef.current = null;
     };
-  }, [deckId]);
+  }, [deckId, getReconnectDelay]);
 
   const updateDeck = useCallback((updater: (deck: Deck) => Deck) => {
     const ydoc = ydocRef.current;
     const ws = wsRef.current;
     const currentDeck = deckRef.current;
 
-    if (!ydoc || !ws || ws.readyState !== WebSocket.OPEN || !currentDeck) {
+    if (!ydoc || !currentDeck) {
       return;
     }
 
@@ -152,9 +256,17 @@ export function useYDoc(deckId: string): UseYDocResult {
       applyPatchesToYDoc(patches, ydoc);
     }, 'local');
 
-    // Send update to server
-    const update = Y.encodeStateAsUpdate(ydoc);
-    ws.send(update);
+    // Immediately update local state so next edit has fresh deck
+    // (Don't wait for YDoc update event which may have timing issues)
+    setDeck(newDeck);
+    deckRef.current = newDeck;
+
+    // Send update to server if connected
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const update = Y.encodeStateAsUpdate(ydoc);
+      ws.send(update);
+    }
+    // If not connected, changes are still in YDoc and will sync on reconnect
   }, []);
 
   const undo = useCallback(() => {
@@ -162,7 +274,7 @@ export function useYDoc(deckId: string): UseYDocResult {
     const ydoc = ydocRef.current;
     const ws = wsRef.current;
     
-    if (!undoManager || !ydoc || !ws || ws.readyState !== WebSocket.OPEN) {
+    if (!undoManager || !ydoc) {
       return;
     }
 
@@ -174,9 +286,11 @@ export function useYDoc(deckId: string): UseYDocResult {
       setDeck(newDeck);
     }
     
-    // Send update to server
-    const update = Y.encodeStateAsUpdate(ydoc);
-    ws.send(update);
+    // Send update to server if connected
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const update = Y.encodeStateAsUpdate(ydoc);
+      ws.send(update);
+    }
   }, []);
 
   const redo = useCallback(() => {
@@ -184,7 +298,9 @@ export function useYDoc(deckId: string): UseYDocResult {
     const ydoc = ydocRef.current;
     const ws = wsRef.current;
     
-    if (!undoManager || !ydoc || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!undoManager || !ydoc) {
+      return;
+    }
 
     undoManager.redo();
     
@@ -194,13 +310,15 @@ export function useYDoc(deckId: string): UseYDocResult {
       setDeck(newDeck);
     }
     
-    // Send update to server
-    const update = Y.encodeStateAsUpdate(ydoc);
-    ws.send(update);
+    // Send update to server if connected
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const update = Y.encodeStateAsUpdate(ydoc);
+      ws.send(update);
+    }
   }, []);
 
   const canUndo = undoCount > 0;
   const canRedo = redoCount > 0;
 
-  return { deck, status, error, updateDeck, undo, redo, canUndo, canRedo };
+  return { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo };
 }

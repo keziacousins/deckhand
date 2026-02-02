@@ -71,6 +71,8 @@ export const tools: Anthropic.Tool[] = [
                 backgroundSize: { type: 'string', enum: ['fill', 'fit-width', 'fit-height'] },
                 backgroundDarken: { type: 'number', description: '0-100 percent' },
                 backgroundBlur: { type: 'number', description: '0-20 pixels' },
+                backgroundTransparent: { type: 'boolean', description: 'When true, slide has no background (transparent). Useful for backdrop slides that should let parent background show through.' },
+                backdropSlideId: { type: 'string', description: 'ID of slide to render as backdrop behind this slide. Backdrop slides render with transparent background by default unless they have explicit background set.' },
               },
             },
           },
@@ -321,10 +323,6 @@ export const tools: Anthropic.Tool[] = [
     input_schema: {
       type: 'object' as const,
       properties: {
-        entrySlide: {
-          type: 'string',
-          description: 'The slide ID to use as the entry point',
-        },
         defaultTransition: {
           type: 'string',
           enum: ['instant', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'cross-fade', 'fade-through-black'],
@@ -341,7 +339,7 @@ export const tools: Anthropic.Tool[] = [
   // Deck settings
   {
     name: 'update_deck_settings',
-    description: 'Update deck-level settings like title, description, aspect ratio, and grid columns',
+    description: 'Update deck-level settings like title, description, aspect ratio, grid columns, and default backdrop',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -361,6 +359,10 @@ export const tools: Anthropic.Tool[] = [
         gridColumns: {
           type: 'number',
           description: 'Number of grid columns for component layout (1-12)',
+        },
+        defaultBackdropSlideId: {
+          type: 'string',
+          description: 'ID of slide to use as default backdrop for all slides',
         },
       },
       required: [],
@@ -412,14 +414,14 @@ export const tools: Anthropic.Tool[] = [
   },
   {
     name: 'get_deck_state',
-    description: 'Get the current state of the deck (slides, components, edges, assets). Call this to see current state after making changes or if the user refers to something you cannot see.',
+    description: 'Get the full current state of the deck. Always returns deckSettings (title, aspectRatio, gridColumns, defaultBackdropSlideId). Use include parameter to add: slides (with full style, notes, gridColumns, components), edges, startPoints, theme (with all tokens), assets. Call this to understand current state before making changes.',
     input_schema: {
       type: 'object' as const,
       properties: {
         include: {
           type: 'array',
           items: { type: 'string', enum: ['slides', 'edges', 'startPoints', 'theme', 'assets', 'all'] },
-          description: 'What to include in the response. Defaults to ["slides", "edges", "assets"]',
+          description: 'What to include in the response. Defaults to ["slides", "edges", "assets"]. Use "all" for complete state.',
         },
       },
       required: [],
@@ -633,17 +635,19 @@ export function executeToolCall(
 
       // Deck settings
       case 'update_deck_settings': {
-        const { title, description, aspectRatio, gridColumns } = input as {
+        const { title, description, aspectRatio, gridColumns, defaultBackdropSlideId } = input as {
           title?: string;
           description?: string;
           aspectRatio?: string;
           gridColumns?: number;
+          defaultBackdropSlideId?: string;
         };
         const updates: UpdateDeckSettingsOptions = {
           title,
           description,
           aspectRatio: aspectRatio as UpdateDeckSettingsOptions['aspectRatio'],
           gridColumns,
+          defaultBackdropSlideId,
         };
         newDeck = updateDeckSettings(deck, updates);
         resultData = { updates };
@@ -694,12 +698,35 @@ export function executeToolCall(
         
         const state: Record<string, unknown> = {};
         
+        // Deck-level settings (always included)
+        state.deckSettings = {
+          id: deck.meta.id,
+          title: deck.meta.title,
+          description: deck.meta.description,
+          aspectRatio: deck.aspectRatio,
+          gridColumns: deck.gridColumns,
+          defaultBackdropSlideId: deck.defaultBackdropSlideId,
+        };
+        
         if (includeAll || include.includes('slides')) {
           state.slides = Object.values(deck.slides).map(slide => ({
             id: slide.id,
             title: slide.title,
+            notes: slide.notes,
             position: slide.position,
-            componentCount: slide.components.length,
+            gridColumns: slide.gridColumns,
+            style: slide.style ? {
+              background: slide.style.background,
+              textPrimary: slide.style.textPrimary,
+              textSecondary: slide.style.textSecondary,
+              accent: slide.style.accent,
+              backgroundAssetId: slide.style.backgroundAssetId,
+              backgroundSize: slide.style.backgroundSize,
+              backgroundDarken: slide.style.backgroundDarken,
+              backgroundBlur: slide.style.backgroundBlur,
+              backgroundTransparent: slide.style.backgroundTransparent,
+              backdropSlideId: slide.style.backdropSlideId,
+            } : undefined,
             components: slide.components.map(c => ({
               id: c.id,
               type: c.type,
@@ -716,9 +743,12 @@ export function executeToolCall(
             trigger: edge.trigger,
             label: edge.label,
             transition: edge.transition,
+            transitionDuration: edge.transitionDuration,
           }));
-          state.entrySlide = deck.flow.entrySlide;
-          state.defaultTransition = deck.flow.defaultTransition || 'instant';
+          state.flowSettings = {
+            defaultTransition: deck.flow.defaultTransition || 'instant',
+            defaultTransitionDuration: deck.flow.defaultTransitionDuration,
+          };
         }
         
         if (includeAll || include.includes('startPoints')) {
@@ -742,6 +772,7 @@ export function executeToolCall(
             id: asset.id,
             filename: asset.filename,
             mimeType: asset.mimeType,
+            size: asset.size,
           }));
         }
         

@@ -41,6 +41,7 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showSessionList, setShowSessionList] = useState(false);
   const [expandedToolResult, setExpandedToolResult] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -128,6 +129,13 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
     }
   }, [input]);
 
+  // Restore focus to textarea if it was focused before re-render
+  useEffect(() => {
+    if (isFocused && textareaRef.current && document.activeElement !== textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  });
+
   const startNewChat = useCallback(() => {
     setCurrentSessionId(null);
     setMessages([]);
@@ -170,6 +178,9 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
     setInput('');
     setIsLoading(true);
     setError(null);
+    
+    // Restore focus to input after sending
+    setTimeout(() => textareaRef.current?.focus(), 0);
 
     try {
       const response = await fetch(`/api/decks/${deckId}/chat`, {
@@ -417,6 +428,8 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           placeholder="Describe changes..."
           rows={1}
           disabled={isLoading}

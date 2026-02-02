@@ -65,7 +65,7 @@ ${componentsSummary || '    (no components)'}`;
   return `**Title:** ${deck.meta.title || 'Untitled Deck'}
 **Aspect Ratio:** ${deck.aspectRatio} (${slideWidth}×${slideHeight}px)
 **Grid Columns:** ${deck.gridColumns}
-**Entry Slide:** ${deck.flow.entrySlide}
+**Default Backdrop:** ${deck.defaultBackdropSlideId || 'none'}
 **Default Transition:** ${deck.flow.defaultTransition || 'instant'}
 
 **Theme:**
@@ -96,11 +96,28 @@ function buildBasePrompt(): string {
 ## Component Types
 
 Available components you can add:
+
+**Content Components (flow with grid layout):**
 - **deck-title**: Heading text. Props: text (string), level ("1"|"2"|"3"), align ("left"|"center"|"right"), gridWidth (number)
 - **deck-text**: Rich text paragraph. Props: content (array of {text, bold?, italic?, underline?, code?, href?}), align, gridWidth
 - **deck-list**: Bullet or numbered list. Props: items (string[]), ordered (boolean), gridWidth
 - **deck-image**: Image from assets. Props: assetId (string), alt, caption, fit ("contain"|"cover"|"fill"), darken (0-100), blur (0-20), maxHeight, gridWidth
 - **deck-headline-subhead**: Headline with subheading. Props: headline, subheading, category, isHero (boolean), variant ("dark"|"light"), align, gridWidth
+
+**Floating Components (absolute positioning, outside content padding):**
+- **deck-floating-image**: Image at specific coordinates. Props: assetId, alt, anchorX ("left"|"right"), anchorY ("top"|"bottom"), x (offset like "20" or "5%"), y, width, height, fit, opacity (0-100), borderRadius
+
+## Slide Style Properties
+
+Each slide can have style overrides (via update_slide tool):
+- **background**: Background color override (hex)
+- **textPrimary/textSecondary/accent**: Color overrides for this slide
+- **backgroundAssetId**: Asset ID for background image
+- **backgroundSize**: "fill" (cover), "fit-width", or "fit-height"
+- **backgroundDarken**: 0-100, darkens background image
+- **backgroundBlur**: 0-20px blur on background
+- **backgroundTransparent**: true to make slide background transparent (useful for backdrop slides)
+- **backdropSlideId**: ID of another slide to render behind this one (for reusable footers/logos). Use "__none__" to explicitly disable default backdrop.
 
 ## Slide Positioning
 
@@ -116,17 +133,24 @@ ${generateToolDocumentation()}
 
 ## Instructions
 
-**CRITICAL: You MUST use tools to make any changes to the deck.** You cannot modify slides, components, or any deck content without calling the appropriate tool. Never claim to have made changes without actually calling a tool - the user can see whether tools were called.
+**CRITICAL RULES - VIOLATION WILL CAUSE FAILURES:**
 
-1. When the user says "this slide", "this", "the current slide", or similar, they mean the **selected slide** shown in the context.
-2. When the user says "this component" or refers to content without specifying, they mean the **selected component** if one is selected.
-3. If no slide is selected and the user says "this", ask which slide they mean or use get_deck_state to list slides.
-4. For colors, use hex format (e.g., "#ff0000" for red).
-5. For text content, be creative but professional unless given specific text.
-6. After making changes, briefly confirm what you did.
-7. If the request is ambiguous, ask for clarification rather than guessing.
-8. For navigation flow, use edges to connect slides. Start points provide named entry points for different presentation paths.
-9. Use get_deck_state or list_assets to see current state if you need to reference existing content.
+1. **YOU MUST CALL TOOLS TO MAKE CHANGES.** You have NO ability to modify the deck except through tool calls. If you say "Done!" without having called tools, NOTHING HAPPENED. The user sees tool call logs and will know you lied.
+
+2. **NEVER claim to have made changes without actually calling tools.** If you want to update 6 slides, you must call update_slide 6 times. There are no shortcuts.
+
+3. **DESCRIBE BRIEFLY, THEN CALL TOOLS.** First say what you plan to do in one sentence, then immediately call the tools. Example: "I'll update the background color on all 6 slides." [then call update_slide 6 times]
+
+**Additional guidelines:**
+- When the user says "this slide", "this", "the current slide", or similar, they mean the **selected slide** shown in the context.
+- When the user says "this component" or refers to content without specifying, they mean the **selected component** if one is selected.
+- If no slide is selected and the user says "this", ask which slide they mean or use get_deck_state to list slides.
+- For colors, use hex format (e.g., "#ff0000" for red).
+- For text content, be creative but professional unless given specific text.
+- After making changes, briefly confirm what you did.
+- If the request is ambiguous, ask for clarification rather than guessing.
+- For navigation flow, use edges to connect slides. Start points provide named entry points for different presentation paths.
+- Use get_deck_state or list_assets to see current state if you need to reference existing content.
 
 Be concise in your responses. The user can see the changes in real-time.`;
 }
@@ -154,10 +178,17 @@ function buildSelectedSlideInfo(deck: Deck, context?: ChatContext): string {
     return `  ${i + 1}. ${c.id} (${c.type})${marker}`;
   }).join('\n');
 
+  // Build style info if slide has style overrides
+  const style = slide.style;
+  const styleInfo = style ? Object.entries(style)
+    .filter(([_, v]) => v !== undefined)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(', ') : null;
+
   return `**Selected Slide:** ${slide.id} ("${slide.title || 'Untitled'}")
   - Position: (${slide.position.x}, ${slide.position.y})
   - Grid columns: ${slide.gridColumns || deck.gridColumns}
-  - Components (${slide.components.length}):
+${styleInfo ? `  - Style: ${styleInfo}\n` : ''}  - Components (${slide.components.length}):
 ${componentsList || '    (none)'}
 ${selectedComponent 
   ? `\n**Selected Component:** ${selectedComponent.id} (${selectedComponent.type})

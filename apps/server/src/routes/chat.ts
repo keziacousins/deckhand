@@ -412,8 +412,9 @@ router.post('/:deckId/chat', async (req, res) => {
       }
     }
     
-    // Add current user message
-    messages.push({ role: 'user', content: message });
+    // Add current user message with tool reminder
+    const toolReminder = '\n\n[Remember: You MUST call tools to make any changes. Describe your plan briefly, then call the necessary tools.]';
+    messages.push({ role: 'user', content: message + toolReminder });
 
     // Use full prompt for first message in session, lighter prompt for continuation
     const hasHistory = historyRows.length > 1;

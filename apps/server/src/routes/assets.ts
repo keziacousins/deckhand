@@ -235,4 +235,102 @@ router.delete('/decks/:deckId/assets/:assetId', (req: Request, res: Response) =>
   }
 });
 
+/**
+ * POST /api/decks/:deckId/cover
+ * Upload a cover image for the deck (replaces any existing cover)
+ */
+router.post(
+  '/decks/:deckId/cover',
+  upload.single('file'),
+  async (req: Request, res: Response) => {
+    const { deckId } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+
+    // Validate it's an image
+    if (!file.mimetype.startsWith('image/')) {
+      fs.unlinkSync(file.path);
+      res.status(400).json({ error: 'Cover must be an image' });
+      return;
+    }
+
+    try {
+      // Delete old cover file if exists
+      const assetDir = paths.deckAssets(deckId);
+      const existingFiles = fs.readdirSync(assetDir);
+      for (const f of existingFiles) {
+        if (f.startsWith('cover.')) {
+          fs.unlinkSync(path.join(assetDir, f));
+        }
+      }
+
+      // Rename uploaded file to cover.ext
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+      const coverFilename = `cover${ext}`;
+      const coverPath = path.join(assetDir, coverFilename);
+      fs.renameSync(file.path, coverPath);
+
+      // Update database with cover URL
+      const coverUrl = `/api/decks/${deckId}/cover`;
+      const stmt = db.prepare("UPDATE decks SET cover_url = ?, updated_at = datetime('now') WHERE id = ?");
+      stmt.run(coverUrl, deckId);
+
+      console.log(`[Assets] Updated cover for deck ${deckId}`);
+      res.json({ coverUrl });
+    } catch (error) {
+      console.error('[Assets] Error uploading cover:', error);
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      res.status(500).json({ error: 'Failed to upload cover' });
+    }
+  }
+);
+
+/**
+ * GET /api/decks/:deckId/cover
+ * Serve the deck's cover image
+ */
+router.get('/decks/:deckId/cover', (req: Request, res: Response) => {
+  const { deckId } = req.params;
+
+  try {
+    const assetDir = paths.deckAssets(deckId);
+    
+    if (!fs.existsSync(assetDir)) {
+      res.status(404).json({ error: 'Cover not found' });
+      return;
+    }
+
+    const files = fs.readdirSync(assetDir);
+    const coverFile = files.find(f => f.startsWith('cover.'));
+
+    if (!coverFile) {
+      res.status(404).json({ error: 'Cover not found' });
+      return;
+    }
+
+    const coverPath = path.join(assetDir, coverFile);
+    const ext = path.extname(coverFile).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+    };
+
+    res.setHeader('Content-Type', mimeTypes[ext] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache (covers change)
+    res.sendFile(coverPath);
+  } catch (error) {
+    console.error('[Assets] Error serving cover:', error);
+    res.status(500).json({ error: 'Failed to serve cover' });
+  }
+});
+
 export default router;

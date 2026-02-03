@@ -95,6 +95,9 @@ export function deckToYDoc(deck: Deck, ydoc?: Y.Doc): Y.Doc {
     if (deck.defaultBackdropSlideId) {
       root.set('defaultBackdropSlideId', deck.defaultBackdropSlideId);
     }
+    if (deck.defaultStartPointId) {
+      root.set('defaultStartPointId', deck.defaultStartPointId);
+    }
     root.set('slides', toYValue(deck.slides));
     root.set('flow', toYValue(deck.flow));
     if (deck.assets) {
@@ -124,6 +127,11 @@ export function yDocToDeck(ydoc: Y.Doc): Deck {
   const defaultBackdropSlideId = root.get('defaultBackdropSlideId') as string | undefined;
   if (defaultBackdropSlideId) {
     deck.defaultBackdropSlideId = defaultBackdropSlideId;
+  }
+
+  const defaultStartPointId = root.get('defaultStartPointId') as string | undefined;
+  if (defaultStartPointId) {
+    deck.defaultStartPointId = defaultStartPointId;
   }
 
   return deck;

@@ -10,6 +10,7 @@ import { ColorsSection } from './sections/ColorsSection';
 import { ComponentList } from './sections/ComponentList';
 import { ComponentBrowser } from './sections/ComponentBrowser';
 import { ThemeSection } from './sections/ThemeSection';
+import { DeckPropertiesSection } from './sections/DeckPropertiesSection';
 import { AssetsSection } from './sections/AssetsSection';
 import { ChatSection } from './sections/ChatSection';
 import { EdgePropertiesSection } from './sections/EdgePropertiesSection';
@@ -530,7 +531,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
               className={`inspector-tab ${activeTab === 'theme' ? 'inspector-tab-active' : ''}`}
               onClick={() => setActiveTab('theme')}
             >
-              Theme
+              Deck
             </button>
             <button
               className={`inspector-tab ${activeTab === 'assets' ? 'inspector-tab-active' : ''}`}
@@ -589,6 +590,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
 
           {activeTab === 'theme' && (
             <>
+              <DeckPropertiesSection context={context} />
               <ThemeSection context={context} />
               {onToggleShowGrid && (
                 <div className="inspector-section">

@@ -237,3 +237,42 @@ export function validateDeck(data: unknown): { success: true; data: Deck } | { s
   }
   return { success: false, errors: result.error };
 }
+
+/**
+ * Get the cover slide ID for a deck.
+ * Priority:
+ * 1. Default start point's first edge target
+ * 2. Any start point's first edge target
+ * 3. First slide by position (top-left)
+ */
+export function getCoverSlideId(deck: Deck): string | null {
+  const edges = Object.values(deck.flow.edges);
+  const slides = Object.values(deck.slides);
+  
+  if (slides.length === 0) return null;
+
+  // 1. Try default start point
+  if (deck.defaultStartPointId) {
+    const edge = edges.find(e => e.from === deck.defaultStartPointId);
+    if (edge && deck.slides[edge.to]) {
+      return edge.to;
+    }
+  }
+
+  // 2. Try any start point
+  const startPoints = Object.keys(deck.flow.startPoints ?? {});
+  for (const spId of startPoints) {
+    const edge = edges.find(e => e.from === spId);
+    if (edge && deck.slides[edge.to]) {
+      return edge.to;
+    }
+  }
+
+  // 3. Fall back to first slide by position (top-left = min x, then min y)
+  const sortedSlides = [...slides].sort((a, b) => {
+    if (a.position.x !== b.position.x) return a.position.x - b.position.x;
+    return a.position.y - b.position.y;
+  });
+  
+  return sortedSlides[0]?.id ?? null;
+}

@@ -9,6 +9,7 @@ export interface DeckMetadata {
   title: string;
   description: string | null;
   slideCount: number;
+  coverUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

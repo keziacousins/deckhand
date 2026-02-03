@@ -117,6 +117,13 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
               onClick={() => onOpenDeck(deck.id)}
             >
               <div className="deck-card-preview">
+                {deck.coverUrl && (
+                  <img
+                    src={deck.coverUrl}
+                    alt=""
+                    className="deck-card-cover"
+                  />
+                )}
                 <span className="deck-card-slide-count">
                   {deck.slideCount} slide{deck.slideCount !== 1 ? 's' : ''}
                 </span>

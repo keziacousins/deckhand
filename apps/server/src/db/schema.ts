@@ -27,6 +27,7 @@ export function initSchema(): void {
       content TEXT NOT NULL,           -- JSON content (source of truth)
       content_hash TEXT NOT NULL,      -- SHA-256 hash for bootstrap detection
       slide_count INTEGER DEFAULT 0,
+      cover_url TEXT,                  -- URL to cover image (generated from cover slide)
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -90,6 +91,14 @@ export function initSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id, created_at);
   `);
 
+  // Migrations for existing databases
+  // Add cover_url column if it doesn't exist
+  const columns = db.prepare("PRAGMA table_info(decks)").all() as Array<{ name: string }>;
+  if (!columns.some(c => c.name === 'cover_url')) {
+    db.exec('ALTER TABLE decks ADD COLUMN cover_url TEXT');
+    console.log('[DB] Added cover_url column to decks table');
+  }
+
   console.log('[DB] Schema initialized');
 }
 
@@ -101,6 +110,7 @@ export interface DeckMetadata {
   title: string;
   description: string | null;
   slideCount: number;
+  coverUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -115,6 +125,7 @@ export interface DeckRow {
   content: string;
   content_hash: string;
   slide_count: number;
+  cover_url: string | null;
   created_at: string;
   updated_at: string;
 }

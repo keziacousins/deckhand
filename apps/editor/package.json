@@ -13,6 +13,7 @@
     "@deckhand/schema": "*",
     "@deckhand/sync": "*",
     "@xyflow/react": "^12.0.0",
+    "html-to-image": "^1.11.13",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",

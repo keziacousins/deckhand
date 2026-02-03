@@ -1,9 +1,7 @@
-import { useMemo } from 'react';
 import type { InspectorSectionProps } from '../types';
 import { TextField } from '../fields/TextField';
 import { ColorField } from '../fields/ColorField';
 import { NumberField } from '../fields/NumberField';
-import { SelectField } from '../fields/SelectField';
 
 // Token groups for organized display
 const TOKEN_GROUPS = {
@@ -48,12 +46,6 @@ const TOKEN_GROUPS = {
   },
 };
 
-const ASPECT_RATIO_OPTIONS = [
-  { value: '16:9', label: '16:9 (Widescreen)' },
-  { value: '16:10', label: '16:10 (Widescreen)' },
-  { value: '4:3', label: '4:3 (Standard)' },
-];
-
 export function ThemeSection({ context }: InspectorSectionProps) {
   const { deck, onUpdate } = context;
   const theme = deck.theme;
@@ -61,19 +53,6 @@ export function ThemeSection({ context }: InspectorSectionProps) {
   const handleTokenChange = (key: string, value: string | number | undefined) => {
     onUpdate({ type: 'theme', field: key, value });
   };
-
-  const handleDeckChange = (field: 'title' | 'description', value: string) => {
-    onUpdate({ type: 'deck', field, value });
-  };
-
-  // Build backdrop slide options
-  const backdropOptions = useMemo(() => {
-    const options = [{ value: '', label: 'None' }];
-    Object.values(deck.slides).forEach(s => {
-      options.push({ value: s.id, label: s.title || 'Untitled' });
-    });
-    return options;
-  }, [deck.slides]);
 
   const renderTokenField = (token: { key: string; label: string; type: 'text' | 'color' | 'number' }) => {
     const value = theme.tokens[token.key as keyof typeof theme.tokens];
@@ -115,42 +94,6 @@ export function ThemeSection({ context }: InspectorSectionProps) {
 
   return (
     <>
-      {/* Deck Properties */}
-      <div className="inspector-section">
-        <div className="inspector-section-header">Deck</div>
-        <div className="inspector-section-content">
-          <TextField
-            label="Title"
-            value={deck.meta.title}
-            onChange={(v) => handleDeckChange('title', v)}
-          />
-          <TextField
-            label="Description"
-            value={deck.meta.description ?? ''}
-            onChange={(v) => handleDeckChange('description', v)}
-          />
-          <SelectField
-            label="Aspect Ratio"
-            value={deck.aspectRatio}
-            options={ASPECT_RATIO_OPTIONS}
-            onChange={(v) => onUpdate({ type: 'deck', field: 'aspectRatio', value: v as '16:9' | '16:10' | '4:3' })}
-          />
-          <NumberField
-            label="Grid Columns"
-            value={deck.gridColumns}
-            onChange={(v) => onUpdate({ type: 'deck', field: 'gridColumns', value: v })}
-            min={4}
-            max={16}
-          />
-          <SelectField
-            label="Default Backdrop"
-            value={deck.defaultBackdropSlideId ?? ''}
-            options={backdropOptions}
-            onChange={(v) => onUpdate({ type: 'deck', field: 'defaultBackdropSlideId', value: v || undefined })}
-          />
-        </div>
-      </div>
-
       {/* Theme Name */}
       <div className="inspector-section">
         <div className="inspector-section-header">Theme</div>

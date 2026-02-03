@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Canvas } from '../canvas/Canvas';
 import { Inspector } from '../inspector/Inspector';
@@ -6,6 +6,7 @@ import { StartPresentationModal } from '../components/StartPresentationModal';
 import { SelectionProvider, useSelection } from '../selection';
 import { useYDoc } from '../sync';
 import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
+import { useCoverCapture } from '../hooks/useCoverCapture';
 import type { Deck } from '@deckhand/schema';
 import '../styles/layout.css';
 
@@ -23,9 +24,14 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   const [showGrid, setShowGrid] = useState(false);
   const { selectSlide } = useSelection();
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
+  const hasCapturedInitialCover = useRef(false);
 
   // Register undo/redo keyboard shortcuts
   useUndoRedoShortcuts({ undo, redo, canUndo, canRedo });
+
+  // Cover image capture
+  const { captureCover, isCapturing } = useCoverCapture({ deck, deckId });
+  const [isSaving, setIsSaving] = useState(false);
 
   // Select first slide when deck loads
   useEffect(() => {
@@ -41,7 +47,20 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   // Reset initial selection flag when deckId changes
   useEffect(() => {
     setInitialSelectionDone(false);
+    hasCapturedInitialCover.current = false;
   }, [deckId]);
+
+  // Capture cover image after initial render (with delay for canvas to render)
+  useEffect(() => {
+    if (deck && hasEverSynced && !hasCapturedInitialCover.current) {
+      hasCapturedInitialCover.current = true;
+      // Delay to ensure the slide is rendered
+      const timer = setTimeout(() => {
+        captureCover();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [deck, hasEverSynced, captureCover]);
 
   const handleUpdateDeck = useCallback((updater: (deck: Deck) => Deck) => {
     updateDeck((current) => {
@@ -65,6 +84,13 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
       },
     }));
   }, [handleUpdateDeck]);
+
+  // Capture cover before navigating away
+  const handleBack = useCallback(async () => {
+    setIsSaving(true);
+    await captureCover();
+    onBack();
+  }, [captureCover, onBack]);
 
   const toggleInspector = useCallback(() => {
     setInspectorVisible((v) => !v);
@@ -177,7 +203,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         <div className="editor-container">
           <div className="error-state">
             <p>{error || 'Failed to load deck'}</p>
-            <button onClick={onBack}>Back to Decks</button>
+            <button onClick={handleBack}>Back to Decks</button>
           </div>
         </div>
       );
@@ -198,7 +224,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
       <div className="editor-container">
         <div className="error-state">
           <p>Deck not found</p>
-          <button onClick={onBack}>Back to Decks</button>
+          <button onClick={handleBack}>Back to Decks</button>
         </div>
       </div>
     );
@@ -211,7 +237,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
           <Canvas
             deck={deck}
             onUpdateDeck={handleUpdateDeck}
-            onBack={onBack}
+            onBack={handleBack}
             onNameChange={handleNameChange}
             onPlayFullscreen={handlePlayFullscreen}
             onPlayWindow={handlePlayWindow}
@@ -240,6 +266,13 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
           onStart={handleModalStart}
           onClose={handleModalClose}
         />
+      )}
+      
+      {isSaving && (
+        <div className="saving-overlay">
+          <div className="saving-spinner" />
+          <span>Saving...</span>
+        </div>
       )}
     </div>
   );

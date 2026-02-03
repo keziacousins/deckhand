@@ -18,7 +18,7 @@ export function hashContent(content: string): string {
  */
 export function listDecks(): DeckMetadata[] {
   const stmt = db.prepare(`
-    SELECT id, title, description, slide_count, created_at, updated_at
+    SELECT id, title, description, slide_count, cover_url, created_at, updated_at
     FROM decks
     ORDER BY updated_at DESC
   `);
@@ -28,6 +28,7 @@ export function listDecks(): DeckMetadata[] {
     title: string;
     description: string | null;
     slide_count: number;
+    cover_url: string | null;
     created_at: string;
     updated_at: string;
   }>;
@@ -37,6 +38,7 @@ export function listDecks(): DeckMetadata[] {
     title: row.title,
     description: row.description,
     slideCount: row.slide_count,
+    coverUrl: row.cover_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));

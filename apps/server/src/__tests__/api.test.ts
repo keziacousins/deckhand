@@ -25,6 +25,7 @@ function initTestSchema(db: Database.Database): void {
       content TEXT NOT NULL,
       content_hash TEXT NOT NULL,
       slide_count INTEGER DEFAULT 0,
+      cover_url TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );

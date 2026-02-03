@@ -73,7 +73,10 @@ export const ImageComponentSchema = BaseComponentSchema.extend({
     fit: z.enum(['contain', 'cover', 'fill']).optional(),
     darken: z.number().min(0).max(100).optional(),
     blur: z.number().min(0).max(20).optional(),
-    maxHeight: z.number().min(0).max(1000).optional(),
+    maxWidth: z.number().min(0).max(2000).optional(),
+    maxHeight: z.number().min(0).max(2000).optional(),
+    align: z.enum(['left', 'center', 'right']).optional(),
+    color: z.string().optional(), // SVG fill color (works with currentColor SVGs)
   }),
 });
 

@@ -71,15 +71,43 @@ export class DeckImage extends DeckComponent {
         default: 0,
         group: PropertyGroups.STYLE,
       },
+      maxWidth: {
+        type: 'number',
+        label: 'Max Width',
+        description: 'Maximum width in pixels (0 = no limit)',
+        min: 0,
+        max: 2000,
+        step: 50,
+        default: 0,
+        group: PropertyGroups.LAYOUT,
+      },
       maxHeight: {
         type: 'number',
         label: 'Max Height',
         description: 'Maximum height in pixels (0 = no limit)',
         min: 0,
-        max: 1000,
+        max: 2000,
         step: 50,
         default: 0,
         group: PropertyGroups.LAYOUT,
+      },
+      align: {
+        type: 'enum',
+        label: 'Align',
+        description: 'Horizontal alignment within grid slot',
+        options: [
+          { value: 'left', label: 'Left' },
+          { value: 'center', label: 'Center' },
+          { value: 'right', label: 'Right' },
+        ],
+        default: 'left',
+        group: PropertyGroups.LAYOUT,
+      },
+      color: {
+        type: 'color',
+        label: 'SVG Color',
+        description: 'Fill color for SVGs using currentColor',
+        group: PropertyGroups.STYLE,
       },
       gridWidth: CommonProperties.gridWidth(),
     },
@@ -92,7 +120,7 @@ export class DeckImage extends DeckComponent {
     },
   };
 
-  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-height', 'grid-width'];
+  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-width', 'max-height', 'align', 'color', 'grid-width'];
 
   attributeChangedCallback(): void {
     this.render();
@@ -106,7 +134,10 @@ export class DeckImage extends DeckComponent {
     const fit = this.getAttr('fit', 'contain');
     const darken = this.getAttrNumber('darken', 0);
     const blur = this.getAttrNumber('blur', 0);
+    const maxWidth = this.getAttrNumber('max-width', 0);
     const maxHeight = this.getAttrNumber('max-height', 0);
+    const align = this.getAttr('align', 'left') as 'left' | 'center' | 'right';
+    const color = this.getAttr('color');
 
     // Use shared image renderer
     const url = resolveAssetUrl(assetId, assetsJson);
@@ -117,7 +148,10 @@ export class DeckImage extends DeckComponent {
       blur,
       alt,
       caption: caption || undefined,
+      maxWidth: maxWidth > 0 ? maxWidth : undefined,
       maxHeight: maxHeight > 0 ? maxHeight : undefined,
+      align,
+      color: color || undefined,
     });
 
     this.shadow.innerHTML = `

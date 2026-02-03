@@ -102,7 +102,7 @@ export const tools: Anthropic.Tool[] = [
             },
             props: {
               type: 'object',
-              description: 'Component properties (varies by type). For deck-container: gridWidth (required, 1-12), background, padding, gap, borderRadius, border, alignItems, justifyContent',
+              description: 'Component properties (varies by type). For deck-container: gridWidth (required, 1-12), background, padding, gap, borderRadius, border, alignItems, justifyContent. For deck-image: assetId, alt, caption, fit (contain/cover/fill), darken, blur, maxWidth (pixels), maxHeight (pixels), align (left/center/right), color (hex color for SVG fill)',
             },
           },
           required: ['type', 'props'],
@@ -551,7 +551,12 @@ export function executeToolCall(
           componentId: string;
           props: Record<string, unknown>;
         };
+        console.log('[update_component] Input props:', JSON.stringify(props));
+        const oldComponent = deck.slides[slideId]?.components.find(c => c.id === componentId);
+        console.log('[update_component] Old component props:', JSON.stringify(oldComponent?.props));
         newDeck = updateComponent(deck, slideId, componentId, props);
+        const newComponent = newDeck.slides[slideId]?.components.find(c => c.id === componentId);
+        console.log('[update_component] New component props:', JSON.stringify(newComponent?.props));
         resultData = { slideId, componentId, props };
         break;
       }
@@ -793,6 +798,7 @@ export function executeToolCall(
 
     // Diff and apply patches to YDoc
     const patches = diffDeck(deck, newDeck);
+    console.log('[executeToolCall] Patches:', JSON.stringify(patches, null, 2));
     if (patches.length > 0) {
       ydoc.transact(() => {
         applyPatchesToYDoc(patches, ydoc);

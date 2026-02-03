@@ -131,7 +131,10 @@ export function generateImageBackgroundHtml(options: ImageRenderOptions): {
 export function generateImageElementHtml(options: ImageRenderOptions & {
   alt?: string;
   caption?: string;
+  maxWidth?: number;
   maxHeight?: number;
+  align?: 'left' | 'center' | 'right';
+  color?: string; // SVG fill color (for currentColor SVGs)
 }): {
   html: string;
   styles: string;
@@ -141,7 +144,10 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
   const caption = options.caption;
   const darken = options.darken || 0;
   const blur = options.blur || 0;
+  const maxWidth = options.maxWidth;
   const maxHeight = options.maxHeight;
+  const align = options.align || 'left';
+  const color = options.color;
 
   if (!url) {
     // Placeholder when no image
@@ -191,16 +197,29 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
   // Determine sizing mode
   const size = options.size || 'contain';
 
+  // Alignment styles for the wrapper
+  const alignStyles = maxWidth ? (
+    align === 'center' ? 'margin-left: auto; margin-right: auto;' :
+    align === 'right' ? 'margin-left: auto; margin-right: 0;' :
+    'margin-left: 0; margin-right: auto;'
+  ) : '';
+
+  // Color styles for SVG support (currentColor)
+  const colorStyles = color ? `color: ${color}; --icon-color: ${color};` : '';
+
   const styles = `
     .image-container {
       position: relative;
       width: 100%;
+      ${colorStyles}
     }
     .image-wrapper {
       position: relative;
       overflow: hidden;
       border-radius: var(--deck-radius-md, 8px);
+      ${maxWidth ? `max-width: ${maxWidth}px;` : ''}
       ${maxHeight ? `height: ${maxHeight}px;` : ''}
+      ${alignStyles}
       ${size === 'contain' && maxHeight ? `
         display: flex;
         align-items: center;

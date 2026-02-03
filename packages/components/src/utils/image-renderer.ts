@@ -126,6 +126,27 @@ export function generateImageBackgroundHtml(options: ImageRenderOptions): {
 }
 
 /**
+ * Map borderRadius prop to CSS value.
+ */
+export function borderRadiusToCss(radius: string | undefined): string {
+  switch (radius) {
+    case 'none':
+      return '0';
+    case 'sm':
+      return 'var(--deck-radius-sm, 4px)';
+    case 'md':
+      return 'var(--deck-radius-md, 8px)';
+    case 'lg':
+      return 'var(--deck-radius-lg, 16px)';
+    case 'full':
+      return '50%';
+    case 'default':
+    default:
+      return 'var(--deck-radius-md, 8px)';
+  }
+}
+
+/**
  * Generate HTML for a foreground image (like deck-image).
  */
 export function generateImageElementHtml(options: ImageRenderOptions & {
@@ -135,6 +156,7 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
   maxHeight?: number;
   align?: 'left' | 'center' | 'right';
   color?: string; // SVG fill color (for currentColor SVGs)
+  borderRadius?: 'default' | 'none' | 'sm' | 'md' | 'lg' | 'full';
 }): {
   html: string;
   styles: string;
@@ -148,6 +170,7 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
   const maxHeight = options.maxHeight;
   const align = options.align || 'left';
   const color = options.color;
+  const borderRadius = borderRadiusToCss(options.borderRadius);
 
   if (!url) {
     // Placeholder when no image
@@ -216,7 +239,7 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
     .image-wrapper {
       position: relative;
       overflow: hidden;
-      border-radius: var(--deck-radius-md, 8px);
+      border-radius: ${borderRadius};
       ${maxWidth ? `max-width: ${maxWidth}px;` : ''}
       ${maxHeight ? `height: ${maxHeight}px;` : ''}
       ${alignStyles}
@@ -255,7 +278,7 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
       inset: 0;
       background: rgba(0, 0, 0, ${darken / 100});
       pointer-events: none;
-      border-radius: var(--deck-radius-md, 8px);
+      border-radius: ${borderRadius};
     }
     ` : ''}
     .image-caption {

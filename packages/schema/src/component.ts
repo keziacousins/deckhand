@@ -77,6 +77,7 @@ export const ImageComponentSchema = BaseComponentSchema.extend({
     maxHeight: z.number().min(0).max(2000).optional(),
     align: z.enum(['left', 'center', 'right']).optional(),
     color: z.string().optional(), // SVG fill color (works with currentColor SVGs)
+    borderRadius: z.enum(['default', 'none', 'sm', 'md', 'lg', 'full']).optional(),
   }),
 });
 
@@ -97,7 +98,7 @@ export const FloatingImageComponentSchema = BaseComponentSchema.extend({
     height: z.string().optional(), // Height (e.g., "150", "150px", "20%")
     fit: z.enum(['contain', 'cover', 'fill']).optional(),
     opacity: z.number().min(0).max(100).optional(),
-    borderRadius: z.number().min(0).optional(),
+    borderRadius: z.enum(['default', 'none', 'sm', 'md', 'lg', 'full']).optional(),
   }),
 });
 

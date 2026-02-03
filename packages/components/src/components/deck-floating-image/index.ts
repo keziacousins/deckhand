@@ -16,7 +16,7 @@ import { DeckComponent } from '../../base';
 import type { ComponentMeta } from '../../types';
 import { PropertyGroups } from '../../types';
 import { styles } from './styles';
-import { resolveAssetUrl } from '../../utils/image-renderer';
+import { resolveAssetUrl, borderRadiusToCss } from '../../utils/image-renderer';
 
 export class DeckFloatingImage extends DeckComponent {
   static meta: ComponentMeta = {
@@ -115,13 +115,18 @@ export class DeckFloatingImage extends DeckComponent {
         group: PropertyGroups.STYLE,
       },
       borderRadius: {
-        type: 'number',
-        label: 'Corner Radius',
-        description: 'Rounded corners in pixels',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 0,
+        type: 'enum',
+        label: 'Border Radius',
+        description: 'Corner rounding',
+        options: [
+          { value: 'default', label: 'Default (theme)' },
+          { value: 'none', label: 'None' },
+          { value: 'sm', label: 'Small' },
+          { value: 'md', label: 'Medium' },
+          { value: 'lg', label: 'Large' },
+          { value: 'full', label: 'Full (circle)' },
+        ],
+        default: 'default',
         group: PropertyGroups.STYLE,
       },
     },
@@ -194,7 +199,8 @@ export class DeckFloatingImage extends DeckComponent {
     const height = this.parseDimension(this.getAttr('height'));
     const fit = this.getAttr('fit', 'contain');
     const opacity = this.getAttrNumber('opacity', 100);
-    const borderRadius = this.getAttrNumber('border-radius', 0);
+    const borderRadiusAttr = this.getAttr('border-radius', 'default') as 'default' | 'none' | 'sm' | 'md' | 'lg' | 'full';
+    const borderRadius = borderRadiusToCss(borderRadiusAttr);
 
     const url = resolveAssetUrl(assetId, assetsJson);
 
@@ -223,7 +229,7 @@ export class DeckFloatingImage extends DeckComponent {
           max-width: 100%;
           height: auto;
         `}
-        ${borderRadius > 0 ? `border-radius: ${borderRadius}px;` : ''}
+        border-radius: ${borderRadius};
       }
       .placeholder {
         display: flex;
@@ -233,7 +239,7 @@ export class DeckFloatingImage extends DeckComponent {
         height: ${height || '100px'};
         background: var(--deck-color-surface, #f1f5f9);
         border: 2px dashed var(--deck-color-border, #cbd5e1);
-        border-radius: ${borderRadius > 0 ? `${borderRadius}px` : 'var(--deck-radius-md, 8px)'};
+        border-radius: ${borderRadius};
         color: var(--deck-color-text-secondary, #64748b);
         font-family: var(--deck-font-body, system-ui, sans-serif);
         font-size: 12px;

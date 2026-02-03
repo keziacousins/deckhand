@@ -109,6 +109,21 @@ export class DeckImage extends DeckComponent {
         description: 'Fill color for SVGs using currentColor',
         group: PropertyGroups.STYLE,
       },
+      borderRadius: {
+        type: 'enum',
+        label: 'Border Radius',
+        description: 'Corner rounding',
+        options: [
+          { value: 'default', label: 'Default (theme)' },
+          { value: 'none', label: 'None' },
+          { value: 'sm', label: 'Small' },
+          { value: 'md', label: 'Medium' },
+          { value: 'lg', label: 'Large' },
+          { value: 'full', label: 'Full (circle)' },
+        ],
+        default: 'default',
+        group: PropertyGroups.STYLE,
+      },
       gridWidth: CommonProperties.gridWidth(),
     },
     preview: {
@@ -120,7 +135,7 @@ export class DeckImage extends DeckComponent {
     },
   };
 
-  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-width', 'max-height', 'align', 'color', 'grid-width'];
+  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-width', 'max-height', 'align', 'color', 'border-radius', 'grid-width'];
 
   attributeChangedCallback(): void {
     this.render();
@@ -138,6 +153,7 @@ export class DeckImage extends DeckComponent {
     const maxHeight = this.getAttrNumber('max-height', 0);
     const align = this.getAttr('align', 'left') as 'left' | 'center' | 'right';
     const color = this.getAttr('color');
+    const borderRadius = this.getAttr('border-radius', 'default') as 'default' | 'none' | 'sm' | 'md' | 'lg' | 'full';
 
     // Use shared image renderer
     const url = resolveAssetUrl(assetId, assetsJson);
@@ -152,6 +168,7 @@ export class DeckImage extends DeckComponent {
       maxHeight: maxHeight > 0 ? maxHeight : undefined,
       align,
       color: color || undefined,
+      borderRadius,
     });
 
     this.shadow.innerHTML = `

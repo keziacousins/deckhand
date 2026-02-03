@@ -39,3 +39,6 @@ apps/server/deck-data/
 **/__tests__/*.js
 **/__tests__/*.d.ts
 **/__tests__/*.d.ts.map
+
+# Coverage reports
+coverage/

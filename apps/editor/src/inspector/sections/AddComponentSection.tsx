@@ -16,14 +16,16 @@ const categoryOrder: ComponentCategory[] = ['content', 'layout', 'media', 'data'
 interface ComponentButtonProps {
   meta: ComponentMeta;
   onClick: () => void;
+  disabled?: boolean;
 }
 
-function ComponentButton({ meta, onClick }: ComponentButtonProps) {
+function ComponentButton({ meta, onClick, disabled }: ComponentButtonProps) {
   return (
     <button
       className="add-component-button"
       onClick={onClick}
       title={meta.description}
+      disabled={disabled}
     >
       <span className="add-component-name">{meta.name}</span>
     </button>
@@ -31,9 +33,13 @@ function ComponentButton({ meta, onClick }: ComponentButtonProps) {
 }
 
 export function AddComponentSection({ context }: InspectorSectionProps) {
-  const { selectedSlide, onAddComponent } = context;
+  const { selectedSlide, selectedComponent, onAddComponent } = context;
   
   if (!selectedSlide || !onAddComponent) return null;
+
+  // Check if selected component is a container - if so, new components go inside it
+  const selectedContainer = selectedComponent?.type === 'deck-container' ? selectedComponent : null;
+  const parentId = selectedContainer?.id;
 
   const grouped = useMemo(() => {
     const allMeta = registry.getAllMeta();
@@ -58,7 +64,11 @@ export function AddComponentSection({ context }: InspectorSectionProps) {
   }, []);
 
   const handleAdd = (meta: ComponentMeta) => {
-    onAddComponent(meta.type);
+    // Don't allow adding containers inside containers
+    if (parentId && meta.type === 'deck-container') {
+      return;
+    }
+    onAddComponent(meta.type, parentId);
   };
 
   // Only show categories that have components
@@ -68,9 +78,18 @@ export function AddComponentSection({ context }: InspectorSectionProps) {
     return null;
   }
 
+  const headerText = selectedContainer 
+    ? `Add to Container` 
+    : 'Add Component';
+
   return (
     <div className="inspector-section">
-      <div className="inspector-section-header">Add Component</div>
+      <div className="inspector-section-header">{headerText}</div>
+      {selectedContainer && (
+        <div className="add-component-context">
+          Adding inside: Container ({(selectedContainer.props as Record<string, unknown>).gridWidth} col)
+        </div>
+      )}
       <div className="inspector-section-content add-component-section">
         {visibleCategories.map(category => (
           <div key={category} className="add-component-category">
@@ -81,6 +100,7 @@ export function AddComponentSection({ context }: InspectorSectionProps) {
                   key={meta.type}
                   meta={meta}
                   onClick={() => handleAdd(meta)}
+                  disabled={parentId !== undefined && meta.type === 'deck-container'}
                 />
               ))}
             </div>

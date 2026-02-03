@@ -83,7 +83,7 @@ export const tools: Anthropic.Tool[] = [
   },
   {
     name: 'add_component',
-    description: 'Add a new component to a slide',
+    description: 'Add a new component to a slide, or inside a container. For deck-container, set gridWidth in props (1-12, determines span AND internal columns). Containers cannot be nested inside other containers.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -97,12 +97,12 @@ export const tools: Anthropic.Tool[] = [
           properties: {
             type: {
               type: 'string',
-              enum: ['deck-title', 'deck-text', 'deck-list', 'deck-image', 'deck-headline-subhead'],
+              enum: ['deck-title', 'deck-text', 'deck-list', 'deck-image', 'deck-floating-image', 'deck-headline-subhead', 'deck-container'],
               description: 'The component type',
             },
             props: {
               type: 'object',
-              description: 'Component properties (varies by type)',
+              description: 'Component properties (varies by type). For deck-container: gridWidth (required, 1-12), background, padding, gap, borderRadius, border, alignItems, justifyContent',
             },
           },
           required: ['type', 'props'],
@@ -110,6 +110,10 @@ export const tools: Anthropic.Tool[] = [
         position: {
           type: 'number',
           description: 'Index position to insert at (optional, defaults to end)',
+        },
+        parentId: {
+          type: 'string',
+          description: 'ID of a deck-container to add this component inside. Cannot be used when adding deck-container (no nesting).',
         },
       },
       required: ['slideId', 'component'],
@@ -523,19 +527,21 @@ export function executeToolCall(
       }
 
       case 'add_component': {
-        const { slideId, component, position } = input as {
+        const { slideId, component, position, parentId } = input as {
           slideId: string;
           component: { type: string; props: Record<string, unknown> };
           position?: number;
+          parentId?: string;
         };
         const options: AddComponentOptions = {
           type: component.type,
           props: component.props,
           position,
+          parentId,
         };
         const result = addComponent(deck, slideId, options);
         newDeck = result.deck;
-        resultData = { slideId, componentId: result.componentId };
+        resultData = { slideId, componentId: result.componentId, parentId };
         break;
       }
 
@@ -730,6 +736,7 @@ export function executeToolCall(
             components: slide.components.map(c => ({
               id: c.id,
               type: c.type,
+              parentId: c.parentId, // Set for components inside containers
               props: c.props,
             })),
           }));

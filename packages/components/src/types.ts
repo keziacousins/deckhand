@@ -168,8 +168,8 @@ export const CommonProperties = {
   gridWidth: (maxColumns = 12): PropertyDescriptor => ({
     type: 'number',
     label: 'Grid Width',
-    description: 'Number of columns this component spans',
-    min: 1,
+    description: 'Number of columns this component spans (0 = full width)',
+    min: 0,
     max: maxColumns,
     step: 1,
     group: PropertyGroups.LAYOUT,

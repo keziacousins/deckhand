@@ -104,15 +104,22 @@ function isFloatingComponent(type: string): boolean {
   return type.includes('-floating-');
 }
 
+interface RenderComponentOptions extends RenderOptions {
+  /** All components in the slide, needed for rendering container children */
+  allComponents?: Component[];
+}
+
 /**
  * Render a component to a React element
  * 
  * Uses the component's type to look up metadata from the registry,
  * then converts props to HTML attributes and creates the element.
+ * 
+ * For containers (deck-container), recursively renders child components inside.
  */
 export function renderComponent(
   component: Component,
-  options: RenderOptions = {}
+  options: RenderComponentOptions = {}
 ): React.ReactElement | null {
   const meta = registry.getMeta(component.type);
   
@@ -124,9 +131,30 @@ export function renderComponent(
     attrs['slot'] = 'floating';
   }
 
+  // For containers, render children inside
+  if (component.type === 'deck-container' && options.allComponents) {
+    const children = options.allComponents.filter(c => c.parentId === component.id);
+    const childElements = children.map(child => 
+      renderComponent(child, { ...options, allComponents: options.allComponents })
+    );
+    
+    return React.createElement(
+      component.type,
+      { key: component.id, ...attrs },
+      ...childElements
+    );
+  }
+
   // Use createElement to dynamically create the custom element
   return React.createElement(component.type, {
     key: component.id,
     ...attrs,
   });
+}
+
+/**
+ * Get top-level components (those without a parentId)
+ */
+export function getTopLevelComponents(components: Component[]): Component[] {
+  return components.filter(c => !c.parentId);
 }

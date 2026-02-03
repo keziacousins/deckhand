@@ -205,6 +205,12 @@
   border-style: dashed;
 }
 
+.component-card-drop-target {
+  border-color: var(--color-primary);
+  border-style: dashed;
+  background: var(--bg-surface-hover);
+}
+
 .component-card-header {
   display: flex;
   align-items: center;
@@ -375,6 +381,38 @@
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+/* Container component styling */
+.component-card-container {
+  border-left: 3px solid var(--color-accent, #3b82f6);
+}
+
+.component-card-container > .component-card-header .component-card-name {
+  color: var(--color-accent, #3b82f6);
+}
+
+/* Children container */
+.component-card-children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) 0 var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface-hover);
+}
+
+.component-card-children .component-card {
+  margin-left: 0;
+}
+
+/* Add component context info */
+.add-component-context {
+  font-size: var(--font-size-xs);
+  color: var(--color-accent, #3b82f6);
+  background: var(--bg-surface);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 /* Component Browser Overlay */

@@ -11,6 +11,7 @@ import {
   ColumnsComponentSchema,
   SpacerComponentSchema,
   HeadlineSubheadComponentSchema,
+  ContainerComponentSchema,
   componentTypes,
 } from '../component';
 
@@ -71,7 +72,10 @@ describe('TitleComponentSchema', () => {
     })).toThrow();
   });
 
-  it('validates gridWidth range (1-12)', () => {
+  it('validates gridWidth range (0-12)', () => {
+    expect(TitleComponentSchema.parse({
+      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 0 }
+    }).props.gridWidth).toBe(0); // 0 = full width
     expect(TitleComponentSchema.parse({
       id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 1 }
     }).props.gridWidth).toBe(1);
@@ -79,7 +83,7 @@ describe('TitleComponentSchema', () => {
       id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 12 }
     }).props.gridWidth).toBe(12);
     expect(() => TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 0 }
+      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: -1 }
     })).toThrow();
     expect(() => TitleComponentSchema.parse({
       id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 13 }
@@ -413,6 +417,100 @@ describe('HeadlineSubheadComponentSchema', () => {
   });
 });
 
+describe('ContainerComponentSchema', () => {
+  it('validates minimal container', () => {
+    const comp = {
+      id: 'comp-1',
+      type: 'deck-container',
+      props: { gridWidth: 6 },
+    };
+    expect(ContainerComponentSchema.parse(comp).props.gridWidth).toBe(6);
+  });
+
+  it('validates all optional props', () => {
+    const comp = {
+      id: 'comp-1',
+      type: 'deck-container',
+      props: {
+        gridWidth: 4,
+        background: '#f0f0f0',
+        padding: 'md',
+        gap: 'sm',
+        borderRadius: 'lg',
+        border: '1px solid #ccc',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      },
+    };
+    const result = ContainerComponentSchema.parse(comp);
+    expect(result.props.background).toBe('#f0f0f0');
+    expect(result.props.padding).toBe('md');
+    expect(result.props.gap).toBe('sm');
+    expect(result.props.borderRadius).toBe('lg');
+    expect(result.props.border).toBe('1px solid #ccc');
+    expect(result.props.alignItems).toBe('center');
+    expect(result.props.justifyContent).toBe('space-between');
+  });
+
+  it('requires gridWidth', () => {
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: {}
+    })).toThrow();
+  });
+
+  it('validates gridWidth range (1-12)', () => {
+    expect(ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 1 }
+    }).props.gridWidth).toBe(1);
+    expect(ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 12 }
+    }).props.gridWidth).toBe(12);
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 0 }
+    })).toThrow();
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 13 }
+    })).toThrow();
+  });
+
+  it('validates padding values', () => {
+    for (const padding of ['none', 'sm', 'md', 'lg']) {
+      expect(ContainerComponentSchema.parse({
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, padding }
+      }).props.padding).toBe(padding);
+    }
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, padding: 'xl' }
+    })).toThrow();
+  });
+
+  it('validates alignItems values', () => {
+    for (const alignItems of ['start', 'center', 'end', 'stretch']) {
+      expect(ContainerComponentSchema.parse({
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, alignItems }
+      }).props.alignItems).toBe(alignItems);
+    }
+  });
+
+  it('validates justifyContent values', () => {
+    for (const justifyContent of ['start', 'center', 'end', 'space-between']) {
+      expect(ContainerComponentSchema.parse({
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, justifyContent }
+      }).props.justifyContent).toBe(justifyContent);
+    }
+  });
+
+  it('supports parentId for nesting in parent', () => {
+    const comp = {
+      id: 'comp-1',
+      parentId: 'parent-container',
+      type: 'deck-container',
+      props: { gridWidth: 4 },
+    };
+    expect(ContainerComponentSchema.parse(comp).parentId).toBe('parent-container');
+  });
+});
+
 describe('ComponentSchema (discriminated union)', () => {
   it('correctly discriminates by type', () => {
     const title = ComponentSchema.parse({
@@ -453,15 +551,39 @@ describe('componentTypes', () => {
     expect(componentTypes).toContain('deck-columns');
     expect(componentTypes).toContain('deck-spacer');
     expect(componentTypes).toContain('deck-headline-subhead');
+    expect(componentTypes).toContain('deck-container');
   });
 
-  it('has 11 component types', () => {
-    expect(componentTypes).toHaveLength(11);
+  it('has 12 component types', () => {
+    expect(componentTypes).toHaveLength(12);
+  });
+});
+
+describe('parentId on components', () => {
+  it('allows parentId on any component type', () => {
+    const comp = {
+      id: 'child-1',
+      parentId: 'container-1',
+      type: 'deck-text',
+      props: { content: [{ text: 'Inside container' }] },
+    };
+    const result = ComponentSchema.parse(comp);
+    expect(result.parentId).toBe('container-1');
+  });
+
+  it('parentId is optional', () => {
+    const comp = {
+      id: 'top-level',
+      type: 'deck-title',
+      props: { text: 'No parent' },
+    };
+    const result = ComponentSchema.parse(comp);
+    expect(result.parentId).toBeUndefined();
   });
 });
 
 describe('gridWidth across all components', () => {
-  // Grid-based components that support gridWidth
+  // Grid-based components that support gridWidth (optional)
   const gridComponentConfigs = [
     { type: 'deck-title', props: { text: 'T' } },
     { type: 'deck-subtitle', props: { text: 'S' } },
@@ -473,6 +595,11 @@ describe('gridWidth across all components', () => {
     { type: 'deck-columns', props: { columns: [] } },
     { type: 'deck-spacer', props: {} },
     { type: 'deck-headline-subhead', props: { headline: 'H' } },
+  ];
+
+  // Container component has required gridWidth
+  const containerComponentConfigs = [
+    { type: 'deck-container', props: { gridWidth: 6 } },
   ];
 
   // Floating components that use absolute positioning (no gridWidth)
@@ -513,6 +640,18 @@ describe('gridWidth across all components', () => {
       };
       const result = ComponentSchema.parse(component);
       expect('gridWidth' in result.props).toBe(false);
+    }
+  });
+
+  it('container component has required gridWidth', () => {
+    for (const config of containerComponentConfigs) {
+      const withGridWidth = {
+        id: 'test-id',
+        type: config.type,
+        props: config.props,
+      };
+      const result = ComponentSchema.parse(withGridWidth);
+      expect((result.props as { gridWidth: number }).gridWidth).toBe(6);
     }
   });
 });

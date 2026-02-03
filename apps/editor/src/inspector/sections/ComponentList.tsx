@@ -19,12 +19,20 @@ interface ComponentCardProps {
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onMoveToRoot?: () => void;
   onUpdateProp: (field: string, value: unknown) => void;
-  onDragStart: (e: React.DragEvent, index: number) => void;
+  onDragStart: (e: React.DragEvent, componentId: string) => void;
   onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   isDragOver: boolean;
   isDragging: boolean;
+  /** Nesting depth for indentation (0 = top level) */
+  depth?: number;
+  /** Children components (for containers) */
+  children?: React.ReactNode;
+  /** Whether this is a valid drop target for current drag */
+  isDropTarget?: boolean;
 }
 
 function ComponentCard({
@@ -37,12 +45,17 @@ function ComponentCard({
   onDelete,
   onMoveUp,
   onMoveDown,
+  onMoveToRoot,
   onUpdateProp,
   onDragStart,
   onDragOver,
+  onDrop,
   onDragEnd,
   isDragOver,
   isDragging,
+  depth = 0,
+  children,
+  isDropTarget = false,
 }: ComponentCardProps) {
   const meta = registry.getMeta(component.type);
   const componentName = meta?.name ?? component.type;
@@ -91,12 +104,25 @@ function ComponentCard({
     return result;
   }, [groupedProperties]);
 
+  const isContainer = component.type === 'deck-container';
+  const indentStyle = depth > 0 ? { marginLeft: `${depth * 16}px` } : undefined;
+
+  const classNames = [
+    'component-card',
+    isExpanded && 'component-card-expanded',
+    isDragging && 'component-card-dragging',
+    isContainer && 'component-card-container',
+    isDropTarget && 'component-card-drop-target',
+  ].filter(Boolean).join(' ');
+
   return (
     <div 
-      className={`component-card ${isExpanded ? 'component-card-expanded' : ''} ${isDragging ? 'component-card-dragging' : ''}`}
+      className={classNames}
+      style={indentStyle}
       draggable
-      onDragStart={(e) => onDragStart(e, index)}
+      onDragStart={(e) => onDragStart(e, component.id)}
       onDragOver={onDragOver}
+      onDrop={onDrop}
       onDragEnd={onDragEnd}
     >
       <div className="component-card-header">
@@ -137,6 +163,18 @@ function ComponentCard({
         </div>
 
         <div className="component-card-actions">
+          {onMoveToRoot && (
+            <button
+              className="component-card-action"
+              onClick={(e) => { e.stopPropagation(); onMoveToRoot(); }}
+              title="Move out of container"
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2l4 4H9v6H7V6H4l4-4z" fill="currentColor" />
+                <path d="M3 12h10v2H3v-2z" fill="currentColor" />
+              </svg>
+            </button>
+          )}
           <button
             className="component-card-action"
             onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
@@ -199,19 +237,21 @@ function ComponentCard({
           </div>
         </div>
       )}
+      {/* Render children for containers */}
+      {children}
     </div>
   );
 }
 
 export function ComponentList({ context }: InspectorSectionProps) {
-  const { deck, selectedSlide, selection, onUpdate, onDeleteComponent, onReorderComponent } = context;
+  const { deck, selectedSlide, selection, onUpdate, onDeleteComponent, onReorderComponent, onReorderComponents, onMoveComponentToContainer } = context;
   const assets = deck.assets ?? {};
   const { selectComponent } = useSelection();
   const { expandedComponentId, setExpandedComponentId } = useInspectorExpansion();
   
-  // Drag and drop state
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  // Drag and drop state - track by component ID
+  const [draggedComponentId, setDraggedComponentId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null); // container ID or null for top-level
   
   // Refs for scrolling to expanded component
   const componentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -222,6 +262,11 @@ export function ComponentList({ context }: InspectorSectionProps) {
   // Derived values (safe to compute even when no slide selected)
   const slideId = selection.slideId ?? '';
   const components = selectedSlide?.components ?? [];
+  
+  // Get the dragged component
+  const draggedComponent = draggedComponentId 
+    ? components.find(c => c.id === draggedComponentId) 
+    : null;
   
   // Auto-expand and scroll when a component is selected on the canvas
   useEffect(() => {
@@ -250,56 +295,153 @@ export function ComponentList({ context }: InspectorSectionProps) {
     }
   }, [expandedComponentId, setExpandedComponentId, slideId, selectComponent]);
 
-  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
-    setDragIndex(index);
+  // Drag handlers
+  const handleDragStart = useCallback((e: React.DragEvent, componentId: string) => {
+    e.stopPropagation(); // Prevent parent containers from capturing the drag
+    setDraggedComponentId(componentId);
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', index.toString());
-    setTimeout(() => {
-      (e.target as HTMLElement).classList.add('component-card-dragging');
-    }, 0);
+    e.dataTransfer.setData('text/plain', componentId);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, displayIndex: number) => {
+  const handleDragOver = useCallback((e: React.DragEvent, targetComponentId: string) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragIndex !== null && dragOverIndex !== displayIndex) {
-      setDragOverIndex(displayIndex);
+    e.stopPropagation();
+    
+    if (!draggedComponentId || draggedComponentId === targetComponentId) return;
+    
+    const targetComponent = components.find(c => c.id === targetComponentId);
+    if (!targetComponent) return;
+    
+    // Check if this is a valid drop target
+    const isSibling = draggedComponent?.parentId === targetComponent.parentId;
+    const isContainer = targetComponent.type === 'deck-container';
+    const canDropIntoContainer = isContainer && 
+      draggedComponent?.type !== 'deck-container';
+    
+    if (isSibling || canDropIntoContainer) {
+      e.dataTransfer.dropEffect = 'move';
+      setDropTargetId(targetComponentId);
     }
-  }, [dragIndex, dragOverIndex]);
+  }, [draggedComponentId, draggedComponent, components]);
 
-  const handleDragEnd = useCallback(() => {
-    if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
-      const component = components[dragIndex];
-      if (component && slideId) {
-        const diff = dragOverIndex - dragIndex;
-        if (diff > 0) {
-          for (let i = 0; i < diff; i++) {
-            onReorderComponent?.(slideId, component.id, 'down');
-          }
-        } else {
-          for (let i = 0; i < Math.abs(diff); i++) {
-            onReorderComponent?.(slideId, component.id, 'up');
-          }
-        }
+  const handleDrop = useCallback((e: React.DragEvent, targetComponentId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedComponentId || !slideId) return;
+    
+    const targetComponent = components.find(c => c.id === targetComponentId);
+    if (!targetComponent) return;
+    
+    const isSibling = draggedComponent?.parentId === targetComponent.parentId;
+    const isContainer = targetComponent.type === 'deck-container';
+    const canDropIntoContainer = isContainer && draggedComponent?.type !== 'deck-container';
+    
+    // Prioritize dropping into containers over sibling reordering
+    if (canDropIntoContainer) {
+      // Move into container
+      onMoveComponentToContainer?.(slideId, draggedComponentId, targetComponentId);
+    } else if (isSibling) {
+      // Reorder among siblings - swap positions in the array
+      const draggedIndex = components.findIndex(c => c.id === draggedComponentId);
+      const targetIndex = components.findIndex(c => c.id === targetComponentId);
+      
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        const newComponents = [...components];
+        // Remove dragged component and insert at target position
+        const [removed] = newComponents.splice(draggedIndex, 1);
+        newComponents.splice(targetIndex, 0, removed);
+        
+        // Update via context
+        onReorderComponents?.(slideId, newComponents);
       }
     }
-    setDragIndex(null);
-    setDragOverIndex(null);
-    document.querySelectorAll('.component-card-dragging').forEach((el) => {
-      el.classList.remove('component-card-dragging');
-    });
-  }, [dragIndex, dragOverIndex, components, slideId, onReorderComponent]);
+    
+    setDraggedComponentId(null);
+    setDropTargetId(null);
+  }, [draggedComponentId, draggedComponent, slideId, components, onMoveComponentToContainer, onReorderComponents]);
 
-  // Compute the display order during drag
-  const displayComponents = useMemo(() => {
-    if (dragIndex === null || dragOverIndex === null || dragIndex === dragOverIndex) {
-      return components;
-    }
-    const result = [...components];
-    const [draggedItem] = result.splice(dragIndex, 1);
-    result.splice(dragOverIndex, 0, draggedItem);
-    return result;
-  }, [components, dragIndex, dragOverIndex]);
+  const handleDragEnd = useCallback(() => {
+    setDraggedComponentId(null);
+    setDropTargetId(null);
+  }, []);
+
+  // Get top-level components (no parentId)
+  const topLevelComponents = useMemo(() => {
+    return components.filter(c => !c.parentId);
+  }, [components]);
+
+  // Get children of a container
+  const getChildComponents = useCallback((parentId: string) => {
+    return components.filter(c => c.parentId === parentId);
+  }, [components]);
+
+  // Recursive render function for components
+  const renderComponentCard = useCallback((component: Component, depth: number = 0) => {
+    const originalIndex = components.findIndex(c => c.id === component.id);
+    const isDragging = draggedComponentId === component.id;
+    const isContainer = component.type === 'deck-container';
+    const childComponents = isContainer ? getChildComponents(component.id) : [];
+    const siblingCount = depth === 0 
+      ? topLevelComponents.length 
+      : components.filter(c => c.parentId === component.parentId).length;
+    
+    // Is this component a valid drop target?
+    const isValidDropTarget = isContainer && 
+      draggedComponentId !== null && 
+      draggedComponentId !== component.id &&
+      draggedComponent?.type !== 'deck-container';
+    const isDropTarget = dropTargetId === component.id;
+
+    return (
+      <div
+        key={component.id}
+        ref={(el) => {
+          if (el) {
+            componentRefs.current.set(component.id, el);
+          } else {
+            componentRefs.current.delete(component.id);
+          }
+        }}
+      >
+        <ComponentCard
+          component={component}
+          slideId={slideId}
+          index={originalIndex}
+          totalCount={siblingCount}
+          isExpanded={expandedComponentId === component.id}
+          assets={assets}
+          onToggleExpand={() => toggleExpanded(component.id)}
+          onDelete={() => onDeleteComponent?.(slideId, component.id)}
+          onMoveUp={() => onReorderComponent?.(slideId, component.id, 'up')}
+          onMoveDown={() => onReorderComponent?.(slideId, component.id, 'down')}
+          onMoveToRoot={component.parentId ? () => onMoveComponentToContainer?.(slideId, component.id, null) : undefined}
+          onUpdateProp={(field, value) =>
+            onUpdate({ type: 'component', slideId, componentId: component.id, field, value })
+          }
+          onDragStart={handleDragStart}
+          onDragOver={(e) => handleDragOver(e, component.id)}
+          onDrop={(e) => handleDrop(e, component.id)}
+          onDragEnd={handleDragEnd}
+          isDragOver={isValidDropTarget}
+          isDragging={isDragging}
+          depth={depth}
+          isDropTarget={isDropTarget}
+        >
+          {/* Render children for containers */}
+          {childComponents.length > 0 && (
+            <div className="component-card-children">
+              {childComponents.map(child => renderComponentCard(child, depth + 1))}
+            </div>
+          )}
+        </ComponentCard>
+      </div>
+    );
+  }, [
+    components, draggedComponentId, draggedComponent, dropTargetId, slideId, expandedComponentId, assets,
+    toggleExpanded, onDeleteComponent, onReorderComponent, onMoveComponentToContainer, onUpdate,
+    handleDragStart, handleDragOver, handleDrop, handleDragEnd, getChildComponents, topLevelComponents
+  ]);
 
   // Early returns AFTER all hooks
   if (!selectedSlide || !selection.slideId) return null;
@@ -321,45 +463,7 @@ export function ComponentList({ context }: InspectorSectionProps) {
     <div className="inspector-section">
       <div className="inspector-section-header">Components</div>
       <div className="inspector-section-content component-list">
-        {displayComponents.map((component, displayIndex) => {
-          // Find the original index for this component
-          const originalIndex = components.findIndex(c => c.id === component.id);
-          const isDragging = originalIndex === dragIndex;
-          
-          return (
-            <div
-              key={component.id}
-              ref={(el) => {
-                if (el) {
-                  componentRefs.current.set(component.id, el);
-                } else {
-                  componentRefs.current.delete(component.id);
-                }
-              }}
-            >
-              <ComponentCard
-                component={component}
-                slideId={slideId}
-                index={originalIndex}
-                totalCount={components.length}
-                isExpanded={expandedComponentId === component.id}
-                assets={assets}
-                onToggleExpand={() => toggleExpanded(component.id)}
-                onDelete={() => onDeleteComponent?.(slideId, component.id)}
-                onMoveUp={() => onReorderComponent?.(slideId, component.id, 'up')}
-                onMoveDown={() => onReorderComponent?.(slideId, component.id, 'down')}
-                onUpdateProp={(field, value) =>
-                  onUpdate({ type: 'component', slideId, componentId: component.id, field, value })
-                }
-                onDragStart={handleDragStart}
-                onDragOver={(e) => handleDragOver(e, displayIndex)}
-                onDragEnd={handleDragEnd}
-                isDragOver={false}
-                isDragging={isDragging}
-              />
-            </div>
-          );
-        })}
+        {topLevelComponents.map((component) => renderComponentCard(component, 0))}
       </div>
     </div>
   );

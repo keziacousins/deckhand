@@ -9,9 +9,11 @@ export interface InspectorContext {
   selectedSlide: Slide | null;
   selectedComponent: Component | null;
   onUpdate: (update: InspectorUpdate) => void;
-  onAddComponent?: (componentType: string) => void;
+  onAddComponent?: (componentType: string, parentId?: string) => void;
   onDeleteComponent?: (slideId: string, componentId: string) => void;
   onReorderComponent?: (slideId: string, componentId: string, direction: 'up' | 'down') => void;
+  onReorderComponents?: (slideId: string, components: Component[]) => void;
+  onMoveComponentToContainer?: (slideId: string, componentId: string, newParentId: string | null) => void;
 }
 
 export type InspectorUpdate =

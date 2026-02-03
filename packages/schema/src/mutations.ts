@@ -154,6 +154,7 @@ export interface AddComponentOptions {
   type: string;
   props: Record<string, unknown>;
   position?: number;
+  parentId?: string; // ID of container to add inside
 }
 
 /**
@@ -169,9 +170,25 @@ export function addComponent(
     throw new Error(`Slide ${slideId} not found`);
   }
 
+  // Validate parentId if provided
+  if (options.parentId) {
+    const parentComponent = slide.components.find(c => c.id === options.parentId);
+    if (!parentComponent) {
+      throw new Error(`Parent container ${options.parentId} not found in slide ${slideId}`);
+    }
+    if (parentComponent.type !== 'deck-container') {
+      throw new Error(`Parent ${options.parentId} is not a container`);
+    }
+    // Prevent nesting containers inside containers
+    if (options.type === 'deck-container') {
+      throw new Error('Containers cannot be nested inside other containers');
+    }
+  }
+
   const componentId = generateId('comp');
   const newComponent: Component = {
     id: componentId,
+    ...(options.parentId && { parentId: options.parentId }),
     type: options.type,
     props: options.props,
   } as Component;
@@ -242,7 +259,8 @@ export function updateComponent(
 }
 
 /**
- * Delete a component from a slide
+ * Delete a component from a slide.
+ * If the component is a container, also deletes all child components.
  */
 export function deleteComponent(deck: Deck, slideId: string, componentId: string): Deck {
   const slide = deck.slides[slideId];
@@ -255,7 +273,20 @@ export function deleteComponent(deck: Deck, slideId: string, componentId: string
     throw new Error(`Component ${componentId} not found in slide ${slideId}`);
   }
 
-  const components = slide.components.filter(c => c.id !== componentId);
+  // Get IDs to delete: the component itself + any children (if it's a container)
+  const idsToDelete = new Set<string>([componentId]);
+  const component = slide.components[componentIndex];
+  
+  if (component.type === 'deck-container') {
+    // Find all children of this container
+    for (const c of slide.components) {
+      if (c.parentId === componentId) {
+        idsToDelete.add(c.id);
+      }
+    }
+  }
+
+  const components = slide.components.filter(c => !idsToDelete.has(c.id));
 
   return {
     ...deck,
@@ -715,14 +746,19 @@ export function moveSlide(
   };
 }
 
+export interface MoveComponentOptions {
+  newIndex: number;
+  newParentId?: string | null; // null = move to root, string = move into container, undefined = no change
+}
+
 /**
- * Move a component to a new position within a slide
+ * Move a component to a new position within a slide, optionally changing parent
  */
 export function moveComponent(
   deck: Deck,
   slideId: string,
   componentId: string,
-  newIndex: number
+  options: number | MoveComponentOptions // Support legacy number arg or new options object
 ): Deck {
   const slide = deck.slides[slideId];
   if (!slide) {
@@ -734,16 +770,63 @@ export function moveComponent(
     throw new Error(`Component ${componentId} not found in slide ${slideId}`);
   }
 
+  // Normalize options
+  const opts: MoveComponentOptions = typeof options === 'number' 
+    ? { newIndex: options } 
+    : options;
+
+  const component = slide.components[componentIndex];
+
+  // Validate parent change if requested
+  if (opts.newParentId !== undefined) {
+    if (opts.newParentId !== null) {
+      const parentComponent = slide.components.find(c => c.id === opts.newParentId);
+      if (!parentComponent) {
+        throw new Error(`Parent container ${opts.newParentId} not found in slide ${slideId}`);
+      }
+      if (parentComponent.type !== 'deck-container') {
+        throw new Error(`Parent ${opts.newParentId} is not a container`);
+      }
+      // Prevent moving containers into containers
+      if (component.type === 'deck-container') {
+        throw new Error('Containers cannot be nested inside other containers');
+      }
+      // Prevent moving component into itself
+      if (opts.newParentId === componentId) {
+        throw new Error('Cannot move component into itself');
+      }
+    }
+  }
+
   // Clamp new index to valid range
-  const clampedIndex = Math.max(0, Math.min(newIndex, slide.components.length - 1));
+  const clampedIndex = Math.max(0, Math.min(opts.newIndex, slide.components.length - 1));
   
-  if (clampedIndex === componentIndex) {
+  // Check if anything changes
+  const parentIdChanged = opts.newParentId !== undefined && 
+    (opts.newParentId === null ? component.parentId !== undefined : component.parentId !== opts.newParentId);
+  const indexChanged = clampedIndex !== componentIndex;
+  
+  if (!parentIdChanged && !indexChanged) {
     return deck; // No change needed
   }
 
   const components = [...slide.components];
-  const [component] = components.splice(componentIndex, 1);
-  components.splice(clampedIndex, 0, component);
+  const [movedComponent] = components.splice(componentIndex, 1);
+  
+  // Update parentId if requested
+  let updatedComponent = movedComponent;
+  if (opts.newParentId !== undefined) {
+    if (opts.newParentId === null) {
+      // Remove parentId
+      const { parentId: _, ...rest } = movedComponent;
+      updatedComponent = rest as Component;
+    } else {
+      // Set new parentId
+      updatedComponent = { ...movedComponent, parentId: opts.newParentId } as Component;
+    }
+  }
+  
+  components.splice(clampedIndex, 0, updatedComponent);
 
   return {
     ...deck,

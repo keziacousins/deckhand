@@ -1,24 +1,16 @@
 /**
- * Styles for deck-slide component
+ * Styles for deck-container component
  * 
  * Components set their grid-column span via the grid-width attribute.
- * The slide reads this and applies grid-column: span N.
+ * The container reads this and applies grid-column: span N.
  */
 export const styles = `
   :host {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    box-sizing: border-box;
+    display: grid;
+    gap: var(--deck-grid-gap, 1rem);
   }
 
-  ::slotted(*) {
-    flex-shrink: 0;
-    max-width: 100%;
-    min-width: 0; /* Prevent grid blowout */
-  }
-
-  /* Grid width spans - components set grid-width attribute */
+  /* Grid column spans for children based on grid-width attribute */
   ::slotted([grid-width="0"]) { grid-column: 1 / -1; }
   ::slotted([grid-width="1"]) { grid-column: span 1; }
   ::slotted([grid-width="2"]) { grid-column: span 2; }
@@ -33,6 +25,6 @@ export const styles = `
   ::slotted([grid-width="11"]) { grid-column: span 11; }
   ::slotted([grid-width="12"]) { grid-column: span 12; }
 
-  /* Default: full width when no grid-width specified */
+  /* Default: full width if no grid-width specified */
   ::slotted(:not([grid-width])) { grid-column: 1 / -1; }
 `;

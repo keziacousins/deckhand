@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import type { Slide, Theme, AspectRatio, Asset, SlidesMap } from '@deckhand/schema';
 import { SLIDE_WIDTH, getSlideHeight, themeToCssProperties } from '@deckhand/schema';
 import { useSelection } from '../selection';
-import { renderComponent } from '../utils/renderComponent';
+import { renderComponent, getTopLevelComponents } from '../utils/renderComponent';
 import './SlideNode.css';
 
 type SlideNodeData = {
@@ -98,8 +98,8 @@ function BackdropSlideRenderer({
         background-blur={style.backgroundBlur?.toString()}
         background-transparent={useTransparentBg ? 'true' : undefined}
       >
-        {slide.components.map((c) => 
-          renderComponent(c, { editorMode: false, assets })
+        {getTopLevelComponents(slide.components).map((c) => 
+          renderComponent(c, { editorMode: false, assets, allComponents: slide.components })
         )}
       </deck-slide>
     </div>
@@ -218,11 +218,12 @@ export const SlideNode = memo(function SlideNode({
           background-blur={hasBackdrop ? undefined : style.backgroundBlur?.toString()}
           background-transparent={hasBackdrop ? 'true' : undefined}
         >
-          {slide.components.map((c) => 
+          {getTopLevelComponents(slide.components).map((c) => 
             renderComponent(c, { 
               editorMode: true, 
               selectedComponentId: selectedComponentId ?? undefined,
               assets,
+              allComponents: slide.components,
             })
           )}
         </deck-slide>

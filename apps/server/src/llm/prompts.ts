@@ -104,6 +104,12 @@ Available components you can add:
 - **deck-image**: Image from assets. Props: assetId (string), alt, caption, fit ("contain"|"cover"|"fill"), darken (0-100), blur (0-20), maxHeight, gridWidth
 - **deck-headline-subhead**: Headline with subheading. Props: headline, subheading, category, isHero (boolean), variant ("dark"|"light"), align, gridWidth
 
+**Layout Components:**
+- **deck-container**: Groups components in a sub-grid for multi-column layouts. Props: gridWidth (required, 1-12 - sets both span AND internal column count), background (color), padding ("none"|"sm"|"md"|"lg"), gap ("none"|"sm"|"md"|"lg"), borderRadius ("none"|"sm"|"md"|"lg"), border (e.g., "1px solid #ccc"), alignItems ("start"|"center"|"end"|"stretch"), justifyContent ("start"|"center"|"end"|"space-between")
+  - To add components inside a container, use the parentId parameter when calling add_component
+  - Containers CANNOT be nested inside other containers (max 2 levels: slide → container → components)
+  - Children inherit the container's internal grid (e.g., container with gridWidth=4 has 4 internal columns for children)
+
 **Floating Components (absolute positioning, outside content padding):**
 - **deck-floating-image**: Image at specific coordinates. Props: assetId, alt, anchorX ("left"|"right"), anchorY ("top"|"bottom"), x (offset like "20" or "5%"), y, width, height, fit, opacity (0-100), borderRadius
 

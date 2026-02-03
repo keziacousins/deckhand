@@ -5,7 +5,7 @@ import { RichTextSchema } from './richtext';
  * Grid layout properties shared by all components
  */
 const GridPropsSchema = z.object({
-  gridWidth: z.number().min(1).max(12).optional(), // Number of columns to span
+  gridWidth: z.number().min(0).max(12).optional(), // Number of columns to span (0 = full width)
 });
 
 /**
@@ -13,6 +13,7 @@ const GridPropsSchema = z.object({
  */
 const BaseComponentSchema = z.object({
   id: z.string(),
+  parentId: z.string().optional(), // ID of parent container, if nested
 });
 
 /**
@@ -162,6 +163,28 @@ export const HeadlineSubheadComponentSchema = BaseComponentSchema.extend({
 });
 
 /**
+ * Container component - groups components in a sub-grid
+ * gridWidth determines both how many parent columns to span AND
+ * how many internal columns are available for children
+ * Note: Containers cannot be nested inside other containers (max 2 levels)
+ */
+export const ContainerComponentSchema = BaseComponentSchema.extend({
+  type: z.literal('deck-container'),
+  props: z.object({
+    gridWidth: z.number().min(1).max(12), // Required: columns to span AND internal columns
+    // Style options
+    background: z.string().optional(), // Background color
+    padding: z.enum(['none', 'sm', 'md', 'lg']).optional(),
+    gap: z.enum(['none', 'sm', 'md', 'lg']).optional(), // Override theme gap
+    borderRadius: z.enum(['none', 'sm', 'md', 'lg']).optional(),
+    border: z.string().optional(), // e.g., "1px solid #ccc"
+    // Layout
+    alignItems: z.enum(['start', 'center', 'end', 'stretch']).optional(),
+    justifyContent: z.enum(['start', 'center', 'end', 'space-between']).optional(),
+  }),
+});
+
+/**
  * Union of all component types
  */
 export const ComponentSchema = z.discriminatedUnion('type', [
@@ -176,6 +199,7 @@ export const ComponentSchema = z.discriminatedUnion('type', [
   ColumnsComponentSchema,
   SpacerComponentSchema,
   HeadlineSubheadComponentSchema,
+  ContainerComponentSchema,
 ]);
 
 export type TitleComponent = z.infer<typeof TitleComponentSchema>;
@@ -189,6 +213,7 @@ export type QuoteComponent = z.infer<typeof QuoteComponentSchema>;
 export type ColumnsComponent = z.infer<typeof ColumnsComponentSchema>;
 export type SpacerComponent = z.infer<typeof SpacerComponentSchema>;
 export type HeadlineSubheadComponent = z.infer<typeof HeadlineSubheadComponentSchema>;
+export type ContainerComponent = z.infer<typeof ContainerComponentSchema>;
 
 export type Component = z.infer<typeof ComponentSchema>;
 
@@ -207,6 +232,7 @@ export const componentTypes = [
   'deck-columns',
   'deck-spacer',
   'deck-headline-subhead',
+  'deck-container',
 ] as const;
 
 export type ComponentType = (typeof componentTypes)[number];

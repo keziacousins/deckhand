@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useYDoc } from '../sync';
 import type { Deck, Slide, TransitionType } from '@deckhand/schema';
 import { DEFAULT_GRID_COLUMNS, SLIDE_WIDTH, getSlideHeight, themeToCssProperties, DEFAULT_TRANSITION_DURATION } from '@deckhand/schema';
-import { renderComponent } from '../utils/renderComponent';
+import { renderComponent, getTopLevelComponents } from '../utils/renderComponent';
 import './Presentation.css';
 
 interface PresentationProps {
@@ -205,7 +205,9 @@ function SlideRenderer({
         background-blur={hasBackdrop ? undefined : style.backgroundBlur?.toString()}
         background-transparent={useTransparentBg ? 'true' : undefined}
       >
-        {slide.components.map((component) => renderComponent(component, { assets }))}
+        {getTopLevelComponents(slide.components).map((component) => 
+          renderComponent(component, { assets, allComponents: slide.components })
+        )}
       </deck-slide>
     </div>
   );

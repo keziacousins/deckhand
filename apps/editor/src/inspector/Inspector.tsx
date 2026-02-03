@@ -193,7 +193,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
   );
 
   const handleAddComponent = useCallback(
-    (componentType: string) => {
+    (componentType: string, parentId?: string) => {
       const slideId = selection.slideId;
       if (!slideId) return;
 
@@ -218,6 +218,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
 
       const newComponent = {
         id: generateId(),
+        ...(parentId && { parentId }),
         type: componentType,
         props,
       } as Component;
@@ -278,14 +279,78 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
         if (!slide) return d;
 
         const components = [...slide.components];
-        const index = components.findIndex((c) => c.id === componentId);
-        if (index === -1) return d;
+        const component = components.find((c) => c.id === componentId);
+        if (!component) return d;
 
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        if (newIndex < 0 || newIndex >= components.length) return d;
+        // Get siblings (components with the same parentId)
+        const parentId = component.parentId;
+        const siblings = components.filter((c) => c.parentId === parentId);
+        const siblingIndex = siblings.findIndex((c) => c.id === componentId);
+        
+        const newSiblingIndex = direction === 'up' ? siblingIndex - 1 : siblingIndex + 1;
+        if (newSiblingIndex < 0 || newSiblingIndex >= siblings.length) return d;
 
-        // Swap
-        [components[index], components[newIndex]] = [components[newIndex], components[index]];
+        // Find the actual indices in the full array
+        const targetSibling = siblings[newSiblingIndex];
+        const currentIndex = components.findIndex((c) => c.id === componentId);
+        const targetIndex = components.findIndex((c) => c.id === targetSibling.id);
+
+        // Swap in the full array
+        [components[currentIndex], components[targetIndex]] = [components[targetIndex], components[currentIndex]];
+
+        return {
+          ...d,
+          slides: {
+            ...d.slides,
+            [slideId]: {
+              ...slide,
+              components,
+            },
+          },
+        };
+      });
+    },
+    [onUpdateDeck]
+  );
+
+  const handleReorderComponents = useCallback(
+    (slideId: string, components: Component[]) => {
+      onUpdateDeck((d) => {
+        const slide = d.slides[slideId];
+        if (!slide) return d;
+
+        return {
+          ...d,
+          slides: {
+            ...d.slides,
+            [slideId]: {
+              ...slide,
+              components,
+            },
+          },
+        };
+      });
+    },
+    [onUpdateDeck]
+  );
+
+  const handleMoveComponentToContainer = useCallback(
+    (slideId: string, componentId: string, newParentId: string | null) => {
+      onUpdateDeck((d) => {
+        const slide = d.slides[slideId];
+        if (!slide) return d;
+
+        const components = slide.components.map((c) => {
+          if (c.id === componentId) {
+            if (newParentId === null) {
+              // Move to root - remove parentId
+              const { parentId, ...rest } = c;
+              return rest as Component;
+            }
+            return { ...c, parentId: newParentId };
+          }
+          return c;
+        });
 
         return {
           ...d,
@@ -433,8 +498,10 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
       onAddComponent: handleAddComponent,
       onDeleteComponent: handleDeleteComponent,
       onReorderComponent: handleReorderComponent,
+      onReorderComponents: handleReorderComponents,
+      onMoveComponentToContainer: handleMoveComponentToContainer,
     };
-  }, [deck, selection, handleUpdate, handleAddComponent, handleDeleteComponent, handleReorderComponent]);
+  }, [deck, selection, handleUpdate, handleAddComponent, handleDeleteComponent, handleReorderComponent, handleReorderComponents, handleMoveComponentToContainer]);
 
   const hasSlideSelected = context.selectedSlide !== null;
   const selectedEdge = isEdgeSelected(selection) ? deck.flow.edges[selection.edgeId] : null;

@@ -24,6 +24,18 @@ export function DeckPropertiesSection({ context }: InspectorSectionProps) {
     return options;
   }, [deck.slides]);
 
+  // Build start point options
+  const startPointOptions = useMemo(() => {
+    const options = [{ value: '', label: 'None' }];
+    
+    const startPoints = deck.flow.startPoints ?? {};
+    Object.values(startPoints).forEach(sp => {
+      options.push({ value: sp.id, label: sp.name });
+    });
+    
+    return options;
+  }, [deck.flow.startPoints]);
+
   return (
     <div className="inspector-section">
       <div className="inspector-section-header">Deck Properties</div>
@@ -60,6 +72,14 @@ export function DeckPropertiesSection({ context }: InspectorSectionProps) {
           options={backdropOptions}
           onChange={(value) => onUpdate({ type: 'deck', field: 'defaultBackdropSlideId', value: value || undefined })}
         />
+        {startPointOptions.length > 1 && (
+          <SelectField
+            label="Default Start Point"
+            value={deck.defaultStartPointId ?? ''}
+            options={startPointOptions}
+            onChange={(value) => onUpdate({ type: 'deck', field: 'defaultStartPointId', value: value || undefined })}
+          />
+        )}
       </div>
     </div>
   );

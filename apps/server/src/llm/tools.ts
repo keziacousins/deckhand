@@ -343,7 +343,7 @@ export const tools: Anthropic.Tool[] = [
   // Deck settings
   {
     name: 'update_deck_settings',
-    description: 'Update deck-level settings like title, description, aspect ratio, grid columns, and default backdrop',
+    description: 'Update deck-level settings like title, description, aspect ratio, grid columns, default backdrop, and default start point',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -367,6 +367,10 @@ export const tools: Anthropic.Tool[] = [
         defaultBackdropSlideId: {
           type: 'string',
           description: 'ID of slide to use as default backdrop for all slides',
+        },
+        defaultStartPointId: {
+          type: 'string',
+          description: 'ID of default start point for presentations and thumbnail generation',
         },
       },
       required: [],
@@ -418,7 +422,7 @@ export const tools: Anthropic.Tool[] = [
   },
   {
     name: 'get_deck_state',
-    description: 'Get the full current state of the deck. Always returns deckSettings (title, aspectRatio, gridColumns, defaultBackdropSlideId). Use include parameter to add: slides (with full style, notes, gridColumns, components), edges, startPoints, theme (with all tokens), assets. Call this to understand current state before making changes.',
+    description: 'Get the full current state of the deck. Always returns deckSettings (title, aspectRatio, gridColumns, defaultBackdropSlideId, defaultStartPointId). Use include parameter to add: slides (with full style, notes, gridColumns, components), edges, startPoints, theme (with all tokens), assets. Call this to understand current state before making changes.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -646,12 +650,13 @@ export function executeToolCall(
 
       // Deck settings
       case 'update_deck_settings': {
-        const { title, description, aspectRatio, gridColumns, defaultBackdropSlideId } = input as {
+        const { title, description, aspectRatio, gridColumns, defaultBackdropSlideId, defaultStartPointId } = input as {
           title?: string;
           description?: string;
           aspectRatio?: string;
           gridColumns?: number;
           defaultBackdropSlideId?: string;
+          defaultStartPointId?: string;
         };
         const updates: UpdateDeckSettingsOptions = {
           title,
@@ -659,6 +664,7 @@ export function executeToolCall(
           aspectRatio: aspectRatio as UpdateDeckSettingsOptions['aspectRatio'],
           gridColumns,
           defaultBackdropSlideId,
+          defaultStartPointId,
         };
         newDeck = updateDeckSettings(deck, updates);
         resultData = { updates };
@@ -717,6 +723,7 @@ export function executeToolCall(
           aspectRatio: deck.aspectRatio,
           gridColumns: deck.gridColumns,
           defaultBackdropSlideId: deck.defaultBackdropSlideId,
+          defaultStartPointId: deck.defaultStartPointId,
         };
         
         if (includeAll || include.includes('slides')) {

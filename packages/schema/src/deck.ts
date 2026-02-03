@@ -140,6 +140,7 @@ export const DeckSchema = z.object({
   aspectRatio: AspectRatioSchema.default('16:9'),
   gridColumns: z.number().min(1).max(12).default(DEFAULT_GRID_COLUMNS),
   defaultBackdropSlideId: z.string().optional(), // Default backdrop slide for all slides
+  defaultStartPointId: z.string().optional(), // Default start point for presentations/thumbnails
   slides: SlidesMapSchema,
   flow: FlowSchema,
   assets: AssetsMapSchema.optional(),

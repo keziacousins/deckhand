@@ -149,6 +149,12 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
               defaultBackdropSlideId: update.value as string | undefined,
             };
           }
+          if (update.field === 'defaultStartPointId') {
+            return {
+              ...d,
+              defaultStartPointId: update.value as string | undefined,
+            };
+          }
         }
 
         if (update.type === 'addAsset') {

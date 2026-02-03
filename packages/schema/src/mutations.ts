@@ -631,6 +631,7 @@ export interface UpdateDeckSettingsOptions {
   aspectRatio?: AspectRatio;
   gridColumns?: number;
   defaultBackdropSlideId?: string | null; // null to clear
+  defaultStartPointId?: string | null; // null to clear
 }
 
 /**
@@ -670,6 +671,16 @@ export function updateDeckSettings(deck: Deck, updates: UpdateDeckSettingsOption
         throw new Error(`Slide ${updates.defaultBackdropSlideId} not found`);
       }
       updatedDeck.defaultBackdropSlideId = updates.defaultBackdropSlideId;
+    }
+  }
+  if (updates.defaultStartPointId !== undefined) {
+    if (updates.defaultStartPointId === null) {
+      delete updatedDeck.defaultStartPointId;
+    } else {
+      if (!deck.flow.startPoints?.[updates.defaultStartPointId]) {
+        throw new Error(`Start point ${updates.defaultStartPointId} not found`);
+      }
+      updatedDeck.defaultStartPointId = updates.defaultStartPointId;
     }
   }
 

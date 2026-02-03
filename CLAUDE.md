@@ -72,13 +72,12 @@ npm run db:init --workspace=apps/server
 ## Testing
 
 **Unit tests** use Vitest and are located in `__tests__` directories within each package:
-- `packages/schema/src/__tests__/` - Schema validation tests (153 tests)
-- `packages/sync/src/__tests__/` - YDoc diffing/patching tests (95 tests)
-- `packages/components/src/__tests__/` - Web component tests with happy-dom (41 tests)
+- `packages/schema/src/__tests__/` - Schema and mutations tests (490 tests)
+- `packages/sync/src/__tests__/` - YDoc diffing/patching tests (190 tests)
+- `packages/components/src/__tests__/` - Web component tests with happy-dom (105 tests)
 - `apps/server/src/__tests__/` - API integration tests with in-memory SQLite (28 tests)
 
 **E2E tests** use Playwright and are in `tests/` at the project root:
-- `tests/basic-functionality.spec.ts` - Homepage and deck creation
 - `tests/grid-layout.spec.ts` - CSS grid layout verification
 - `tests/deck-operations.spec.ts` - Deck CRUD operations
 - `tests/canvas.spec.ts` - React Flow canvas interactions

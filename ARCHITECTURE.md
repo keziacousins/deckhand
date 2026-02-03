@@ -139,18 +139,27 @@ JSON is the source of truth. No YAML layer.
   "flow": {
     "edges": {
       "edge-1": {
-        "from": "slide-1",
-        "to": "slide-2",
+        "from": "start-1",
+        "to": "slide-1",
         "trigger": "default"
       },
       "edge-2": {
-        "from": "slide-2",
-        "to": "slide-3",
-        "trigger": "button:metrics"
+        "from": "slide-1",
+        "to": "slide-2",
+        "trigger": "default",
+        "transition": "slide-left"
       }
     },
-    "entrySlide": "slide-1"
-  }
+    "startPoints": {
+      "start-1": {
+        "id": "start-1",
+        "name": "Main",
+        "position": { "x": -200, "y": 0 }
+      }
+    }
+  },
+  
+  "defaultStartPointId": "start-1"
 }
 ```
 
@@ -282,20 +291,16 @@ function applyTheme(shadowRoot, theme) {
 
 ### Component Library
 
-Initial set:
-
 | Component | Purpose |
 |-----------|---------|
-| `<deck-slide>` | Slide container, applies theme |
-| `<deck-title>` | Headings (h1-h3) |
-| `<deck-subtitle>` | Secondary text |
-| `<deck-text>` | Body paragraphs |
+| `<deck-slide>` | Slide container, applies theme, grid layout |
+| `<deck-title>` | Headings (h1-h6) |
+| `<deck-headline-subhead>` | Hero layouts with headline + subheading |
+| `<deck-text>` | Rich text paragraphs (bold, italic, links) |
 | `<deck-list>` | Bullet/numbered lists |
-| `<deck-image>` | Images with caption |
-| `<deck-code>` | Syntax-highlighted code |
-| `<deck-quote>` | Block quotes |
-| `<deck-columns>` | Multi-column layout |
-| `<deck-spacer>` | Vertical spacing |
+| `<deck-image>` | Images with caption, fit modes, effects |
+| `<deck-floating-image>` | Absolutely positioned images |
+| `<deck-container>` | Sub-grid container for grouping components |
 
 ## CSS Architecture
 
@@ -425,43 +430,54 @@ The canvas is purely for visualization and flow editing. Content editing happens
 deckhand/
 ├── packages/
 │   ├── schema/              # Zod schemas, TypeScript types
-│   │   ├── deck.ts          # Main deck schema
-│   │   ├── slide.ts         # Slide schema
+│   │   ├── deck.ts          # Main deck schema, flow, start points
+│   │   ├── slide.ts         # Slide schema, styles, layout
 │   │   ├── component.ts     # Component schemas
-│   │   └── theme.ts         # Theme schema
+│   │   ├── theme.ts         # Theme schema
+│   │   ├── mutations.ts     # Pure functions for deck mutations
+│   │   └── richtext.ts      # Rich text content schema
 │   │
 │   ├── components/          # Web components
 │   │   ├── base.ts          # Base component class
-│   │   ├── deck-slide.ts
-│   │   ├── deck-title.ts
-│   │   └── ...
+│   │   ├── registry.ts      # Component registration
+│   │   ├── types.ts         # Component metadata types
+│   │   ├── components/      # Individual components
+│   │   │   ├── deck-slide/
+│   │   │   ├── deck-title/
+│   │   │   ├── deck-text/
+│   │   │   ├── deck-list/
+│   │   │   ├── deck-image/
+│   │   │   ├── deck-floating-image/
+│   │   │   ├── deck-container/
+│   │   │   └── deck-headline-subhead/
+│   │   └── utils/
+│   │       └── image-renderer.ts
 │   │
-│   ├── sync/                # Collaboration layer
-│   │   ├── diff.ts          # JSON diffing
-│   │   ├── patch.ts         # Patch application
-│   │   ├── ydoc.ts          # YDoc utilities
-│   │   └── conversion.ts    # JSON <-> YDoc
-│   │
-│   └── renderer/            # Deck rendering
-│       ├── render.ts        # JSON -> HTML
-│       └── export.ts        # PDF generation
+│   └── sync/                # Collaboration layer
+│       ├── diff.ts          # JSON diffing
+│       ├── patch.ts         # Patch application
+│       └── ydoc.ts          # YDoc conversion utilities
 │
 ├── apps/
 │   ├── editor/              # Frontend application
 │   │   ├── src/
-│   │   │   ├── canvas/      # React Flow setup
-│   │   │   ├── preview/     # Slide preview panel
-│   │   │   ├── chat/        # LLM interface
-│   │   │   └── sync/        # YDoc client bindings
+│   │   │   ├── canvas/      # React Flow canvas components
+│   │   │   ├── inspector/   # Property inspector panels
+│   │   │   ├── pages/       # Route pages (DeckList, DeckEditor, Presentation)
+│   │   │   ├── hooks/       # Custom React hooks
+│   │   │   ├── selection/   # Selection context
+│   │   │   ├── sync/        # YDoc client bindings
+│   │   │   └── api/         # API client functions
 │   │   └── styles/          # Editor CSS
 │   │
 │   └── server/              # Backend
 │       ├── src/
-│       │   ├── api/         # REST endpoints
-│       │   ├── ws/          # WebSocket (YJS)
-│       │   ├── llm/         # Tool execution
-│       │   └── persistence/ # Database
-│       └── db/              # Migrations
+│       │   ├── routes/      # REST endpoints (decks, assets, chat, models)
+│       │   ├── db/          # Database schema and queries
+│       │   ├── llm/         # LLM tools and prompts
+│       │   ├── sessions.ts  # WebSocket session management
+│       │   └── persistence.ts # YDoc persistence
+│       └── data/            # SQLite database and uploads
 │
 └── ARCHITECTURE.md
 ```

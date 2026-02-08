@@ -3,7 +3,7 @@
  * Cleanup script to delete test deck artifacts
  * Run with: npx tsx scripts/cleanup-test-decks.ts
  */
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'http://localhost:3008/api';
 async function main() {
     // Get all decks
     const response = await fetch(`${API_BASE}/decks`);

@@ -1,12 +1,9 @@
-import React, { useRef, useCallback } from 'react';
+import React from 'react';
 import type { InspectorSectionProps } from '../types';
-import { scrollHeaderToSticky } from '../types';
 import { TextField } from '../fields/TextField';
 import { ColorField } from '../fields/ColorField';
 import { NumberField } from '../fields/NumberField';
-import { useInspectorExpansion } from '../context/InspectorExpansionContext';
-
-const HEADER_HEIGHT = 37;
+import { Section } from '../components/Section';
 
 // Token groups for organized display
 const TOKEN_GROUPS = [
@@ -58,14 +55,6 @@ const TOKEN_GROUPS = [
 export function ThemeSection({ context, stickyIndex = 0 }: InspectorSectionProps) {
   const { deck, onUpdate } = context;
   const theme = deck.theme;
-  const { isExpanded, expand, toggle } = useInspectorExpansion();
-  const headerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-
-  const handleHeaderClick = useCallback((sectionId: string) => {
-    expand(sectionId);
-    const header = headerRefs.current.get(sectionId);
-    if (header) setTimeout(() => scrollHeaderToSticky(header), 250);
-  }, [expand]);
 
   const handleTokenChange = (key: string, value: string | number | undefined) => {
     onUpdate({ type: 'theme', field: key, value });
@@ -109,80 +98,22 @@ export function ThemeSection({ context, stickyIndex = 0 }: InspectorSectionProps
     );
   };
 
-  const themeSectionId = 'theme-name';
-  const themeExpanded = isExpanded(themeSectionId);
-
   return (
     <>
-      {/* Theme Name */}
-      <div
-        ref={(el) => { if (el) headerRefs.current.set(themeSectionId, el); else headerRefs.current.delete(themeSectionId); }}
-        className="section-header"
-        data-expanded={themeExpanded}
-        style={{ '--sticky-top': `${stickyIndex * HEADER_HEIGHT}px`, '--sticky-index': stickyIndex } as React.CSSProperties}
-        onClick={() => handleHeaderClick(themeSectionId)}
-      >
-        <button className="section-header-expand" onClick={(e) => { e.stopPropagation(); toggle(themeSectionId); }} title={themeExpanded ? 'Collapse' : 'Expand'}>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className={themeExpanded ? 'section-header-chevron-expanded' : ''}>
-            <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <div className="section-header-title">
-          <span className="section-header-name">Theme</span>
-          {!themeExpanded && theme.name && (
-            <span className="section-header-meta">{theme.name}</span>
-          )}
-        </div>
-      </div>
-      <div className="section-body" data-expanded={themeExpanded}>
-        <div className="section-body-inner">
-          <div className="section-body-overflow">
-            <div className="section-body-content">
-              <TextField
-                label="Name"
-                value={theme.name ?? ''}
-                onChange={(v) => handleTokenChange('name', v)}
-                placeholder="Theme name"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <Section id="theme-name" name="Theme" stickyIndex={stickyIndex} meta={theme.name || undefined}>
+        <TextField
+          label="Name"
+          value={theme.name ?? ''}
+          onChange={(v) => handleTokenChange('name', v)}
+          placeholder="Theme name"
+        />
+      </Section>
 
-      {/* Token Groups */}
-      {TOKEN_GROUPS.map((group, i) => {
-        const groupExpanded = isExpanded(group.id);
-        const groupStickyIndex = stickyIndex + 1 + i;
-        return (
-          <React.Fragment key={group.id}>
-            <div
-              ref={(el) => { if (el) headerRefs.current.set(group.id, el); else headerRefs.current.delete(group.id); }}
-              className="section-header"
-              data-expanded={groupExpanded}
-              style={{ '--sticky-top': `${groupStickyIndex * HEADER_HEIGHT}px`, '--sticky-index': groupStickyIndex } as React.CSSProperties}
-              onClick={() => handleHeaderClick(group.id)}
-            >
-              <button className="section-header-expand" onClick={(e) => { e.stopPropagation(); toggle(group.id); }} title={groupExpanded ? 'Collapse' : 'Expand'}>
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className={groupExpanded ? 'section-header-chevron-expanded' : ''}>
-                  <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <div className="section-header-title">
-                <span className="section-header-name">{group.label}</span>
-              </div>
-            </div>
-            <div className="section-body" data-expanded={groupExpanded}>
-              <div className="section-body-inner">
-                <div className="section-body-overflow">
-                  <div className="section-body-content">
-                    {group.tokens.map(renderTokenField)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </React.Fragment>
-        );
-      })}
+      {TOKEN_GROUPS.map((group, i) => (
+        <Section key={group.id} id={group.id} name={group.label} stickyIndex={stickyIndex + 1 + i}>
+          {group.tokens.map(renderTokenField)}
+        </Section>
+      ))}
     </>
   );
 }

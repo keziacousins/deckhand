@@ -9,7 +9,7 @@ import { PropertyEditor } from '../fields';
 import { useSelection } from '../../selection';
 import { useInspectorExpansion } from '../context/InspectorExpansionContext';
 
-const HEADER_HEIGHT = 37;
+const HEADER_HEIGHT = 41; /* 8px padding + 24px content + 8px padding + 1px border */
 
 interface ComponentCardProps {
   component: Component;

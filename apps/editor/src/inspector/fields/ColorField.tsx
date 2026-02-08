@@ -9,9 +9,10 @@ interface ColorFieldProps {
   placeholder?: string;
   /** Show a clear button to reset to empty/inherited */
   allowClear?: boolean;
+  compact?: boolean;
 }
 
-export function ColorField({ label, value, onChange, placeholder, allowClear = true }: ColorFieldProps) {
+export function ColorField({ label, value, onChange, placeholder, allowClear = true, compact }: ColorFieldProps) {
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -58,7 +59,7 @@ export function ColorField({ label, value, onChange, placeholder, allowClear = t
   const hasValue = localValue.length > 0;
 
   return (
-    <div className="inspector-field color-field">
+    <div className="inspector-field color-field" data-compact={compact || undefined}>
       <label className="inspector-field-label">{label}</label>
       <div className="color-field-inputs">
         <input
@@ -70,7 +71,7 @@ export function ColorField({ label, value, onChange, placeholder, allowClear = t
         <input
           ref={inputRef}
           type="text"
-          className="inspector-field-input color-field-text"
+          className="color-field-text"
           value={localValue}
           onChange={handleTextChange}
           onBlur={handleBlur}

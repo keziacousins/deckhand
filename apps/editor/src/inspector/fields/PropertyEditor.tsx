@@ -55,7 +55,7 @@ export function PropertyEditor({
   onChange,
   assets,
 }: PropertyEditorProps) {
-  const { type, label, placeholder, options, min, max, step, description } = descriptor;
+  const { type, label, placeholder, options, min, max, step, description, compact } = descriptor;
 
   switch (type) {
     case 'string':
@@ -65,6 +65,7 @@ export function PropertyEditor({
           value={(value as string) ?? (descriptor.default as string) ?? ''}
           onChange={onChange}
           placeholder={placeholder}
+          compact={compact}
         />
       );
 
@@ -89,6 +90,7 @@ export function PropertyEditor({
           max={max}
           step={step}
           placeholder={placeholder}
+          compact={compact}
         />
       );
 
@@ -98,7 +100,8 @@ export function PropertyEditor({
           label={label}
           value={(value as boolean) ?? (descriptor.default as boolean) ?? false}
           onChange={onChange}
-          description={description}
+          description={compact ? undefined : description}
+          compact={compact}
         />
       );
 
@@ -113,6 +116,7 @@ export function PropertyEditor({
           value={(value as string) ?? (descriptor.default as string) ?? ''}
           options={normalizedOptions}
           onChange={onChange}
+          compact={compact}
         />
       );
 
@@ -122,6 +126,7 @@ export function PropertyEditor({
           label={label}
           value={(value as string) ?? (descriptor.default as string) ?? ''}
           onChange={onChange}
+          compact={compact}
         />
       );
 
@@ -136,6 +141,7 @@ export function PropertyEditor({
             { value: 'right', label: 'Right' },
           ]}
           onChange={onChange}
+          compact={compact}
         />
       );
 
@@ -164,8 +170,6 @@ export function PropertyEditor({
       );
 
     case 'spacing':
-      // For now, fall back to text input
-      // TODO: Implement spacing editor (margin/padding)
       return (
         <TextField
           label={label}

@@ -55,6 +55,9 @@ export interface PropertyDescriptor {
   
   /** For asset type: allowed mime types */
   accept?: string[];
+  
+  /** Whether this field can share a row with another compact field in the inspector */
+  compact?: boolean;
 }
 
 /**

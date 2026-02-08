@@ -1,46 +1,73 @@
 .color-field-inputs {
   display: flex;
-  gap: 8px;
   align-items: center;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
 }
 
+.color-field-inputs:hover {
+  border-color: var(--border-input-hover);
+}
+
+.color-field-inputs:focus-within {
+  border-color: var(--border-focus);
+}
+
+/* Native color picker — left segment */
 .color-field-picker {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
   padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border: none;
+  border-right: 1px solid var(--border-input);
   cursor: pointer;
   background: none;
 }
 
 .color-field-picker::-webkit-color-swatch-wrapper {
-  padding: 2px;
+  padding: 0;
 }
 
 .color-field-picker::-webkit-color-swatch {
   border: none;
-  border-radius: calc(var(--radius-sm) - 2px);
+  border-radius: calc(var(--radius-md) - 1px) 0 0 calc(var(--radius-md) - 1px);
 }
 
+/* Hex text input — right segment */
 .color-field-text {
   flex: 1;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+  font-family: ui-monospace, 'SF Mono', Monaco, 'Courier New', monospace;
+  color: var(--text-primary);
+}
+
+.color-field-text:focus {
+  outline: none;
 }
 
 .color-field-text::placeholder {
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-style: italic;
+  font-family: var(--font-family);
 }
 
+/* Clear button — inside the bordered container */
 .color-field-clear {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+  margin-right: 3px;
   padding: 0;
   border: none;
-  background: var(--bg-tertiary);
-  color: var(--text-muted);
+  background: none;
+  color: var(--text-tertiary);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
@@ -48,9 +75,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .color-field-clear:hover {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
 }

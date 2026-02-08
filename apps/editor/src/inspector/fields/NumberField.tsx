@@ -10,6 +10,7 @@ interface NumberFieldProps {
   step?: number;
   placeholder?: string;
   suffix?: string;
+  compact?: boolean;
 }
 
 export function NumberField({
@@ -21,6 +22,7 @@ export function NumberField({
   step = 1,
   placeholder,
   suffix,
+  compact,
 }: NumberFieldProps) {
   // Local state for editing - allows empty string while typing
   const [localValue, setLocalValue] = useState(String(value));
@@ -62,7 +64,7 @@ export function NumberField({
   }, []);
 
   return (
-    <div className="inspector-field">
+    <div className="inspector-field" data-compact={compact || undefined}>
       <label className="inspector-field-label">{label}</label>
       <div className={`inspector-field-input-wrapper ${suffix ? 'has-suffix' : ''}`}>
         <input

@@ -5,6 +5,7 @@ interface CheckboxFieldProps {
   value: boolean;
   onChange: (value: boolean) => void;
   description?: string;
+  compact?: boolean;
 }
 
 export function CheckboxField({
@@ -12,9 +13,10 @@ export function CheckboxField({
   value,
   onChange,
   description,
+  compact,
 }: CheckboxFieldProps) {
   return (
-    <div className="inspector-field inspector-field-checkbox">
+    <div className="inspector-field inspector-field-checkbox" data-compact={compact || undefined}>
       <label className="inspector-checkbox-label">
         <input
           type="checkbox"

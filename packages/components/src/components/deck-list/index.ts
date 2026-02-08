@@ -29,11 +29,14 @@ export class DeckList extends DeckComponent {
       ordered: {
         type: 'boolean',
         label: 'Numbered',
-        description: 'Use numbered list instead of bullets',
         default: false,
         group: PropertyGroups.STYLE,
+        compact: true,
       },
-      gridWidth: CommonProperties.gridWidth(),
+      gridWidth: {
+        ...CommonProperties.gridWidth(),
+        compact: true,
+      },
     },
     preview: {
       sampleProps: {

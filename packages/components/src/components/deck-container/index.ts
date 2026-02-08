@@ -22,12 +22,12 @@ export class DeckContainer extends DeckComponent {
         ...CommonProperties.gridWidth(),
         required: true,
         default: 6,
-        description: 'Columns to span (also sets internal column count)',
       },
       background: {
         type: 'color',
         label: 'Background',
         group: PropertyGroups.STYLE,
+        compact: true,
       },
       padding: {
         type: 'enum',
@@ -40,11 +40,11 @@ export class DeckContainer extends DeckComponent {
         ],
         default: 'none',
         group: PropertyGroups.STYLE,
+        compact: true,
       },
       gap: {
         type: 'enum',
         label: 'Gap',
-        description: 'Override theme gap between children',
         options: [
           { value: '', label: 'Theme default' },
           { value: 'none', label: 'None' },
@@ -53,10 +53,11 @@ export class DeckContainer extends DeckComponent {
           { value: 'lg', label: 'Large' },
         ],
         group: PropertyGroups.STYLE,
+        compact: true,
       },
       borderRadius: {
         type: 'enum',
-        label: 'Border Radius',
+        label: 'Radius',
         options: [
           { value: 'none', label: 'None' },
           { value: 'sm', label: 'Small' },
@@ -65,6 +66,7 @@ export class DeckContainer extends DeckComponent {
         ],
         default: 'none',
         group: PropertyGroups.STYLE,
+        compact: true,
       },
       border: {
         type: 'string',
@@ -75,7 +77,6 @@ export class DeckContainer extends DeckComponent {
       alignItems: {
         type: 'enum',
         label: 'Align Items',
-        description: 'Vertical alignment of children',
         options: [
           { value: '', label: 'Default' },
           { value: 'start', label: 'Top' },
@@ -88,7 +89,6 @@ export class DeckContainer extends DeckComponent {
       justifyContent: {
         type: 'enum',
         label: 'Justify Content',
-        description: 'Horizontal distribution of children',
         options: [
           { value: '', label: 'Default' },
           { value: 'start', label: 'Start' },

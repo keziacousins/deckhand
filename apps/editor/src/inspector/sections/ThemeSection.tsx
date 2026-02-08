@@ -22,32 +22,32 @@ const TOKEN_GROUPS = [
     id: 'theme-colors',
     label: 'Colors',
     tokens: [
-      { key: 'color-background', label: 'Background', type: 'color' as const },
-      { key: 'color-surface', label: 'Surface', type: 'color' as const },
-      { key: 'color-text-primary', label: 'Text Primary', type: 'color' as const },
-      { key: 'color-text-secondary', label: 'Text Secondary', type: 'color' as const },
-      { key: 'color-accent', label: 'Accent', type: 'color' as const },
-      { key: 'color-accent-contrast', label: 'Accent Contrast', type: 'color' as const },
+      { key: 'color-background', label: 'Background', type: 'color' as const, compact: true },
+      { key: 'color-surface', label: 'Surface', type: 'color' as const, compact: true },
+      { key: 'color-text-primary', label: 'Text', type: 'color' as const, compact: true },
+      { key: 'color-text-secondary', label: 'Text 2nd', type: 'color' as const, compact: true },
+      { key: 'color-accent', label: 'Accent', type: 'color' as const, compact: true },
+      { key: 'color-accent-contrast', label: 'Accent Alt', type: 'color' as const, compact: true },
     ],
   },
   {
     id: 'theme-spacing',
     label: 'Spacing',
     tokens: [
-      { key: 'content-padding-top', label: 'Content Padding Top', type: 'text' as const },
-      { key: 'content-padding-sides', label: 'Content Padding Sides', type: 'text' as const },
-      { key: 'grid-gap', label: 'Grid Gap', type: 'text' as const },
-      { key: 'space-unit', label: 'Base Unit', type: 'text' as const },
-      { key: 'space-scale', label: 'Scale', type: 'number' as const },
+      { key: 'content-padding-top', label: 'Padding Top', type: 'text' as const, compact: true },
+      { key: 'content-padding-sides', label: 'Padding Sides', type: 'text' as const, compact: true },
+      { key: 'grid-gap', label: 'Grid Gap', type: 'text' as const, compact: true },
+      { key: 'space-unit', label: 'Base Unit', type: 'text' as const, compact: true },
+      { key: 'space-scale', label: 'Scale', type: 'number' as const, compact: true },
     ],
   },
   {
     id: 'theme-effects',
     label: 'Effects',
     tokens: [
-      { key: 'radius-sm', label: 'Radius SM', type: 'text' as const },
-      { key: 'radius-md', label: 'Radius MD', type: 'text' as const },
-      { key: 'radius-lg', label: 'Radius LG', type: 'text' as const },
+      { key: 'radius-sm', label: 'Radius SM', type: 'text' as const, compact: true },
+      { key: 'radius-md', label: 'Radius MD', type: 'text' as const, compact: true },
+      { key: 'radius-lg', label: 'Radius LG', type: 'text' as const, compact: true },
     ],
   },
 ];
@@ -60,7 +60,7 @@ export function ThemeSection({ context, stickyIndex = 0 }: InspectorSectionProps
     onUpdate({ type: 'theme', field: key, value });
   };
 
-  const renderTokenField = (token: { key: string; label: string; type: 'text' | 'color' | 'number' }) => {
+  const renderTokenField = (token: { key: string; label: string; type: 'text' | 'color' | 'number'; compact?: boolean }) => {
     const value = theme.tokens[token.key as keyof typeof theme.tokens];
 
     if (token.type === 'color') {
@@ -70,6 +70,7 @@ export function ThemeSection({ context, stickyIndex = 0 }: InspectorSectionProps
           label={token.label}
           value={(value as string) ?? ''}
           onChange={(v) => handleTokenChange(token.key, v)}
+          compact={token.compact}
         />
       );
     }
@@ -84,6 +85,7 @@ export function ThemeSection({ context, stickyIndex = 0 }: InspectorSectionProps
           step={0.05}
           min={0.5}
           max={3}
+          compact={token.compact}
         />
       );
     }
@@ -94,6 +96,7 @@ export function ThemeSection({ context, stickyIndex = 0 }: InspectorSectionProps
         label={token.label}
         value={(value as string) ?? ''}
         onChange={(v) => handleTokenChange(token.key, v)}
+        compact={token.compact}
       />
     );
   };

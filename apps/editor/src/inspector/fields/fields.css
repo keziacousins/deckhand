@@ -2,6 +2,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Non-compact fields span full width in grid layouts */
+.inspector-field:not([data-compact]) {
+  grid-column: 1 / -1;
 }
 
 .inspector-field-label {

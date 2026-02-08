@@ -7,6 +7,7 @@ interface TextFieldProps {
   onChange: (value: string) => void;
   placeholder?: string;
   multiline?: boolean;
+  compact?: boolean;
 }
 
 export function TextField({
@@ -15,6 +16,7 @@ export function TextField({
   onChange,
   placeholder,
   multiline,
+  compact,
 }: TextFieldProps) {
   // Select all text on focus
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -22,7 +24,7 @@ export function TextField({
   }, []);
 
   return (
-    <div className="inspector-field">
+    <div className="inspector-field" data-compact={compact || undefined}>
       <label className="inspector-field-label">{label}</label>
       {multiline ? (
         <textarea

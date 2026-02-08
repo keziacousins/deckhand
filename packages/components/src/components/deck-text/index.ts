@@ -39,7 +39,7 @@ export class DeckText extends DeckComponent {
       },
       align: {
         type: 'enum',
-        label: 'Alignment',
+        label: 'Align',
         options: [
           { value: 'left', label: 'Left' },
           { value: 'center', label: 'Center' },
@@ -47,8 +47,12 @@ export class DeckText extends DeckComponent {
         ],
         default: 'left',
         group: PropertyGroups.LAYOUT,
+        compact: true,
       },
-      gridWidth: CommonProperties.gridWidth(),
+      gridWidth: {
+        ...CommonProperties.gridWidth(),
+        compact: true,
+      },
     },
     preview: {
       sampleProps: {

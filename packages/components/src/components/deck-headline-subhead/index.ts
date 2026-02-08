@@ -47,7 +47,6 @@ export class DeckHeadlineSubhead extends DeckComponent {
       isHero: {
         type: 'boolean',
         label: 'Hero Mode',
-        description: 'Use larger hero typography',
         default: false,
         group: PropertyGroups.STYLE,
       },
@@ -55,15 +54,15 @@ export class DeckHeadlineSubhead extends DeckComponent {
         type: 'enum',
         label: 'Variant',
         options: [
-          { value: 'dark', label: 'Dark (dark text)' },
-          { value: 'light', label: 'Light (light text)' },
+          { value: 'dark', label: 'Dark' },
+          { value: 'light', label: 'Light' },
         ],
         default: 'dark',
         group: PropertyGroups.STYLE,
       },
       align: {
         type: 'enum',
-        label: 'Alignment',
+        label: 'Align',
         options: [
           { value: 'left', label: 'Left' },
           { value: 'center', label: 'Center' },
@@ -71,8 +70,12 @@ export class DeckHeadlineSubhead extends DeckComponent {
         ],
         default: 'left',
         group: PropertyGroups.LAYOUT,
+        compact: true,
       },
-      gridWidth: CommonProperties.gridWidth(),
+      gridWidth: {
+        ...CommonProperties.gridWidth(),
+        compact: true,
+      },
     },
     preview: {
       sampleProps: {

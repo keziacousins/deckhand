@@ -28,18 +28,18 @@ export class DeckTitle extends DeckComponent {
       level: {
         type: 'enum',
         label: 'Level',
-        description: 'Heading level (1 = largest)',
         options: [
-          { value: '1', label: 'H1 - Main Title' },
-          { value: '2', label: 'H2 - Section' },
-          { value: '3', label: 'H3 - Subsection' },
+          { value: '1', label: 'H1' },
+          { value: '2', label: 'H2' },
+          { value: '3', label: 'H3' },
         ],
         default: '1',
         group: PropertyGroups.STYLE,
+        compact: true,
       },
       align: {
         type: 'enum',
-        label: 'Alignment',
+        label: 'Align',
         options: [
           { value: 'left', label: 'Left' },
           { value: 'center', label: 'Center' },
@@ -47,8 +47,12 @@ export class DeckTitle extends DeckComponent {
         ],
         default: 'center',
         group: PropertyGroups.LAYOUT,
+        compact: true,
       },
-      gridWidth: CommonProperties.gridWidth(),
+      gridWidth: {
+        ...CommonProperties.gridWidth(),
+        compact: true,
+      },
     },
     preview: {
       sampleProps: {

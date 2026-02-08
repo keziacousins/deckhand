@@ -30,8 +30,7 @@
   overflow: visible;
   transition:
     box-shadow var(--transition-normal),
-    border-color var(--transition-normal),
-    border-width var(--transition-normal);
+    border-color var(--transition-normal);
 }
 
 .slide-node:hover {
@@ -40,7 +39,6 @@
 }
 
 .slide-node.selected {
-  border-width: 3px;
   border-color: var(--node-border-selected-strong);
   box-shadow: var(--node-shadow-selected);
 }

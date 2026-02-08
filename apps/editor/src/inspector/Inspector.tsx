@@ -34,7 +34,7 @@ interface InspectorProps {
 }
 
 export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGrid, onToggleShowGrid }: InspectorProps) {
-  const { selection, selectComponent, clearSelection } = useSelection();
+  const { selection, selectSlide, selectComponent, clearSelection } = useSelection();
   const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
   const [showComponentBrowser, setShowComponentBrowser] = useState(false);
   const [addButtonDropActive, setAddButtonDropActive] = useState(false);
@@ -272,12 +272,12 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
         };
       });
 
-      // Clear selection if we deleted the selected component
+      // Deselect component but keep slide selected
       if (selection.componentId === componentId) {
-        clearSelection();
+        selectSlide(slideId);
       }
     },
-    [onUpdateDeck, selection.componentId, clearSelection]
+    [onUpdateDeck, selection.componentId, selectSlide]
   );
 
   const handleReorderComponent = useCallback(

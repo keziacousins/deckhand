@@ -66,7 +66,22 @@ export function NumberField({
   return (
     <div className="inspector-field" data-compact={compact || undefined}>
       <label className="inspector-field-label">{label}</label>
-      <div className={`inspector-field-input-wrapper ${suffix ? 'has-suffix' : ''}`}>
+      {suffix ? (
+        <div className="inspector-field-input-wrapper has-suffix">
+          <input
+            type="text"
+            inputMode="numeric"
+            className="inspector-field-input"
+            value={localValue}
+            onChange={handleChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+          />
+          <span className="inspector-field-suffix">{suffix}</span>
+        </div>
+      ) : (
         <input
           type="text"
           inputMode="numeric"
@@ -76,13 +91,9 @@ export function NumberField({
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          min={min}
-          max={max}
-          step={step}
           placeholder={placeholder}
         />
-        {suffix && <span className="inspector-field-suffix">{suffix}</span>}
-      </div>
+      )}
     </div>
   );
 }

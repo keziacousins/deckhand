@@ -1,6 +1,7 @@
 .color-field-inputs {
   display: flex;
   align-items: center;
+  height: 32px;
   border: 1px solid var(--border-input);
   border-radius: var(--radius-md);
   background: var(--bg-input);
@@ -18,9 +19,9 @@
 
 /* Native color picker — left segment */
 .color-field-picker {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
+  width: 32px;
+  align-self: stretch;
+  min-width: 32px;
   padding: 0;
   border: none;
   border-right: 1px solid var(--border-input);

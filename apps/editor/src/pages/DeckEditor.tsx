@@ -22,7 +22,6 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo } = useYDoc(deckId);
   const [inspectorVisible, setInspectorVisible] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
-  const { selectSlide } = useSelection();
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
   const hasCapturedInitialCover = useRef(false);
 
@@ -33,16 +32,12 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   const { captureCover, isCapturing } = useCoverCapture({ deck, deckId });
   const [isSaving, setIsSaving] = useState(false);
 
-  // Select first slide when deck loads
+  // Mark initial load complete (no auto-selection)
   useEffect(() => {
     if (deck && !initialSelectionDone) {
-      const slideIds = Object.keys(deck.slides);
-      if (slideIds.length > 0) {
-        selectSlide(slideIds[0]);
-        setInitialSelectionDone(true);
-      }
+      setInitialSelectionDone(true);
     }
-  }, [deck, selectSlide, initialSelectionDone]);
+  }, [deck, initialSelectionDone]);
 
   // Reset initial selection flag when deckId changes
   useEffect(() => {

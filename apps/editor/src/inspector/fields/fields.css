@@ -6,10 +6,8 @@
 
 .inspector-field-label {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-normal);
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .inspector-field-input,
@@ -83,10 +81,33 @@
 }
 
 .inspector-checkbox-input {
+  appearance: none;
   width: 16px;
   height: 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
   cursor: pointer;
-  accent-color: var(--interactive-primary);
+  flex-shrink: 0;
+  position: relative;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.inspector-checkbox-input:checked {
+  background: var(--interactive-primary);
+  border-color: var(--interactive-primary);
+}
+
+.inspector-checkbox-input:checked::after {
+  content: '';
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--text-on-accent, #fff);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
 }
 
 .inspector-field-description {

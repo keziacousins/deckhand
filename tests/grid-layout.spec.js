@@ -149,7 +149,7 @@ test.describe('Grid Layout', () => {
         await slideNode.click();
         await page.waitForTimeout(500);
         // Now click on the component card header in the inspector
-        const componentCard = page.locator('.component-card-header').first();
+        const componentCard = page.locator('.section-header[draggable]').first();
         await componentCard.click();
         await page.waitForTimeout(500);
         // Now look for Grid Width

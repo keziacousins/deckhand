@@ -72,12 +72,11 @@
 
 /* Content */
 .inspector-content {
+  position: relative; /* offsetParent for sticky headers — needed by scrollHeaderToSticky offsetTop walk */
   flex: 1;
-  padding: var(--space-3);
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
 }
 
 .inspector-empty {
@@ -89,37 +88,30 @@
   font-size: var(--font-size-sm);
 }
 
-/* Footer with Add Button */
-.inspector-footer {
-  padding: var(--space-3);
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-panel);
-  flex-shrink: 0;
-}
-
-.inspector-add-button {
-  width: 100%;
+/* Add Component button — styled like a section header */
+.inspector-add-component {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--space-2);
+  width: 100%;
   padding: var(--space-2) var(--space-3);
-  background: var(--bg-accent);
-  color: var(--text-on-accent);
   border: none;
-  border-radius: var(--radius-md);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  color: var(--text-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.inspector-add-button:hover {
-  background: var(--bg-accent-hover);
+.inspector-add-component:hover {
+  background: var(--bg-surface-hover);
 }
 
-.inspector-add-button:active {
-  background: var(--bg-accent-active);
+.inspector-add-component:active {
+  background: var(--bg-surface-active);
 }
 
 /* Sections */
@@ -179,52 +171,73 @@
   padding: var(--space-4) var(--space-2);
 }
 
-/* Component Card */
-.component-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  transition: border-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
-}
+/* ===========================================
+   Flat section headers & bodies
+   All are direct children of .inspector-content.
+   Headers are sticky; bodies collapse via CSS grid.
+   =========================================== */
 
-.component-card:hover {
-  border-color: var(--border-strong);
-}
-
-.component-card-expanded {
-  border-color: var(--border-focus);
-}
-
-.component-card-dragging {
-  opacity: 0.5;
-}
-
-.component-card-drag-over {
-  border-color: var(--border-focus);
-  border-style: dashed;
-}
-
-.component-card-drop-target {
-  border-color: var(--color-primary);
-  border-style: dashed;
-  background: var(--bg-surface-hover);
-}
-
-.component-card-header {
+/* Section header — sticky, full-width */
+.section-header {
+  position: sticky;
+  top: var(--sticky-top, 0px);
+  z-index: calc(var(--z-sticky) - var(--sticky-index, 0));
+  background: var(--bg-panel);
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
   transition: background-color 0.15s ease;
+  cursor: pointer;
 }
 
-.component-card-header:hover {
+.section-header:hover {
   background: var(--bg-surface-hover);
 }
 
+/* Expanded state — accent left border */
+.section-header[data-expanded="true"] {
+  background: var(--bg-surface);
+  border-bottom-color: var(--border-default);
+}
+
+/* Draggable component headers */
+.section-header[draggable="true"] {
+  cursor: grab;
+}
+
+.section-header[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Container headers — accent tint */
+.section-header[data-container="true"] {
+  background: color-mix(in srgb, var(--interactive-primary) 5%, var(--bg-panel));
+}
+
+.section-header[data-container="true"] .section-header-name {
+  color: var(--text-primary);
+}
+
+/* Child component headers — indented */
+.section-header[data-child="true"] {
+  padding-left: var(--space-6);
+}
+
+/* Drop target */
+.section-header[data-drop-target="true"] {
+  background: color-mix(in srgb, var(--interactive-primary) 10%, var(--bg-panel));
+  border-bottom: 2px dashed var(--interactive-primary);
+}
+
+/* Dragging state */
+.section-header[data-dragging="true"] {
+  opacity: 0.5;
+}
+
 /* Drag handle */
-.component-card-drag-handle {
+.section-header-drag-handle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -233,24 +246,24 @@
   color: var(--text-tertiary);
   cursor: grab;
   flex-shrink: 0;
-  opacity: 0.5;
+  opacity: 0.7;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
 
-.component-card:hover .component-card-drag-handle {
+.section-header:hover .section-header-drag-handle {
   opacity: 1;
 }
 
-.component-card-drag-handle:hover {
+.section-header-drag-handle:hover {
   color: var(--text-secondary);
 }
 
-.component-card-drag-handle:active {
+.section-header-drag-handle:active {
   cursor: grabbing;
 }
 
-/* Expand/collapse button */
-.component-card-expand {
+/* Expand/collapse chevron */
+.section-header-expand {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -265,28 +278,28 @@
   transition: color 0.15s ease;
 }
 
-.component-card-expand:hover {
+.section-header-expand:hover {
   color: var(--text-primary);
 }
 
-.component-card-expand svg {
+.section-header-expand svg {
   transition: transform 0.15s ease;
 }
 
-.component-card-chevron-expanded {
+.section-header-chevron-expanded {
   transform: rotate(90deg);
 }
 
-.component-card-title {
+/* Title area */
+.section-header-title {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
   flex: 1;
-  cursor: pointer;
 }
 
-.component-card-name {
+.section-header-name {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
@@ -295,24 +308,22 @@
   text-overflow: ellipsis;
 }
 
-.component-card-meta {
+.section-header-meta {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-normal);
   color: var(--text-tertiary);
-  background: var(--bg-surface-secondary);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
   white-space: nowrap;
 }
 
-.component-card-actions {
+/* Action buttons in header */
+.section-header-actions {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   flex-shrink: 0;
 }
 
-.component-card-action {
+.section-header-action {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -326,44 +337,49 @@
   transition: all 0.15s ease;
 }
 
-.component-card-action:hover:not(:disabled) {
+.section-header-action:hover:not(:disabled) {
   background: var(--bg-surface-active);
   color: var(--text-primary);
 }
 
-.component-card-action:disabled {
+.section-header-action:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-.component-card-action-delete:hover:not(:disabled) {
+.section-header-action-delete:hover:not(:disabled) {
   background: var(--bg-error);
   color: var(--text-on-error);
 }
 
-/* Animated expand/collapse using CSS grid */
-.component-card-body {
+/* Section body — collapses via CSS grid animation */
+.section-body-inner {
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 0.2s ease-out;
 }
 
-.component-card-expanded .component-card-body {
+.section-body[data-expanded="true"] .section-body-inner {
   grid-template-rows: 1fr;
 }
 
-.component-card-content-wrapper {
+.section-body-overflow {
   overflow: hidden;
 }
 
-.component-card-content {
+.section-body-content {
   padding: var(--space-2) var(--space-3) var(--space-3);
-  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
+/* Child body — indented */
+.section-body[data-child="true"] .section-body-content {
+  padding-left: var(--space-6);
+}
+
+/* Property groups inside section body */
 .component-property-group {
   display: flex;
   flex-direction: column;
@@ -377,33 +393,8 @@
 
 .component-group-label {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-normal);
   color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-/* Container component styling */
-.component-card-container {
-  border-left: 3px solid var(--color-accent, #3b82f6);
-}
-
-.component-card-container > .component-card-header .component-card-name {
-  color: var(--color-accent, #3b82f6);
-}
-
-/* Children container */
-.component-card-children {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-2) 0 var(--space-2) var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-surface-hover);
-}
-
-.component-card-children .component-card {
-  margin-left: 0;
 }
 
 /* Add component context info */

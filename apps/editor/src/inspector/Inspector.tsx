@@ -579,10 +579,10 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
                 <div className="inspector-empty">Select an object to edit</div>
               ) : (
                 <>
-                  <SlidePropertiesSection context={context} />
-                  <BackgroundSection context={context} />
-                  <ColorsSection context={context} />
-                  <ComponentList context={context} />
+                  <SlidePropertiesSection context={context} stickyIndex={0} />
+                  <BackgroundSection context={context} stickyIndex={1} />
+                  <ColorsSection context={context} stickyIndex={2} />
+                  <ComponentList context={context} stickyIndex={3} />
                 </>
               )}
             </>
@@ -590,31 +590,26 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
 
           {activeTab === 'theme' && (
             <>
-              <DeckPropertiesSection context={context} />
-              <ThemeSection context={context} />
+              <DeckPropertiesSection context={context} stickyIndex={0} />
+              <ThemeSection context={context} stickyIndex={1} />
               {onToggleShowGrid && (
-                <div className="inspector-section">
-                  <div className="inspector-section-header">Debug</div>
-                  <div className="inspector-section-content">
-                    <div className="inspector-field inspector-field-checkbox">
-                      <label className="inspector-checkbox-label">
-                        <input
-                          type="checkbox"
-                          className="inspector-checkbox-input"
-                          checked={showGrid ?? false}
-                          onChange={onToggleShowGrid}
-                        />
-                        <span className="inspector-checkbox-text">Show Grid Overlay</span>
-                      </label>
-                    </div>
-                  </div>
+                <div className="section-header" style={{ '--sticky-top': `${6 * 37}px`, '--sticky-index': 6 } as React.CSSProperties}>
+                  <label className="inspector-checkbox-label" style={{ flex: 1 }}>
+                    <input
+                      type="checkbox"
+                      className="inspector-checkbox-input"
+                      checked={showGrid ?? false}
+                      onChange={onToggleShowGrid}
+                    />
+                    <span className="inspector-checkbox-text">Show Grid Overlay</span>
+                  </label>
                 </div>
               )}
             </>
           )}
 
           {activeTab === 'assets' && (
-            <AssetsSection context={context} />
+            <AssetsSection context={context} stickyIndex={0} />
           )}
 
           {activeTab === 'chat' && (
@@ -622,24 +617,22 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
           )}
         </div>
 
-        {/* Add Component Button - only show on selection tab when slide is selected (not edge/start point) */}
+        {/* Add Component Button - only show on selection tab when slide is selected */}
         {activeTab === 'selection' && hasSlideSelected && !selectedEdge && !selectedStartPoint && (
-          <div className="inspector-footer">
-            <button
-              className="inspector-add-button"
-              onClick={() => setShowComponentBrowser(true)}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M8 3v10M3 8h10"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-              Add Component
-            </button>
-          </div>
+          <button
+            className="inspector-add-component"
+            onClick={() => setShowComponentBrowser(true)}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 3v10M3 8h10"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span>Add Component</span>
+          </button>
         )}
 
         {/* Component Browser Modal */}

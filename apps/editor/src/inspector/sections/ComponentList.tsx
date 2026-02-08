@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import type { InspectorSectionProps } from '../types';
+import { scrollHeaderToSticky } from '../types';
 import type { Component, Asset } from '@deckhand/schema';
 import { registry } from '@deckhand/components';
 import type { PropertyDescriptor } from '@deckhand/components';
@@ -8,6 +9,8 @@ import { PropertyEditor } from '../fields';
 import { useSelection } from '../../selection';
 import { useInspectorExpansion } from '../context/InspectorExpansionContext';
 
+const HEADER_HEIGHT = 37;
+
 interface ComponentCardProps {
   component: Component;
   slideId: string;
@@ -15,7 +18,8 @@ interface ComponentCardProps {
   totalCount: number;
   isExpanded: boolean;
   assets: Record<string, Asset>;
-  onToggleExpand: () => void;
+  onExpand: () => void;
+  onCollapse: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -27,12 +31,14 @@ interface ComponentCardProps {
   onDragEnd: () => void;
   isDragOver: boolean;
   isDragging: boolean;
-  /** Nesting depth for indentation (0 = top level) */
-  depth?: number;
-  /** Children components (for containers) */
-  children?: React.ReactNode;
+  /** Whether this component is a child of a container */
+  isChild?: boolean;
   /** Whether this is a valid drop target for current drag */
   isDropTarget?: boolean;
+  /** Index for sticky header stacking */
+  stickyIndex?: number;
+  /** Ref forwarded to the header element for scroll-into-view */
+  headerRef?: React.Ref<HTMLDivElement>;
 }
 
 function ComponentCard({
@@ -41,7 +47,8 @@ function ComponentCard({
   totalCount,
   isExpanded,
   assets,
-  onToggleExpand,
+  onExpand,
+  onCollapse,
   onDelete,
   onMoveUp,
   onMoveDown,
@@ -53,13 +60,17 @@ function ComponentCard({
   onDragEnd,
   isDragOver,
   isDragging,
-  depth = 0,
-  children,
+  isChild = false,
   isDropTarget = false,
+  stickyIndex = 0,
+  headerRef,
 }: ComponentCardProps) {
   const meta = registry.getMeta(component.type);
   const componentName = meta?.name ?? component.type;
   const gridWidth = (component.props as Record<string, unknown>).gridWidth as number | undefined;
+
+  // Track whether a drag happened so we can suppress click
+  const didDragRef = useRef(false);
 
   // Group properties by their group field
   const groupedProperties = useMemo(() => {
@@ -105,29 +116,27 @@ function ComponentCard({
   }, [groupedProperties]);
 
   const isContainer = component.type === 'deck-container';
-  const indentStyle = depth > 0 ? { marginLeft: `${depth * 16}px` } : undefined;
-
-  const classNames = [
-    'component-card',
-    isExpanded && 'component-card-expanded',
-    isDragging && 'component-card-dragging',
-    isContainer && 'component-card-container',
-    isDropTarget && 'component-card-drop-target',
-  ].filter(Boolean).join(' ');
 
   return (
-    <div 
-      className={classNames}
-      style={indentStyle}
-      draggable
-      onDragStart={(e) => onDragStart(e, component.id)}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-    >
-      <div className="component-card-header">
+    <>
+      <div
+        ref={headerRef}
+        className="section-header"
+        data-expanded={isExpanded}
+        data-container={isContainer || undefined}
+        data-child={isChild || undefined}
+        data-dragging={isDragging || undefined}
+        data-drop-target={isDropTarget || undefined}
+        style={{ '--sticky-top': `${stickyIndex * HEADER_HEIGHT}px`, '--sticky-index': stickyIndex } as React.CSSProperties}
+        draggable
+        onDragStart={(e) => { didDragRef.current = true; onDragStart(e, component.id); }}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDragEnd={(e) => { onDragEnd(); /* reset after a short delay so click doesn't fire */ setTimeout(() => { didDragRef.current = false; }, 0); }}
+        onClick={() => { if (didDragRef.current) return; if (!isExpanded) onExpand(); }}
+      >
         {/* Drag handle */}
-        <div className="component-card-drag-handle" title="Drag to reorder">
+        <div className="section-header-drag-handle" title="Drag to reorder">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
             <circle cx="5" cy="4" r="1.5" fill="currentColor" />
             <circle cx="11" cy="4" r="1.5" fill="currentColor" />
@@ -138,10 +147,10 @@ function ComponentCard({
           </svg>
         </div>
 
-        {/* Expand/collapse toggle */}
+        {/* Expand/collapse chevron — only way to collapse */}
         <button 
-          className="component-card-expand" 
-          onClick={onToggleExpand}
+          className="section-header-expand" 
+          onClick={(e) => { e.stopPropagation(); if (isExpanded) onCollapse(); else onExpand(); }}
           title={isExpanded ? 'Collapse' : 'Expand'}
         >
           <svg 
@@ -149,23 +158,23 @@ function ComponentCard({
             height="12" 
             viewBox="0 0 16 16" 
             fill="none"
-            className={isExpanded ? 'component-card-chevron-expanded' : ''}
+            className={isExpanded ? 'section-header-chevron-expanded' : ''}
           >
             <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
-        <div className="component-card-title" onClick={onToggleExpand}>
-          <span className="component-card-name">{componentName}</span>
+        <div className="section-header-title">
+          <span className="section-header-name">{componentName}</span>
           {gridWidth !== undefined && gridWidth > 0 && (
-            <span className="component-card-meta">{gridWidth} col</span>
+            <span className="section-header-meta">{gridWidth} col</span>
           )}
         </div>
 
-        <div className="component-card-actions">
+        <div className="section-header-actions">
           {onMoveToRoot && (
             <button
-              className="component-card-action"
+              className="section-header-action"
               onClick={(e) => { e.stopPropagation(); onMoveToRoot(); }}
               title="Move out of container"
             >
@@ -176,7 +185,7 @@ function ComponentCard({
             </button>
           )}
           <button
-            className="component-card-action"
+            className="section-header-action"
             onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
             disabled={index === 0}
             title="Move up"
@@ -186,7 +195,7 @@ function ComponentCard({
             </svg>
           </button>
           <button
-            className="component-card-action"
+            className="section-header-action"
             onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
             disabled={index === totalCount - 1}
             title="Move down"
@@ -196,7 +205,7 @@ function ComponentCard({
             </svg>
           </button>
           <button
-            className="component-card-action component-card-action-delete"
+            className="section-header-action section-header-action-delete"
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             title="Delete component"
           >
@@ -213,48 +222,48 @@ function ComponentCard({
       </div>
 
       {meta && (
-        <div className="component-card-body">
-          <div className="component-card-content-wrapper">
-            <div className="component-card-content">
-              {orderedGroups.map(({ name, properties }) => (
-                <div key={name} className="component-property-group">
-                  {orderedGroups.length > 1 && (
-                    <div className="component-group-label">{name}</div>
-                  )}
-                  {properties.map(([key, descriptor]) => (
-                    <PropertyEditor
-                      key={key}
-                      name={key}
-                      descriptor={descriptor}
-                      value={(component.props as Record<string, unknown>)[key]}
-                      onChange={(value) => onUpdateProp(key, value)}
-                      assets={assets}
-                    />
-                  ))}
-                </div>
-              ))}
+        <div className="section-body" data-expanded={isExpanded} data-child={isChild || undefined}>
+          <div className="section-body-inner">
+            <div className="section-body-overflow">
+              <div className="section-body-content">
+                {orderedGroups.map(({ name, properties }) => (
+                  <div key={name} className="component-property-group">
+                    {orderedGroups.length > 1 && name !== PropertyGroups.CONTENT && properties.length > 1 && (
+                      <div className="component-group-label">{name}</div>
+                    )}
+                    {properties.map(([key, descriptor]) => (
+                      <PropertyEditor
+                        key={key}
+                        name={key}
+                        descriptor={descriptor}
+                        value={(component.props as Record<string, unknown>)[key]}
+                        onChange={(value) => onUpdateProp(key, value)}
+                        assets={assets}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       )}
-      {/* Render children for containers */}
-      {children}
-    </div>
+    </>
   );
 }
 
-export function ComponentList({ context }: InspectorSectionProps) {
+export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProps) {
   const { deck, selectedSlide, selection, onUpdate, onDeleteComponent, onReorderComponent, onReorderComponents, onMoveComponentToContainer } = context;
   const assets = deck.assets ?? {};
   const { selectComponent } = useSelection();
-  const { expandedComponentId, setExpandedComponentId } = useInspectorExpansion();
+  const { isComponentExpanded, expandComponent, collapseComponent } = useInspectorExpansion();
   
   // Drag and drop state - track by component ID
   const [draggedComponentId, setDraggedComponentId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null); // container ID or null for top-level
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   
-  // Refs for scrolling to expanded component
-  const componentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Refs for scrolling to selected component header
+  const headerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
   // Track previous selection to detect canvas-driven changes
   const prevSelectionRef = useRef<string | null>(null);
@@ -267,6 +276,13 @@ export function ComponentList({ context }: InspectorSectionProps) {
   const draggedComponent = draggedComponentId 
     ? components.find(c => c.id === draggedComponentId) 
     : null;
+
+  const scrollToHeader = useCallback((componentId: string) => {
+    setTimeout(() => {
+      const header = headerRefs.current.get(componentId);
+      if (header) scrollHeaderToSticky(header);
+    }, 250);
+  }, []);
   
   // Auto-expand and scroll when a component is selected on the canvas
   useEffect(() => {
@@ -276,28 +292,28 @@ export function ComponentList({ context }: InspectorSectionProps) {
     prevSelectionRef.current = selection.componentId;
     
     if (selection.componentId && selection.componentId !== prevSelection) {
-      setExpandedComponentId(selection.componentId);
-      setTimeout(() => {
-        const ref = componentRefs.current.get(selection.componentId!);
-        if (ref) {
-          ref.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }, 50);
+      expandComponent(selection.componentId);
+      scrollToHeader(selection.componentId);
     }
-  }, [selection.componentId, selection.slideId, selectedSlide, setExpandedComponentId]);
+  }, [selection.componentId, selection.slideId, selectedSlide, expandComponent, scrollToHeader]);
 
-  const toggleExpanded = useCallback((componentId: string) => {
-    if (expandedComponentId === componentId) {
-      setExpandedComponentId(null);
-    } else {
-      setExpandedComponentId(componentId);
-      if (slideId) selectComponent(slideId, componentId);
-    }
-  }, [expandedComponentId, setExpandedComponentId, slideId, selectComponent]);
+  const handleExpand = useCallback((componentId: string) => {
+    expandComponent(componentId);
+    if (slideId) selectComponent(slideId, componentId);
+    scrollToHeader(componentId);
+  }, [expandComponent, slideId, selectComponent, scrollToHeader]);
+
+  const handleCollapse = useCallback((componentId: string) => {
+    const component = components.find(c => c.id === componentId);
+    const childIds = component?.type === 'deck-container'
+      ? components.filter(c => c.parentId === componentId).map(c => c.id)
+      : undefined;
+    collapseComponent(componentId, childIds);
+  }, [collapseComponent, components]);
 
   // Drag handlers
   const handleDragStart = useCallback((e: React.DragEvent, componentId: string) => {
-    e.stopPropagation(); // Prevent parent containers from capturing the drag
+    e.stopPropagation();
     setDraggedComponentId(componentId);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', componentId);
@@ -312,16 +328,12 @@ export function ComponentList({ context }: InspectorSectionProps) {
     const targetComponent = components.find(c => c.id === targetComponentId);
     if (!targetComponent) return;
     
-    // Check if this is a valid drop target
-    const isSibling = draggedComponent?.parentId === targetComponent.parentId;
+    // Don't allow dropping a container into another container
     const isContainer = targetComponent.type === 'deck-container';
-    const canDropIntoContainer = isContainer && 
-      draggedComponent?.type !== 'deck-container';
+    if (isContainer && draggedComponent?.type === 'deck-container') return;
     
-    if (isSibling || canDropIntoContainer) {
-      e.dataTransfer.dropEffect = 'move';
-      setDropTargetId(targetComponentId);
-    }
+    e.dataTransfer.dropEffect = 'move';
+    setDropTargetId(targetComponentId);
   }, [draggedComponentId, draggedComponent, components]);
 
   const handleDrop = useCallback((e: React.DragEvent, targetComponentId: string) => {
@@ -337,24 +349,22 @@ export function ComponentList({ context }: InspectorSectionProps) {
     const isContainer = targetComponent.type === 'deck-container';
     const canDropIntoContainer = isContainer && draggedComponent?.type !== 'deck-container';
     
-    // Prioritize dropping into containers over sibling reordering
     if (canDropIntoContainer) {
-      // Move into container
       onMoveComponentToContainer?.(slideId, draggedComponentId, targetComponentId);
     } else if (isSibling) {
-      // Reorder among siblings - swap positions in the array
       const draggedIndex = components.findIndex(c => c.id === draggedComponentId);
       const targetIndex = components.findIndex(c => c.id === targetComponentId);
       
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newComponents = [...components];
-        // Remove dragged component and insert at target position
         const [removed] = newComponents.splice(draggedIndex, 1);
         newComponents.splice(targetIndex, 0, removed);
-        
-        // Update via context
         onReorderComponents?.(slideId, newComponents);
       }
+    } else {
+      // Cross-level move: move to target's parent level
+      const newParentId = targetComponent.parentId ?? null;
+      onMoveComponentToContainer?.(slideId, draggedComponentId, newParentId);
     }
     
     setDraggedComponentId(null);
@@ -376,71 +386,76 @@ export function ComponentList({ context }: InspectorSectionProps) {
     return components.filter(c => c.parentId === parentId);
   }, [components]);
 
-  // Recursive render function for components
-  const renderComponentCard = useCallback((component: Component, depth: number = 0) => {
+  // Flat render: returns an array of header+body elements for a component
+  // and recursively for its children (all as flat siblings)
+  const renderComponentFlat = useCallback((component: Component, isChild: boolean, cardStickyIndex: number): React.ReactNode[] => {
     const originalIndex = components.findIndex(c => c.id === component.id);
     const isDragging = draggedComponentId === component.id;
     const isContainer = component.type === 'deck-container';
     const childComponents = isContainer ? getChildComponents(component.id) : [];
-    const siblingCount = depth === 0 
+    const siblingCount = !isChild
       ? topLevelComponents.length 
       : components.filter(c => c.parentId === component.parentId).length;
     
-    // Is this component a valid drop target?
     const isValidDropTarget = isContainer && 
       draggedComponentId !== null && 
       draggedComponentId !== component.id &&
       draggedComponent?.type !== 'deck-container';
-    const isDropTarget = dropTargetId === component.id;
+    const isCurrentDropTarget = dropTargetId === component.id;
 
-    return (
-      <div
+    const elements: React.ReactNode[] = [];
+
+    const refCallback = (el: HTMLDivElement | null) => {
+      if (el) {
+        headerRefs.current.set(component.id, el);
+      } else {
+        headerRefs.current.delete(component.id);
+      }
+    };
+
+    elements.push(
+      <ComponentCard
         key={component.id}
-        ref={(el) => {
-          if (el) {
-            componentRefs.current.set(component.id, el);
-          } else {
-            componentRefs.current.delete(component.id);
-          }
-        }}
-      >
-        <ComponentCard
-          component={component}
-          slideId={slideId}
-          index={originalIndex}
-          totalCount={siblingCount}
-          isExpanded={expandedComponentId === component.id}
-          assets={assets}
-          onToggleExpand={() => toggleExpanded(component.id)}
-          onDelete={() => onDeleteComponent?.(slideId, component.id)}
-          onMoveUp={() => onReorderComponent?.(slideId, component.id, 'up')}
-          onMoveDown={() => onReorderComponent?.(slideId, component.id, 'down')}
-          onMoveToRoot={component.parentId ? () => onMoveComponentToContainer?.(slideId, component.id, null) : undefined}
-          onUpdateProp={(field, value) =>
-            onUpdate({ type: 'component', slideId, componentId: component.id, field, value })
-          }
-          onDragStart={handleDragStart}
-          onDragOver={(e) => handleDragOver(e, component.id)}
-          onDrop={(e) => handleDrop(e, component.id)}
-          onDragEnd={handleDragEnd}
-          isDragOver={isValidDropTarget}
-          isDragging={isDragging}
-          depth={depth}
-          isDropTarget={isDropTarget}
-        >
-          {/* Render children for containers */}
-          {childComponents.length > 0 && (
-            <div className="component-card-children">
-              {childComponents.map(child => renderComponentCard(child, depth + 1))}
-            </div>
-          )}
-        </ComponentCard>
-      </div>
+        component={component}
+        slideId={slideId}
+        index={originalIndex}
+        totalCount={siblingCount}
+        isExpanded={isComponentExpanded(component.id)}
+        assets={assets}
+        onExpand={() => handleExpand(component.id)}
+        onCollapse={() => handleCollapse(component.id)}
+        onDelete={() => onDeleteComponent?.(slideId, component.id)}
+        onMoveUp={() => onReorderComponent?.(slideId, component.id, 'up')}
+        onMoveDown={() => onReorderComponent?.(slideId, component.id, 'down')}
+        onMoveToRoot={component.parentId ? () => onMoveComponentToContainer?.(slideId, component.id, null) : undefined}
+        onUpdateProp={(field, value) =>
+          onUpdate({ type: 'component', slideId, componentId: component.id, field, value })
+        }
+        onDragStart={handleDragStart}
+        onDragOver={(e) => handleDragOver(e, component.id)}
+        onDrop={(e) => handleDrop(e, component.id)}
+        onDragEnd={handleDragEnd}
+        isDragOver={isValidDropTarget}
+        isDragging={isDragging}
+        isChild={isChild}
+        isDropTarget={isCurrentDropTarget}
+        stickyIndex={cardStickyIndex}
+        headerRef={refCallback}
+      />
     );
+
+    // Flatten children into the same level
+    if (childComponents.length > 0) {
+      for (const child of childComponents) {
+        elements.push(...renderComponentFlat(child, true, cardStickyIndex + 1));
+      }
+    }
+
+    return elements;
   }, [
-    components, draggedComponentId, draggedComponent, dropTargetId, slideId, expandedComponentId, assets,
-    toggleExpanded, onDeleteComponent, onReorderComponent, onMoveComponentToContainer, onUpdate,
-    handleDragStart, handleDragOver, handleDrop, handleDragEnd, getChildComponents, topLevelComponents
+    components, draggedComponentId, draggedComponent, dropTargetId, slideId, isComponentExpanded, assets,
+    handleExpand, handleCollapse, onDeleteComponent, onReorderComponent, onMoveComponentToContainer, onUpdate,
+    handleDragStart, handleDragOver, handleDrop, handleDragEnd, getChildComponents, topLevelComponents,
   ]);
 
   // Early returns AFTER all hooks
@@ -448,23 +463,15 @@ export function ComponentList({ context }: InspectorSectionProps) {
 
   if (components.length === 0) {
     return (
-      <div className="inspector-section">
-        <div className="inspector-section-header">Components</div>
-        <div className="inspector-section-content">
-          <div className="component-list-empty">
-            No components yet. Click "Add Component" below to get started.
-          </div>
-        </div>
+      <div className="component-list-empty">
+        No components yet. Click "Add Component" below to get started.
       </div>
     );
   }
 
   return (
-    <div className="inspector-section">
-      <div className="inspector-section-header">Components</div>
-      <div className="inspector-section-content component-list">
-        {topLevelComponents.map((component) => renderComponentCard(component, 0))}
-      </div>
-    </div>
+    <>
+      {topLevelComponents.map((component, i) => renderComponentFlat(component, false, stickyIndex + i))}
+    </>
   );
 }

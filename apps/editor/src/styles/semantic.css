@@ -121,7 +121,7 @@
     /* Text */
     --text-primary: var(--color-gray-50);
     --text-secondary: var(--color-gray-400);
-    --text-tertiary: var(--color-gray-500);
+    --text-tertiary: var(--color-gray-400);
     --text-disabled: var(--color-gray-600);
     --text-inverse: var(--color-white);
     --text-link: var(--color-blue-400);
@@ -130,7 +130,7 @@
     /* Borders */
     --border-default: var(--color-gray-700);
     --border-strong: var(--color-gray-600);
-    --border-subtle: var(--color-gray-800);
+    --border-subtle: var(--color-gray-700);
     --border-focus: var(--color-blue-400);
     --border-input: var(--color-gray-600);
     --border-input-hover: var(--color-gray-500);

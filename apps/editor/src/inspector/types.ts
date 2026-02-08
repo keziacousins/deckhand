@@ -32,6 +32,40 @@ export type InspectorUpdate =
 
 export interface InspectorSectionProps {
   context: InspectorContext;
+  /** Index for sticky header stacking — determines top offset and z-index */
+  stickyIndex?: number;
+}
+
+/**
+ * Scroll a section header to its sticky position within .inspector-content,
+ * maximizing visibility of the body content below.
+ *
+ * Computes the header's natural document position by summing the heights of
+ * all preceding siblings, since sticky positioning and offsetTop can both
+ * report the stuck visual position rather than the layout position.
+ */
+export function scrollHeaderToSticky(header: HTMLElement) {
+  const scrollContainer = header.closest('.inspector-content');
+  if (!scrollContainer) return;
+
+  const stickyTop = parseInt(getComputedStyle(header).getPropertyValue('--sticky-top') || '0', 10);
+
+  // Sum heights of all preceding siblings to find natural position
+  let naturalTop = 0;
+  let sibling = scrollContainer.firstElementChild as HTMLElement | null;
+  while (sibling && sibling !== header) {
+    naturalTop += sibling.offsetHeight;
+    sibling = sibling.nextElementSibling as HTMLElement | null;
+  }
+
+  const desiredScrollTop = naturalTop - stickyTop;
+
+  if (Math.abs(scrollContainer.scrollTop - desiredScrollTop) > 1) {
+    scrollContainer.scrollTo({
+      top: desiredScrollTop,
+      behavior: 'smooth',
+    });
+  }
 }
 
 export interface InspectorSectionConfig {

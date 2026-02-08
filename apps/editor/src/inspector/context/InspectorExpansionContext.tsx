@@ -7,9 +7,12 @@ interface InspectorExpansionContextValue {
   expand: (sectionId: string) => void;
   collapse: (sectionId: string) => void;
   collapseAll: () => void;
-  // For components - track which component card is expanded
-  expandedComponentId: string | null;
-  setExpandedComponentId: (id: string | null) => void;
+  // For components - track which component cards are expanded (supports multiple)
+  expandedComponentIds: Set<string>;
+  isComponentExpanded: (id: string) => boolean;
+  toggleComponentExpanded: (id: string) => void;
+  expandComponent: (id: string) => void;
+  collapseComponent: (id: string, childIds?: string[]) => void;
 }
 
 const InspectorExpansionContext = createContext<InspectorExpansionContextValue | null>(null);
@@ -19,8 +22,8 @@ interface InspectorExpansionProviderProps {
 }
 
 export function InspectorExpansionProvider({ children }: InspectorExpansionProviderProps) {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  const [expandedComponentId, setExpandedComponentId] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['assets-upload', 'assets-library']));
+  const [expandedComponentIds, setExpandedComponentIds] = useState<Set<string>>(new Set());
 
   const isExpanded = useCallback((sectionId: string) => {
     return expandedSections.has(sectionId);
@@ -56,9 +59,49 @@ export function InspectorExpansionProvider({ children }: InspectorExpansionProvi
     });
   }, []);
 
+  const isComponentExpanded = useCallback((id: string) => {
+    return expandedComponentIds.has(id);
+  }, [expandedComponentIds]);
+
+  const toggleComponentExpanded = useCallback((id: string) => {
+    setExpandedComponentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const expandComponent = useCallback((id: string) => {
+    setExpandedComponentIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  // When collapsing a container, also collapse its children to avoid orphaned expanded states
+  const collapseComponent = useCallback((id: string, childIds?: string[]) => {
+    setExpandedComponentIds((prev) => {
+      if (!prev.has(id) && (!childIds || childIds.every(cid => !prev.has(cid)))) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      if (childIds) {
+        for (const childId of childIds) {
+          next.delete(childId);
+        }
+      }
+      return next;
+    });
+  }, []);
+
   const collapseAll = useCallback(() => {
     setExpandedSections(new Set());
-    setExpandedComponentId(null);
+    setExpandedComponentIds(new Set());
   }, []);
 
   const value = useMemo(() => ({
@@ -68,9 +111,12 @@ export function InspectorExpansionProvider({ children }: InspectorExpansionProvi
     expand,
     collapse,
     collapseAll,
-    expandedComponentId,
-    setExpandedComponentId,
-  }), [expandedSections, isExpanded, toggle, expand, collapse, collapseAll, expandedComponentId]);
+    expandedComponentIds,
+    isComponentExpanded,
+    toggleComponentExpanded,
+    expandComponent,
+    collapseComponent,
+  }), [expandedSections, isExpanded, toggle, expand, collapse, collapseAll, expandedComponentIds, isComponentExpanded, toggleComponentExpanded, expandComponent, collapseComponent]);
 
   return (
     <InspectorExpansionContext.Provider value={value}>

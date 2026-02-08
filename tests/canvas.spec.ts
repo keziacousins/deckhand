@@ -102,8 +102,8 @@ test.describe('Canvas', () => {
     
     await page.waitForTimeout(500);
     
-    // Should have component cards in inspector
-    const componentCards = page.locator('.component-card');
-    await expect(componentCards.first()).toBeVisible();
+    // Should have component headers in inspector
+    const componentHeaders = page.locator('.section-header[draggable]');
+    await expect(componentHeaders.first()).toBeVisible();
   });
 });

@@ -3,7 +3,7 @@
  * Run with: npx tsx scripts/cleanup-test-decks.ts
  */
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'http://localhost:3008/api';
 
 async function main() {
   // Get all decks

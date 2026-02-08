@@ -3,7 +3,6 @@ import type { InspectorSectionProps } from '../types';
 import type { Asset } from '@deckhand/schema';
 import './AssetsSection.css';
 
-const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
 // Counter for unique upload IDs when multiple files are uploaded simultaneously
 let uploadCounter = 0;
@@ -33,7 +32,7 @@ export function AssetsSection({ context }: InspectorSectionProps) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${API_BASE}/api/decks/${deckId}/assets`, {
+      const response = await fetch(`/api/decks/${deckId}/assets`, {
         method: 'POST',
         body: formData,
       });
@@ -52,7 +51,7 @@ export function AssetsSection({ context }: InspectorSectionProps) {
           filename: asset.filename,
           mimeType: asset.mimeType,
           size: asset.size,
-          url: `${API_BASE}${asset.url}`,
+          url: asset.url,
           uploaded: new Date().toISOString(),
         } as Asset,
       });
@@ -99,7 +98,7 @@ export function AssetsSection({ context }: InspectorSectionProps) {
     if (!assetToDelete) return;
 
     try {
-      const response = await fetch(`${API_BASE}/api/decks/${deckId}/assets/${assetId}`, {
+      const response = await fetch(`/api/decks/${deckId}/assets/${assetId}`, {
         method: 'DELETE',
       });
 

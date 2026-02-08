@@ -4,7 +4,7 @@
 
 import { Page } from '@playwright/test';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'http://localhost:3008/api';
 
 /**
  * Get the current deck ID from the URL hash

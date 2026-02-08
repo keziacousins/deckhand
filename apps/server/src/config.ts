@@ -60,7 +60,7 @@ export function ensureDeckAssetDir(deckId: string): string {
  * Server configuration from environment variables.
  */
 export const config = {
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || '3008', 10),
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
 };
 

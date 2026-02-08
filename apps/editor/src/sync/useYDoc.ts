@@ -35,9 +35,8 @@ interface UseYDocResult {
   canRedo: boolean;
 }
 
-const WS_BASE = import.meta.env.DEV
-  ? `ws://localhost:3001`
-  : `ws://${window.location.host}`;
+// Use same-origin WebSocket - Vite proxies /ws in dev, same-origin in prod
+const WS_BASE = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 
 // Reconnection settings
 const RECONNECT_BASE_MS = 1000;

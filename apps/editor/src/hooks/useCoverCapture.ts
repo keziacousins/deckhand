@@ -7,7 +7,6 @@ import { useCallback, useRef, useState } from 'react';
 import { toJpeg } from 'html-to-image';
 import { getCoverSlideId, type Deck } from '@deckhand/schema';
 
-const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
 interface UseCoverCaptureOptions {
   deck: Deck | null;
@@ -72,7 +71,7 @@ export function useCoverCapture({ deck, deckId }: UseCoverCaptureOptions): UseCo
       const formData = new FormData();
       formData.append('file', blob, 'cover.jpg');
 
-      const uploadResponse = await fetch(`${API_BASE}/api/decks/${deckId}/cover`, {
+      const uploadResponse = await fetch(`/api/decks/${deckId}/cover`, {
         method: 'POST',
         body: formData,
       });

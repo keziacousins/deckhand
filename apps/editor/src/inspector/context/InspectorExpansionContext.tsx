@@ -13,6 +13,7 @@ interface InspectorExpansionContextValue {
   toggleComponentExpanded: (id: string) => void;
   expandComponent: (id: string) => void;
   collapseComponent: (id: string, childIds?: string[]) => void;
+  resetComponents: () => void;
 }
 
 const InspectorExpansionContext = createContext<InspectorExpansionContextValue | null>(null);
@@ -99,6 +100,10 @@ export function InspectorExpansionProvider({ children }: InspectorExpansionProvi
     });
   }, []);
 
+  const resetComponents = useCallback(() => {
+    setExpandedComponentIds(new Set());
+  }, []);
+
   const collapseAll = useCallback(() => {
     setExpandedSections(new Set());
     setExpandedComponentIds(new Set());
@@ -116,7 +121,8 @@ export function InspectorExpansionProvider({ children }: InspectorExpansionProvi
     toggleComponentExpanded,
     expandComponent,
     collapseComponent,
-  }), [expandedSections, isExpanded, toggle, expand, collapse, collapseAll, expandedComponentIds, isComponentExpanded, toggleComponentExpanded, expandComponent, collapseComponent]);
+    resetComponents,
+  }), [expandedSections, isExpanded, toggle, expand, collapse, collapseAll, expandedComponentIds, isComponentExpanded, toggleComponentExpanded, expandComponent, collapseComponent, resetComponents]);
 
   return (
     <InspectorExpansionContext.Provider value={value}>

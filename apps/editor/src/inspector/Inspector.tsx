@@ -37,6 +37,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
   const { selection, selectComponent, clearSelection } = useSelection();
   const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
   const [showComponentBrowser, setShowComponentBrowser] = useState(false);
+  const [addButtonDropActive, setAddButtonDropActive] = useState(false);
 
   const handleUpdate = useCallback(
     (update: InspectorUpdate) => {
@@ -583,6 +584,48 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
                   <BackgroundSection context={context} stickyIndex={1} />
                   <ColorsSection context={context} stickyIndex={2} />
                   <ComponentList context={context} stickyIndex={3} />
+                  <button
+                    className="inspector-add-component"
+                    data-drop-active={addButtonDropActive || undefined}
+                    onClick={() => setShowComponentBrowser(true)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setAddButtonDropActive(true);
+                    }}
+                    onDragLeave={() => setAddButtonDropActive(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setAddButtonDropActive(false);
+                      const componentId = e.dataTransfer.getData('text/plain');
+                      if (componentId && selection.slideId) {
+                        const sid = selection.slideId;
+                        // Move to root level at end of array
+                        onUpdateDeck((d) => {
+                          const slide = d.slides[sid];
+                          if (!slide) return d;
+                          const comp = slide.components.find(c => c.id === componentId);
+                          if (!comp) return d;
+                          const { parentId, ...rest } = comp;
+                          const others = slide.components.filter(c => c.id !== componentId);
+                          return {
+                            ...d,
+                            slides: { ...d.slides, [sid]: { ...slide, components: [...others, rest as Component] } },
+                          };
+                        });
+                      }
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M8 3v10M3 8h10"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <span>Add Component</span>
+                  </button>
                 </>
               )}
             </>
@@ -616,24 +659,6 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
             <ChatSection context={context} deckId={deckId} />
           )}
         </div>
-
-        {/* Add Component Button - only show on selection tab when slide is selected */}
-        {activeTab === 'selection' && hasSlideSelected && !selectedEdge && !selectedStartPoint && (
-          <button
-            className="inspector-add-component"
-            onClick={() => setShowComponentBrowser(true)}
-          >
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M8 3v10M3 8h10"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span>Add Component</span>
-          </button>
-        )}
 
         {/* Component Browser Modal */}
         {showComponentBrowser && (

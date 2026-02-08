@@ -29,12 +29,11 @@ interface ComponentCardProps {
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   onDragEnd: () => void;
-  isDragOver: boolean;
   isDragging: boolean;
   /** Whether this component is a child of a container */
   isChild?: boolean;
-  /** Whether this is a valid drop target for current drag */
-  isDropTarget?: boolean;
+  /** Visual drop indicator: top border, bottom border, or container highlight */
+  dropIndicator?: 'top' | 'bottom' | 'into' | null;
   /** Index for sticky header stacking */
   stickyIndex?: number;
   /** Ref forwarded to the header element for scroll-into-view */
@@ -58,10 +57,9 @@ function ComponentCard({
   onDragOver,
   onDrop,
   onDragEnd,
-  isDragOver,
   isDragging,
   isChild = false,
-  isDropTarget = false,
+  dropIndicator = null,
   stickyIndex = 0,
   headerRef,
 }: ComponentCardProps) {
@@ -126,7 +124,7 @@ function ComponentCard({
         data-container={isContainer || undefined}
         data-child={isChild || undefined}
         data-dragging={isDragging || undefined}
-        data-drop-target={isDropTarget || undefined}
+        data-drop-indicator={dropIndicator || undefined}
         style={{ '--sticky-top': `${stickyIndex * HEADER_HEIGHT}px`, '--sticky-index': stickyIndex } as React.CSSProperties}
         draggable
         onDragStart={(e) => { didDragRef.current = true; onDragStart(e, component.id); }}
@@ -256,23 +254,24 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
   const { deck, selectedSlide, selection, onUpdate, onDeleteComponent, onReorderComponent, onReorderComponents, onMoveComponentToContainer } = context;
   const assets = deck.assets ?? {};
   const { selectComponent } = useSelection();
-  const { isComponentExpanded, expandComponent, collapseComponent } = useInspectorExpansion();
+  const { isComponentExpanded, expandComponent, collapseComponent, resetComponents } = useInspectorExpansion();
   
   // Drag and drop state - track by component ID
   const [draggedComponentId, setDraggedComponentId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<'top' | 'bottom' | 'into' | null>(null);
   
   // Refs for scrolling to selected component header
   const headerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
   // Track previous selection to detect canvas-driven changes
   const prevSelectionRef = useRef<string | null>(null);
+  const prevSlideIdRef = useRef<string | null>(null);
 
   // Derived values (safe to compute even when no slide selected)
   const slideId = selection.slideId ?? '';
   const components = selectedSlide?.components ?? [];
   
-  // Get the dragged component
   const draggedComponent = draggedComponentId 
     ? components.find(c => c.id === draggedComponentId) 
     : null;
@@ -284,6 +283,17 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
     }, 250);
   }, []);
   
+  // Reset component-level state when switching slides
+  useEffect(() => {
+    if (slideId !== prevSlideIdRef.current) {
+      prevSlideIdRef.current = slideId;
+      resetComponents();
+      setDraggedComponentId(null);
+      setDropTargetId(null);
+      setDropIndicator(null);
+    }
+  }, [slideId, resetComponents]);
+
   // Auto-expand and scroll when a component is selected on the canvas
   useEffect(() => {
     if (!selectedSlide || !selection.slideId) return;
@@ -311,6 +321,23 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
     collapseComponent(componentId, childIds);
   }, [collapseComponent, components]);
 
+  // Safety net: document-level dragend clears stale drag state.
+  // When a drop triggers a reorder, the dragged element may be removed from the DOM
+  // before its onDragEnd fires, leaving draggedComponentId/dropIndicator stale.
+  useEffect(() => {
+    const cleanup = () => {
+      setDraggedComponentId(null);
+      setDropTargetId(null);
+      setDropIndicator(null);
+    };
+    document.addEventListener('dragend', cleanup);
+    document.addEventListener('drop', cleanup);
+    return () => {
+      document.removeEventListener('dragend', cleanup);
+      document.removeEventListener('drop', cleanup);
+    };
+  }, []);
+
   // Drag handlers
   const handleDragStart = useCallback((e: React.DragEvent, componentId: string) => {
     e.stopPropagation();
@@ -328,52 +355,76 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
     const targetComponent = components.find(c => c.id === targetComponentId);
     if (!targetComponent) return;
     
-    // Don't allow dropping a container into another container
     const isContainer = targetComponent.type === 'deck-container';
+    // Don't allow dropping a container into another container
     if (isContainer && draggedComponent?.type === 'deck-container') return;
+    
+    // Detect top/bottom half of header
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const isTopHalf = (e.clientY - rect.top) < rect.height / 2;
+    
+    let indicator: 'top' | 'bottom' | 'into';
+    if (isTopHalf) {
+      indicator = 'top'; // insert before
+    } else if (isContainer && draggedComponent?.type !== 'deck-container') {
+      indicator = 'into'; // drop into container
+    } else {
+      indicator = 'bottom'; // insert after
+    }
     
     e.dataTransfer.dropEffect = 'move';
     setDropTargetId(targetComponentId);
+    setDropIndicator(indicator);
   }, [draggedComponentId, draggedComponent, components]);
 
   const handleDrop = useCallback((e: React.DragEvent, targetComponentId: string) => {
     e.preventDefault();
     e.stopPropagation();
     
-    if (!draggedComponentId || !slideId) return;
+    if (!draggedComponentId || !slideId || !dropIndicator) return;
     
     const targetComponent = components.find(c => c.id === targetComponentId);
     if (!targetComponent) return;
     
-    const isSibling = draggedComponent?.parentId === targetComponent.parentId;
-    const isContainer = targetComponent.type === 'deck-container';
-    const canDropIntoContainer = isContainer && draggedComponent?.type !== 'deck-container';
+    // Capture values and clear state before triggering reorder
+    // (reorder causes re-render; if state lingers, moved component shows stale indicator)
+    const action = dropIndicator;
+    setDraggedComponentId(null);
+    setDropTargetId(null);
+    setDropIndicator(null);
     
-    if (canDropIntoContainer) {
+    if (action === 'into') {
+      // Drop into container
       onMoveComponentToContainer?.(slideId, draggedComponentId, targetComponentId);
-    } else if (isSibling) {
+    } else {
+      // Insert before (top) or after (bottom) the target
       const draggedIndex = components.findIndex(c => c.id === draggedComponentId);
       const targetIndex = components.findIndex(c => c.id === targetComponentId);
       
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newComponents = [...components];
         const [removed] = newComponents.splice(draggedIndex, 1);
-        newComponents.splice(targetIndex, 0, removed);
+        // Strip parentId if moving to a different parent level
+        const targetParentId = targetComponent.parentId ?? null;
+        const draggedParentId = removed.parentId ?? null;
+        const movedComponent = draggedParentId !== targetParentId
+          ? targetParentId === null
+            ? (() => { const { parentId, ...rest } = removed; return rest as Component; })()
+            : { ...removed, parentId: targetParentId }
+          : removed;
+        // Calculate insert position (adjusted for removal)
+        let insertAt = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;
+        if (action === 'bottom') insertAt += 1;
+        newComponents.splice(insertAt, 0, movedComponent);
         onReorderComponents?.(slideId, newComponents);
       }
-    } else {
-      // Cross-level move: move to target's parent level
-      const newParentId = targetComponent.parentId ?? null;
-      onMoveComponentToContainer?.(slideId, draggedComponentId, newParentId);
     }
-    
-    setDraggedComponentId(null);
-    setDropTargetId(null);
-  }, [draggedComponentId, draggedComponent, slideId, components, onMoveComponentToContainer, onReorderComponents]);
+  }, [draggedComponentId, slideId, dropIndicator, components, onMoveComponentToContainer, onReorderComponents]);
 
   const handleDragEnd = useCallback(() => {
     setDraggedComponentId(null);
     setDropTargetId(null);
+    setDropIndicator(null);
   }, []);
 
   // Get top-level components (no parentId)
@@ -397,11 +448,7 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
       ? topLevelComponents.length 
       : components.filter(c => c.parentId === component.parentId).length;
     
-    const isValidDropTarget = isContainer && 
-      draggedComponentId !== null && 
-      draggedComponentId !== component.id &&
-      draggedComponent?.type !== 'deck-container';
-    const isCurrentDropTarget = dropTargetId === component.id;
+    const cardDropIndicator = dropTargetId === component.id ? dropIndicator : null;
 
     const elements: React.ReactNode[] = [];
 
@@ -435,10 +482,9 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
         onDragOver={(e) => handleDragOver(e, component.id)}
         onDrop={(e) => handleDrop(e, component.id)}
         onDragEnd={handleDragEnd}
-        isDragOver={isValidDropTarget}
         isDragging={isDragging}
         isChild={isChild}
-        isDropTarget={isCurrentDropTarget}
+        dropIndicator={cardDropIndicator}
         stickyIndex={cardStickyIndex}
         headerRef={refCallback}
       />
@@ -453,7 +499,7 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
 
     return elements;
   }, [
-    components, draggedComponentId, draggedComponent, dropTargetId, slideId, isComponentExpanded, assets,
+    components, draggedComponentId, dropTargetId, dropIndicator, slideId, isComponentExpanded, assets,
     handleExpand, handleCollapse, onDeleteComponent, onReorderComponent, onMoveComponentToContainer, onUpdate,
     handleDragStart, handleDragOver, handleDrop, handleDragEnd, getChildComponents, topLevelComponents,
   ]);

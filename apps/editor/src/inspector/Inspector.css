@@ -88,7 +88,7 @@
   font-size: var(--font-size-sm);
 }
 
-/* Add Component button — styled like a section header */
+/* Add Component button — styled like a section header, also a drop zone */
 .inspector-add-component {
   display: flex;
   align-items: center;
@@ -112,6 +112,11 @@
 
 .inspector-add-component:active {
   background: var(--bg-surface-active);
+}
+
+.inspector-add-component[data-drop-active] {
+  background: color-mix(in srgb, var(--interactive-primary) 10%, var(--bg-panel));
+  border-top: 2px dashed var(--interactive-primary);
 }
 
 /* Sections */
@@ -225,8 +230,18 @@
   padding-left: var(--space-6);
 }
 
-/* Drop target */
-.section-header[data-drop-target="true"] {
+/* Drop indicator — insert before */
+.section-header[data-drop-indicator="top"] {
+  border-top: 2px solid var(--interactive-primary);
+}
+
+/* Drop indicator — insert after */
+.section-header[data-drop-indicator="bottom"] {
+  border-bottom: 2px solid var(--interactive-primary);
+}
+
+/* Drop indicator — into container */
+.section-header[data-drop-indicator="into"] {
   background: color-mix(in srgb, var(--interactive-primary) 10%, var(--bg-panel));
   border-bottom: 2px dashed var(--interactive-primary);
 }

@@ -25,6 +25,7 @@ import { CanvasHeader } from './CanvasHeader';
 import { useSelection } from '../selection';
 import type { Deck, Slide, StartPoint } from '@deckhand/schema';
 import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS } from '@deckhand/schema';
+import { findClosestTargetHandle } from './handleUtils';
 
 const nodeTypes = {
   slide: SlideNode,
@@ -137,6 +138,8 @@ export function Canvas({
       id: edge.id,
       source: edge.from,
       target: edge.to,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
       type: 'transition',
       data: {
         transition: edge.transition,
@@ -305,16 +308,11 @@ export function Canvas({
         const sourceId = connection.source!;
         const targetId = connection.target!;
         
-        // Check if source is a start point - enforce single outgoing edge
-        const isStartPoint = d.flow.startPoints?.[sourceId] !== undefined;
+        // Enforce single outgoing edge per node (slide or start point)
         let newEdges = { ...d.flow.edges };
-        
-        if (isStartPoint) {
-          // Remove any existing edges from this start point
-          for (const [existingEdgeId, edge] of Object.entries(newEdges)) {
-            if (edge.from === sourceId) {
-              delete newEdges[existingEdgeId];
-            }
+        for (const [existingEdgeId, edge] of Object.entries(newEdges)) {
+          if (edge.from === sourceId) {
+            delete newEdges[existingEdgeId];
           }
         }
         
@@ -324,7 +322,8 @@ export function Canvas({
           from: sourceId,
           to: targetId,
           trigger: 'default',
-          label: undefined,
+          sourceHandle: connection.sourceHandle ?? undefined,
+          targetHandle: connection.targetHandle ?? undefined,
         };
         
         return {
@@ -366,6 +365,8 @@ export function Canvas({
                 ...existingEdge,
                 from: newConnection.source!,
                 to: newConnection.target!,
+                sourceHandle: newConnection.sourceHandle ?? undefined,
+                targetHandle: newConnection.targetHandle ?? undefined,
               },
             },
           },
@@ -405,6 +406,12 @@ export function Canvas({
       }
 
       if (targetNodeId) {
+        // Find closest target handle based on the edge's source handle
+        const sourceHandleId = edge.sourceHandle as string | undefined;
+        const targetHandle = sourceHandleId
+          ? findClosestTargetHandle(targetNodeId, edge.source, sourceHandleId)
+          : null;
+
         // Reconnect edge to dropped node
         onUpdateDeck((d) => {
           const existingEdge = d.flow.edges[edge.id];
@@ -419,6 +426,7 @@ export function Canvas({
                 [edge.id]: {
                   ...existingEdge,
                   to: targetNodeId!,
+                  targetHandle: targetHandle ?? undefined,
                 },
               },
             },
@@ -477,13 +485,16 @@ export function Canvas({
         }
       }
 
-      if (targetNodeId) {
+      if (targetNodeId && startInfo.handleId) {
+        // Find closest target handle based on source handle position
+        const targetHandle = findClosestTargetHandle(targetNodeId, startInfo.nodeId, startInfo.handleId);
+
         // Create connection via drop-on-node
         onConnect({
           source: startInfo.nodeId,
           sourceHandle: startInfo.handleId,
           target: targetNodeId,
-          targetHandle: 'target',
+          targetHandle: targetHandle ?? null,
         });
       }
     },
@@ -821,6 +832,7 @@ export function Canvas({
         onMoveEnd={onMoveEnd}
         onPaneContextMenu={onPaneContextMenu}
         onNodeContextMenu={onNodeContextMenu}
+        connectionMode="loose"
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

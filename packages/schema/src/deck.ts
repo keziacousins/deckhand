@@ -48,6 +48,8 @@ export const EdgeSchema = z.object({
   from: z.string(), // Slide ID or StartPoint ID
   to: z.string(), // Slide ID
   trigger: EdgeTriggerSchema,
+  sourceHandle: z.string().optional(),                // e.g. 'source-right', 'source-bottom'
+  targetHandle: z.string().optional(),                // e.g. 'target-left', 'target-top'
   label: z.string().optional(),
   transition: TransitionTypeSchema.optional(),        // Overrides deck default
   transitionDuration: z.number().min(0).optional(),   // Seconds, overrides deck default

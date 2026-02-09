@@ -46,6 +46,12 @@ interface PropertyEditorProps {
   onChange: (value: unknown) => void;
   /** Assets map for asset picker (required for 'asset' type) */
   assets?: Record<string, Asset>;
+  /** Override placeholder from descriptor */
+  placeholder?: string;
+  /** Show a clear button to reset to default */
+  allowClear?: boolean;
+  /** Called when clear button is clicked */
+  onClear?: () => void;
 }
 
 export function PropertyEditor({
@@ -54,6 +60,9 @@ export function PropertyEditor({
   value,
   onChange,
   assets,
+  placeholder: placeholderOverride,
+  allowClear,
+  onClear,
 }: PropertyEditorProps) {
   const { type, label, placeholder, options, min, max, step, description, compact } = descriptor;
 
@@ -64,8 +73,10 @@ export function PropertyEditor({
           label={label}
           value={(value as string) ?? (descriptor.default as string) ?? ''}
           onChange={onChange}
-          placeholder={placeholder}
+          placeholder={placeholderOverride ?? placeholder}
           compact={compact}
+          allowClear={allowClear}
+          onClear={onClear}
         />
       );
 

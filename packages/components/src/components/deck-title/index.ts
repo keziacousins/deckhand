@@ -21,8 +21,8 @@ export class DeckTitle extends DeckComponent {
       text: {
         type: 'string',
         label: 'Text',
-        required: true,
-        placeholder: 'Enter title...',
+        required: false,
+        placeholder: 'Defaults to slide title',
         group: PropertyGroups.CONTENT,
       },
       level: {
@@ -63,7 +63,7 @@ export class DeckTitle extends DeckComponent {
     },
   };
 
-  static observedAttributes = ['text', 'level', 'align', 'editable', 'grid-width'];
+  static observedAttributes = ['text', 'slide-title', 'level', 'align', 'editable', 'grid-width'];
 
   attributeChangedCallback(): void {
     this.render();
@@ -71,6 +71,8 @@ export class DeckTitle extends DeckComponent {
 
   protected render(): void {
     const text = this.getAttr('text', '');
+    const slideTitle = this.getAttr('slide-title', '');
+    const displayText = text || slideTitle;
     const level = this.getAttr('level', '1');
     const align = this.getAttr('align', 'center');
     const editable = this.getAttrBool('editable');
@@ -86,7 +88,7 @@ export class DeckTitle extends DeckComponent {
         ${styles}
         ${dynamicStyles}
       </style>
-      <h${level} class="title"${editable ? ' contenteditable="true"' : ''}>${this.escapeHtml(text)}</h${level}>
+      <h${level} class="title"${editable ? ' contenteditable="true"' : ''}>${this.escapeHtml(displayText)}</h${level}>
     `;
 
     if (editable) {

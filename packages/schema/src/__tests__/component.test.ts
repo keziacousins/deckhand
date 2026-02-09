@@ -97,10 +97,11 @@ describe('TitleComponentSchema', () => {
     expect(result.props.gridWidth).toBeUndefined();
   });
 
-  it('rejects missing text', () => {
-    expect(() => TitleComponentSchema.parse({
+  it('text is optional (falls back to slide title)', () => {
+    const result = TitleComponentSchema.parse({
       id: 'c1', type: 'deck-title', props: {}
-    })).toThrow();
+    });
+    expect(result.props.text).toBeUndefined();
   });
 });
 
@@ -531,9 +532,9 @@ describe('ComponentSchema (discriminated union)', () => {
   });
 
   it('rejects mismatched props for type', () => {
-    // deck-title requires text prop
+    // deck-list requires items prop
     expect(() => ComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { items: ['a'] }
+      id: 'c1', type: 'deck-list', props: { text: 'hello' }
     })).toThrow();
   });
 });

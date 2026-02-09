@@ -103,8 +103,40 @@ describe('DeckTitle', () => {
 
   it('observes expected attributes', () => {
     expect(DeckTitle.observedAttributes).toContain('text');
+    expect(DeckTitle.observedAttributes).toContain('slide-title');
     expect(DeckTitle.observedAttributes).toContain('level');
     expect(DeckTitle.observedAttributes).toContain('align');
+  });
+
+  it('falls back to slide-title when text is empty', () => {
+    const el = document.createElement('deck-title') as DeckTitle;
+    el.setAttribute('slide-title', 'My Slide');
+    document.body.appendChild(el);
+    
+    const heading = el.shadowRoot?.querySelector('h1');
+    expect(heading?.textContent).toBe('My Slide');
+  });
+
+  it('prefers text over slide-title', () => {
+    const el = document.createElement('deck-title') as DeckTitle;
+    el.setAttribute('text', 'Custom Title');
+    el.setAttribute('slide-title', 'My Slide');
+    document.body.appendChild(el);
+    
+    const heading = el.shadowRoot?.querySelector('h1');
+    expect(heading?.textContent).toBe('Custom Title');
+  });
+
+  it('updates to slide-title when text is removed', () => {
+    const el = document.createElement('deck-title') as DeckTitle;
+    el.setAttribute('text', 'Custom Title');
+    el.setAttribute('slide-title', 'My Slide');
+    document.body.appendChild(el);
+    
+    expect(el.shadowRoot?.querySelector('h1')?.textContent).toBe('Custom Title');
+    
+    el.removeAttribute('text');
+    expect(el.shadowRoot?.querySelector('h1')?.textContent).toBe('My Slide');
   });
 
   it('contains base styles', () => {

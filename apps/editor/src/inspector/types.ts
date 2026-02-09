@@ -67,10 +67,3 @@ export function scrollHeaderToSticky(header: HTMLElement) {
     });
   }
 }
-
-export interface InspectorSectionConfig {
-  id: string;
-  label: string;
-  isVisible: (context: InspectorContext) => boolean;
-  component: React.ComponentType<InspectorSectionProps>;
-}

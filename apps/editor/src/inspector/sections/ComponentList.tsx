@@ -11,6 +11,25 @@ import { useInspectorExpansion } from '../context/InspectorExpansionContext';
 
 const HEADER_HEIGHT = 41; /* 8px padding + 24px content + 8px padding + 1px border */
 
+/** Get summary text shown in the collapsed header for a component */
+function getSummaryMeta(component: Component, slideTitle?: string): string | null {
+  const props = component.props as Record<string, unknown>;
+
+  switch (component.type) {
+    case 'deck-title':
+      return (props.text as string) || null;
+    case 'deck-container': {
+      const gw = props.gridWidth as number | undefined;
+      return gw ? `${gw} col` : null;
+    }
+    default: {
+      // Show gridWidth for any component that has one
+      const gw = props.gridWidth as number | undefined;
+      return gw && gw > 0 ? `${gw} col` : null;
+    }
+  }
+}
+
 interface ComponentCardProps {
   component: Component;
   slideId: string;
@@ -38,6 +57,8 @@ interface ComponentCardProps {
   stickyIndex?: number;
   /** Ref forwarded to the header element for scroll-into-view */
   headerRef?: React.Ref<HTMLDivElement>;
+  /** Slide title, used as fallback text for deck-title components */
+  slideTitle?: string;
 }
 
 function ComponentCard({
@@ -62,6 +83,7 @@ function ComponentCard({
   dropIndicator = null,
   stickyIndex = 0,
   headerRef,
+  slideTitle,
 }: ComponentCardProps) {
   const meta = registry.getMeta(component.type);
   const componentName = meta?.name ?? component.type;
@@ -164,9 +186,10 @@ function ComponentCard({
 
         <div className="section-header-title">
           <span className="section-header-name">{componentName}</span>
-          {gridWidth !== undefined && gridWidth > 0 && (
-            <span className="section-header-meta">{gridWidth} col</span>
-          )}
+          {!isExpanded && (() => {
+            const meta = getSummaryMeta(component, slideTitle);
+            return meta ? <span className="section-header-meta">{meta}</span> : null;
+          })()}
         </div>
 
         <div className="section-header-actions">
@@ -229,16 +252,25 @@ function ComponentCard({
                     {orderedGroups.length > 1 && name !== PropertyGroups.CONTENT && properties.length > 1 && (
                       <div className="component-group-label">{name}</div>
                     )}
-                    {properties.map(([key, descriptor]) => (
-                      <PropertyEditor
-                        key={key}
-                        name={key}
-                        descriptor={descriptor}
-                        value={(component.props as Record<string, unknown>)[key]}
-                        onChange={(value) => onUpdateProp(key, value)}
-                        assets={assets}
-                      />
-                    ))}
+                    {properties.map(([key, descriptor]) => {
+                      const isTitleText = component.type === 'deck-title' && key === 'text';
+                      const currentValue = (component.props as Record<string, unknown>)[key];
+                      return (
+                        <PropertyEditor
+                          key={key}
+                          name={key}
+                          descriptor={descriptor}
+                          value={currentValue}
+                          onChange={(value) => onUpdateProp(key, value)}
+                          assets={assets}
+                          {...(isTitleText && slideTitle ? {
+                            placeholder: slideTitle,
+                            allowClear: !!currentValue,
+                            onClear: () => onUpdateProp('text', undefined),
+                          } : {})}
+                        />
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -487,6 +519,7 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
         dropIndicator={cardDropIndicator}
         stickyIndex={cardStickyIndex}
         headerRef={refCallback}
+        slideTitle={selectedSlide?.title}
       />
     );
 

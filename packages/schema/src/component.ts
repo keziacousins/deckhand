@@ -22,7 +22,7 @@ const BaseComponentSchema = z.object({
 export const TitleComponentSchema = BaseComponentSchema.extend({
   type: z.literal('deck-title'),
   props: GridPropsSchema.extend({
-    text: z.string(),
+    text: z.string().optional(), // Falls back to slide title when empty/absent
     level: z.enum(['1', '2', '3']).optional(),
     align: z.enum(['left', 'center', 'right']).optional(),
   }),

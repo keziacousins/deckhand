@@ -107,6 +107,8 @@ function isFloatingComponent(type: string): boolean {
 interface RenderComponentOptions extends RenderOptions {
   /** All components in the slide, needed for rendering container children */
   allComponents?: Component[];
+  /** Slide title, passed to deck-title components as fallback text */
+  slideTitle?: string;
 }
 
 /**
@@ -125,6 +127,11 @@ export function renderComponent(
   
   // Even without meta, try to render - allows for components not yet in registry
   const attrs = propsToAttributes(component, meta, options);
+
+  // Pass slide title to deck-title components as fallback text
+  if (component.type === 'deck-title' && options.slideTitle) {
+    attrs['slide-title'] = options.slideTitle;
+  }
 
   // Floating components go in the "floating" slot (outside content padding)
   if (isFloatingComponent(component.type)) {

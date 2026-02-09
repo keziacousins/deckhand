@@ -421,70 +421,7 @@
   color: var(--text-tertiary);
 }
 
-/* Component Browser Overlay */
-.component-browser-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
-}
-
-.component-browser {
-  width: 400px;
-  max-height: 80vh;
-  background: var(--bg-panel);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.component-browser-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.component-browser-title {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
-
-.component-browser-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.component-browser-close:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
-
-.component-browser-content {
-  padding: var(--space-3) var(--space-4);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
+/* Component Browser Content */
 .component-browser-category {
   display: flex;
   flex-direction: column;

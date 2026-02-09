@@ -1,4 +1,5 @@
 import type { Deck } from '@deckhand/schema';
+import { Modal } from './Modal';
 import './StartPresentationModal.css';
 
 interface StartPresentationModalProps {
@@ -29,65 +30,46 @@ export function StartPresentationModal({
     return edge?.to;
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose();
-    }
-  };
+  const footer = (
+    <button className="start-modal-cancel" onClick={onClose}>
+      Cancel
+    </button>
+  );
 
   return (
-    <div className="start-modal-overlay" onClick={onClose} onKeyDown={handleKeyDown}>
-      <div className="start-modal" onClick={e => e.stopPropagation()}>
-        <div className="start-modal-header">
-          <h2 className="start-modal-title">Start Presentation</h2>
-          <button className="start-modal-close" onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-        
-        <div className="start-modal-content">
-          <div className="start-modal-section">
+    <Modal title="Start Presentation" onClose={onClose} width="360px" footer={footer}>
+      <div className="start-modal-section">
+        <button 
+          className="start-modal-row"
+          onClick={() => onStart(currentSlideId || undefined)}
+        >
+          <PlayIcon />
+          <span className="start-modal-row-text">
+            <span className="start-modal-row-label">Current slide</span>
+            {hasCurrentSlide && (
+              <span className="start-modal-row-desc">{deck.slides[currentSlideId].title}</span>
+            )}
+          </span>
+        </button>
+      </div>
+      
+      {startPoints.length > 0 && (
+        <div className="start-modal-section">
+          <div className="start-modal-section-label">Start Points</div>
+          {startPoints.map(sp => (
             <button 
+              key={sp.id} 
               className="start-modal-row"
-              onClick={() => onStart(currentSlideId || undefined)}
+              onClick={() => onStart(getStartPointTargetSlide(sp.id))}
             >
               <PlayIcon />
               <span className="start-modal-row-text">
-                <span className="start-modal-row-label">Current slide</span>
-                {hasCurrentSlide && (
-                  <span className="start-modal-row-desc">{deck.slides[currentSlideId].title}</span>
-                )}
+                <span className="start-modal-row-label">{sp.name}</span>
               </span>
             </button>
-          </div>
-          
-          {startPoints.length > 0 && (
-            <div className="start-modal-section">
-              <div className="start-modal-section-label">Start Points</div>
-              {startPoints.map(sp => (
-                <button 
-                  key={sp.id} 
-                  className="start-modal-row"
-                  onClick={() => onStart(getStartPointTargetSlide(sp.id))}
-                >
-                  <PlayIcon />
-                  <span className="start-modal-row-text">
-                    <span className="start-modal-row-label">{sp.name}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
-        
-        <div className="start-modal-footer">
-          <button className="start-modal-cancel" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

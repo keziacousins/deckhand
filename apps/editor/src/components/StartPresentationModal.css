@@ -1,68 +1,4 @@
-/* Start Presentation Modal */
-.start-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
-  backdrop-filter: blur(4px);
-}
-
-.start-modal {
-  width: 360px;
-  max-height: 80vh;
-  background: var(--bg-panel);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.start-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.start-modal-title {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
-
-.start-modal-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.start-modal-close:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
-
-.start-modal-content {
-  padding: var(--space-4);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
+/* Start Presentation Modal - content styles */
 .start-modal-section {
   display: flex;
   flex-direction: column;
@@ -118,13 +54,6 @@
 .start-modal-row-desc {
   font-size: var(--font-size-xs);
   color: var(--text-tertiary);
-}
-
-.start-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border-subtle);
 }
 
 .start-modal-cancel {

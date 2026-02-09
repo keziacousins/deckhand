@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { registry } from '@deckhand/components';
 import type { ComponentMeta, ComponentCategory } from '@deckhand/components';
+import { Modal } from '../../components/Modal';
 
 const categoryLabels: Record<ComponentCategory, string> = {
   content: 'Content',
@@ -44,44 +45,27 @@ export function ComponentBrowser({ onSelect, onClose }: ComponentBrowserProps) {
   const visibleCategories = categoryOrder.filter((cat) => grouped[cat].length > 0);
 
   return (
-    <div className="component-browser-overlay" onClick={onClose}>
-      <div className="component-browser" onClick={(e) => e.stopPropagation()}>
-        <div className="component-browser-header">
-          <div className="component-browser-title">Add Component</div>
-          <button className="component-browser-close" onClick={onClose}>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M4 4l8 8M12 4l-8 8"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+    <Modal title="Add Component" onClose={onClose}>
+      {visibleCategories.map((category) => (
+        <div key={category} className="component-browser-category">
+          <div className="component-browser-category-label">{categoryLabels[category]}</div>
+          <div className="component-browser-list">
+            {grouped[category].map((meta) => (
+              <button
+                key={meta.type}
+                className="component-browser-item"
+                onClick={() => onSelect(meta.type)}
+                title={meta.description}
+              >
+                <span className="component-browser-item-name">{meta.name}</span>
+                {meta.description && (
+                  <span className="component-browser-item-desc">{meta.description}</span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="component-browser-content">
-          {visibleCategories.map((category) => (
-            <div key={category} className="component-browser-category">
-              <div className="component-browser-category-label">{categoryLabels[category]}</div>
-              <div className="component-browser-list">
-                {grouped[category].map((meta) => (
-                  <button
-                    key={meta.type}
-                    className="component-browser-item"
-                    onClick={() => onSelect(meta.type)}
-                    title={meta.description}
-                  >
-                    <span className="component-browser-item-name">{meta.name}</span>
-                    {meta.description && (
-                      <span className="component-browser-item-desc">{meta.description}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+      ))}
+    </Modal>
   );
 }

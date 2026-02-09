@@ -20,7 +20,7 @@
 .inspector-field-select {
   height: 32px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--border-input);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--bg-input);
   font-size: var(--font-size-sm);
@@ -30,7 +30,7 @@
 
 .inspector-field-input:hover,
 .inspector-field-select:hover {
-  border-color: var(--border-input-hover);
+  border-color: var(--border-input);
 }
 
 .inspector-field-input:focus,
@@ -96,13 +96,17 @@
   appearance: none;
   width: 16px;
   height: 16px;
-  border: 1px solid var(--border-default);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
   transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.inspector-checkbox-input:hover {
+  border-color: var(--border-default);
 }
 
 .inspector-checkbox-input:checked {
@@ -139,10 +143,15 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--border-input);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
   background: none;
+  transition: border-color 0.15s ease;
+}
+
+.inspector-color-input:hover {
+  border-color: var(--border-input);
 }
 
 .inspector-color-input::-webkit-color-swatch-wrapper {
@@ -163,7 +172,7 @@
   display: flex;
   align-items: center;
   height: 32px;
-  border: 1px solid var(--border-input);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--bg-input);
   overflow: hidden;
@@ -171,7 +180,7 @@
 }
 
 .text-field-wrapper:hover {
-  border-color: var(--border-input-hover);
+  border-color: var(--border-input);
 }
 
 .text-field-wrapper:focus-within {

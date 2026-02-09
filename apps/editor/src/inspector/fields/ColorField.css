@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   height: 32px;
-  border: 1px solid var(--border-input);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: var(--bg-input);
   overflow: hidden;
@@ -10,7 +10,7 @@
 }
 
 .color-field-inputs:hover {
-  border-color: var(--border-input-hover);
+  border-color: var(--border-input);
 }
 
 .color-field-inputs:focus-within {
@@ -24,7 +24,7 @@
   min-width: 32px;
   padding: 0;
   border: none;
-  border-right: 1px solid var(--border-input);
+  border-right: 1px solid var(--border-subtle);
   cursor: pointer;
   background: none;
 }

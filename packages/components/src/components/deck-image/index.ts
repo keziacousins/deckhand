@@ -16,7 +16,7 @@ export class DeckImage extends DeckComponent {
     type: 'deck-image',
     name: 'Image',
     description: 'Display an image with optional caption',
-    category: 'media',
+    category: 'content',
     icon: 'image',
     properties: {
       assetId: {
@@ -109,21 +109,11 @@ export class DeckImage extends DeckComponent {
         group: PropertyGroups.STYLE,
         compact: true,
       },
-      borderRadius: {
-        type: 'enum',
-        label: 'Radius',
-        options: [
-          { value: 'default', label: 'Theme' },
-          { value: 'none', label: 'None' },
-          { value: 'sm', label: 'Small' },
-          { value: 'md', label: 'Medium' },
-          { value: 'lg', label: 'Large' },
-          { value: 'full', label: 'Circle' },
-        ],
-        default: 'default',
-        group: PropertyGroups.STYLE,
-        compact: true,
-      },
+      borderRadius: CommonProperties.borderRadius(),
+      borderWidth: CommonProperties.borderWidth(),
+      borderColor: CommonProperties.borderColor(),
+      shadow: CommonProperties.shadow(),
+      shadowColor: CommonProperties.shadowColor(),
       gridWidth: {
         ...CommonProperties.gridWidth(),
         compact: true,
@@ -138,7 +128,7 @@ export class DeckImage extends DeckComponent {
     },
   };
 
-  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-width', 'max-height', 'align', 'color', 'border-radius', 'grid-width'];
+  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-width', 'max-height', 'align', 'color', 'border-radius', 'border-width', 'border-color', 'shadow', 'shadow-color', 'grid-width'];
 
   attributeChangedCallback(): void {
     this.render();
@@ -156,7 +146,11 @@ export class DeckImage extends DeckComponent {
     const maxHeight = this.getAttrNumber('max-height', 0);
     const align = this.getAttr('align', 'left') as 'left' | 'center' | 'right';
     const color = this.getAttr('color');
-    const borderRadius = this.getAttr('border-radius', 'default') as 'default' | 'none' | 'sm' | 'md' | 'lg' | 'full';
+    const borderRadius = this.getAttr('border-radius', 'none') as 'none' | 'sm' | 'md' | 'lg' | 'full';
+    const borderWidth = this.getAttrNumber('border-width', 0);
+    const borderColor = this.getAttr('border-color');
+    const shadow = this.getAttr('shadow', 'none') as 'none' | 'sm' | 'md' | 'lg';
+    const shadowColor = this.getAttr('shadow-color');
 
     // Use shared image renderer
     const url = resolveAssetUrl(assetId, assetsJson);
@@ -172,6 +166,10 @@ export class DeckImage extends DeckComponent {
       align,
       color: color || undefined,
       borderRadius,
+      borderWidth,
+      borderColor: borderColor || undefined,
+      shadow,
+      shadowColor: shadowColor || undefined,
     });
 
     this.shadow.innerHTML = `

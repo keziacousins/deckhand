@@ -8,6 +8,7 @@
 import { DeckComponent } from '../../base';
 import type { ComponentMeta } from '../../types';
 import { PropertyGroups, CommonProperties } from '../../types';
+import { borderRadiusToCss, shadowToCss } from '../../utils/image-renderer';
 import { styles } from './styles';
 
 export class DeckContainer extends DeckComponent {
@@ -55,25 +56,11 @@ export class DeckContainer extends DeckComponent {
         group: PropertyGroups.STYLE,
         compact: true,
       },
-      borderRadius: {
-        type: 'enum',
-        label: 'Radius',
-        options: [
-          { value: 'none', label: 'None' },
-          { value: 'sm', label: 'Small' },
-          { value: 'md', label: 'Medium' },
-          { value: 'lg', label: 'Large' },
-        ],
-        default: 'none',
-        group: PropertyGroups.STYLE,
-        compact: true,
-      },
-      border: {
-        type: 'string',
-        label: 'Border',
-        placeholder: 'e.g., 1px solid #ccc',
-        group: PropertyGroups.STYLE,
-      },
+      borderRadius: CommonProperties.borderRadius(),
+      borderWidth: CommonProperties.borderWidth(),
+      borderColor: CommonProperties.borderColor(),
+      shadow: CommonProperties.shadow(),
+      shadowColor: CommonProperties.shadowColor(),
       alignItems: {
         type: 'enum',
         label: 'Align Items',
@@ -98,6 +85,67 @@ export class DeckContainer extends DeckComponent {
         ],
         group: PropertyGroups.LAYOUT,
       },
+      // Floating mode properties
+      anchorX: {
+        type: 'enum',
+        label: 'Anchor X',
+        options: [
+          { value: '', label: 'None (grid)' },
+          { value: 'left', label: 'Left' },
+          { value: 'right', label: 'Right' },
+        ],
+        group: PropertyGroups.ADVANCED,
+        compact: true,
+      },
+      anchorY: {
+        type: 'enum',
+        label: 'Anchor Y',
+        options: [
+          { value: '', label: 'None (grid)' },
+          { value: 'top', label: 'Top' },
+          { value: 'bottom', label: 'Bottom' },
+        ],
+        group: PropertyGroups.ADVANCED,
+        compact: true,
+      },
+      x: {
+        type: 'string',
+        label: 'X Offset',
+        placeholder: '0',
+        group: PropertyGroups.ADVANCED,
+        compact: true,
+      },
+      y: {
+        type: 'string',
+        label: 'Y Offset',
+        placeholder: '0',
+        group: PropertyGroups.ADVANCED,
+        compact: true,
+      },
+      width: {
+        type: 'string',
+        label: 'Width',
+        placeholder: 'auto',
+        group: PropertyGroups.ADVANCED,
+        compact: true,
+      },
+      height: {
+        type: 'string',
+        label: 'Height',
+        placeholder: 'auto',
+        group: PropertyGroups.ADVANCED,
+        compact: true,
+      },
+      opacity: {
+        type: 'number',
+        label: 'Opacity',
+        min: 0,
+        max: 100,
+        step: 5,
+        default: 100,
+        group: PropertyGroups.ADVANCED,
+        compact: true,
+      },
     },
     preview: {
       sampleProps: {
@@ -112,13 +160,36 @@ export class DeckContainer extends DeckComponent {
     'padding',
     'gap',
     'border-radius',
-    'border',
+    'border-width',
+    'border-color',
+    'shadow',
+    'shadow-color',
     'align-items',
     'justify-content',
+    // Floating mode
+    'anchor-x',
+    'anchor-y',
+    'x',
+    'y',
+    'width',
+    'height',
+    'opacity',
   ];
 
   attributeChangedCallback(): void {
     this.render();
+  }
+
+  /**
+   * Parse a dimension value — supports plain numbers ("20" → "20px"),
+   * pixel values ("20px"), percentages ("5%"), or empty/auto → null.
+   */
+  private parseDimension(value: string | null): string | null {
+    if (!value || value.trim() === '' || value === 'auto') return null;
+    const trimmed = value.trim();
+    if (trimmed.endsWith('px') || trimmed.endsWith('%')) return trimmed;
+    const num = parseFloat(trimmed);
+    return !isNaN(num) ? `${num}px` : null;
   }
 
   protected render(): void {
@@ -127,21 +198,54 @@ export class DeckContainer extends DeckComponent {
     const padding = this.getAttr('padding', '');
     const gap = this.getAttr('gap', '');
     const borderRadius = this.getAttr('border-radius', '');
-    const border = this.getAttr('border', '');
+    const borderWidth = this.getAttrNumber('border-width', 0);
+    const borderColor = this.getAttr('border-color', '');
+    const shadow = this.getAttr('shadow', '');
+    const shadowColor = this.getAttr('shadow-color', '');
     const alignItems = this.getAttr('align-items', '');
     const justifyContent = this.getAttr('justify-content', '');
 
-    // Build dynamic styles - all styles applied inline to avoid attribute loops
+    // Floating mode props
+    const anchorX = this.getAttr('anchor-x', '');
+    const anchorY = this.getAttr('anchor-y', '');
+    const isFloating = !!(anchorX || anchorY);
+
+    // Build dynamic styles
     const dynamicStyles: string[] = [];
     
-    // Grid columns based on gridWidth
+    if (isFloating) {
+      // Floating mode — absolute positioning
+      dynamicStyles.push('position: absolute;');
+      
+      const x = this.parseDimension(this.getAttr('x', '0')) || '0px';
+      const y = this.parseDimension(this.getAttr('y', '0')) || '0px';
+      const width = this.parseDimension(this.getAttr('width'));
+      const height = this.parseDimension(this.getAttr('height'));
+      const opacity = this.getAttrNumber('opacity', 100);
+
+      const xProp = anchorX === 'right' ? 'right' : 'left';
+      const yProp = anchorY === 'bottom' ? 'bottom' : 'top';
+
+      dynamicStyles.push(`${xProp}: ${x};`);
+      dynamicStyles.push(`${yProp}: ${y};`);
+      if (width) dynamicStyles.push(`width: ${width};`);
+      if (height) dynamicStyles.push(`height: ${height};`);
+      if (opacity < 100) dynamicStyles.push(`opacity: ${opacity / 100};`);
+    }
+
+    // Grid columns based on gridWidth (useful in both modes for child layout)
     dynamicStyles.push(`grid-template-columns: repeat(${gridWidth}, 1fr);`);
     
     if (background) {
       dynamicStyles.push(`background: ${background};`);
     }
-    if (border) {
-      dynamicStyles.push(`border: ${border};`);
+    if (borderWidth > 0) {
+      dynamicStyles.push(`border: ${borderWidth}px solid ${borderColor || '#000'};`);
+    }
+    // Box shadow
+    const boxShadow = shadowToCss(shadow || undefined, shadowColor || undefined);
+    if (boxShadow !== 'none') {
+      dynamicStyles.push(`box-shadow: ${boxShadow};`);
     }
     if (alignItems) {
       dynamicStyles.push(`align-items: ${alignItems};`);
@@ -172,15 +276,10 @@ export class DeckContainer extends DeckComponent {
       dynamicStyles.push(`gap: ${gapValues[gap]};`);
     }
     
-    // Border radius values
-    const radiusValues: Record<string, string> = {
-      'none': '0',
-      'sm': '0.25rem',
-      'md': '0.5rem',
-      'lg': '1rem',
-    };
-    if (borderRadius && radiusValues[borderRadius]) {
-      dynamicStyles.push(`border-radius: ${radiusValues[borderRadius]};`);
+    // Border radius (shared helper with theme tokens)
+    if (borderRadius && borderRadius !== 'none') {
+      dynamicStyles.push(`border-radius: ${borderRadiusToCss(borderRadius)};`);
+      dynamicStyles.push('overflow: hidden;');
     }
 
     this.shadow.innerHTML = `

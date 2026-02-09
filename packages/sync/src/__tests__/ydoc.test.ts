@@ -86,7 +86,7 @@ describe('toYValue', () => {
           id: 'slide-1',
           title: 'Test',
           components: [
-            { id: 'comp-1', type: 'deck-title', props: { text: 'Hello' } },
+            { id: 'comp-1', type: 'deck-text', props: { content: 'Hello' } },
           ],
         },
       },
@@ -348,7 +348,7 @@ describe('yDocToDeck', () => {
     
     expect(extractedDeck.slides[slideId]).toBeDefined();
     expect(extractedDeck.slides[slideId].components.length).toBe(1);
-    expect(extractedDeck.slides[slideId].components[0].type).toBe('deck-title');
+    expect(extractedDeck.slides[slideId].components[0].type).toBe('deck-text');
   });
 
   it('extracts theme tokens', () => {
@@ -409,8 +409,8 @@ describe('deckToYDoc/yDocToDeck round-trip', () => {
     
     // Add more components
     deck.slides[slideId].components.push(
-      { id: 'comp-2', type: 'deck-title', props: { text: 'Second', gridWidth: 4 } },
-      { id: 'comp-3', type: 'deck-headline-subhead', props: { headline: 'Headline', subheading: 'Sub' } }
+      { id: 'comp-2', type: 'deck-text', props: { content: 'Second', gridWidth: 4 } },
+      { id: 'comp-3', type: 'deck-text', props: { content: 'Headline\n\nSub' } }
     );
     
     // Add another slide
@@ -418,7 +418,7 @@ describe('deckToYDoc/yDocToDeck round-trip', () => {
       id: 'slide-2',
       title: 'Second Slide',
       components: [
-        { id: 'comp-4', type: 'deck-title', props: { text: 'Slide 2' } },
+        { id: 'comp-4', type: 'deck-text', props: { content: 'Slide 2' } },
       ],
       position: { x: 900, y: 0 },
     };
@@ -491,8 +491,8 @@ describe('Y.Doc collaborative editing simulation', () => {
       
       components.push([toYValue({
         id: 'new-comp',
-        type: 'deck-title',
-        props: { text: 'New Component' },
+        type: 'deck-text',
+        props: { content: 'New Component' },
       })]);
     });
     

@@ -97,18 +97,17 @@ function propsToAttributes(
 }
 
 /**
- * Check if a component type is a "floating" component that should be
- * rendered in the floating slot (outside content padding)
+ * Check if a component is a floating container (has anchorX or anchorY set)
  */
-function isFloatingComponent(type: string): boolean {
-  return type.includes('-floating-');
+function isFloatingComponent(component: Component): boolean {
+  if (component.type !== 'deck-container') return false;
+  const props = component.props as Record<string, unknown>;
+  return !!(props.anchorX || props.anchorY);
 }
 
 interface RenderComponentOptions extends RenderOptions {
   /** All components in the slide, needed for rendering container children */
   allComponents?: Component[];
-  /** Slide title, passed to deck-title components as fallback text */
-  slideTitle?: string;
 }
 
 /**
@@ -128,13 +127,8 @@ export function renderComponent(
   // Even without meta, try to render - allows for components not yet in registry
   const attrs = propsToAttributes(component, meta, options);
 
-  // Pass slide title to deck-title components as fallback text
-  if (component.type === 'deck-title' && options.slideTitle) {
-    attrs['slide-title'] = options.slideTitle;
-  }
-
-  // Floating components go in the "floating" slot (outside content padding)
-  if (isFloatingComponent(component.type)) {
+  // Floating containers go in the "floating" slot (outside content padding)
+  if (isFloatingComponent(component)) {
     attrs['slot'] = 'floating';
   }
 

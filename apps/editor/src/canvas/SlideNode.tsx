@@ -99,7 +99,7 @@ function BackdropSlideRenderer({
         background-transparent={useTransparentBg ? 'true' : undefined}
       >
         {getTopLevelComponents(slide.components).map((c) => 
-          renderComponent(c, { editorMode: false, assets, allComponents: slide.components, slideTitle: slide.title })
+          renderComponent(c, { editorMode: false, assets, allComponents: slide.components })
         )}
       </deck-slide>
     </div>
@@ -224,7 +224,6 @@ export const SlideNode = memo(function SlideNode({
               selectedComponentId: selectedComponentId ?? undefined,
               assets,
               allComponents: slide.components,
-              slideTitle: slide.title,
             })
           )}
         </deck-slide>

@@ -213,8 +213,8 @@ describe('applyPatchesToYDoc', () => {
       
       const newComponent = {
         id: 'comp-new',
-        type: 'deck-title',
-        props: { text: 'New Component' },
+        type: 'deck-text',
+        props: { content: 'New Component' },
       };
       
       const patches: Patch[] = [
@@ -259,8 +259,8 @@ describe('applyPatchesToYDoc', () => {
       
       const updatedComponent = {
         id: compId,
-        type: 'deck-title',
-        props: { text: 'Updated Text', level: '2' },
+        type: 'deck-text',
+        props: { content: 'Updated Text', size: 'lg' },
       };
       
       const patches: Patch[] = [
@@ -275,8 +275,8 @@ describe('applyPatchesToYDoc', () => {
       
       const extracted = yDocToDeck(ydoc);
       const comp = extracted.slides[slideId].components[0];
-      if (comp.type === 'deck-title') {
-        expect(comp.props.text).toBe('Updated Text');
+      if (comp.type === 'deck-text') {
+        expect(comp.props.content).toBe('Updated Text');
       }
     });
   });
@@ -288,9 +288,9 @@ describe('applyPatchesToYDoc', () => {
       
       // Add more components
       deck.slides[slideId].components = [
-        { id: 'comp-1', type: 'deck-title', props: { text: 'First' } },
-        { id: 'comp-2', type: 'deck-title', props: { text: 'Second' } },
-        { id: 'comp-3', type: 'deck-title', props: { text: 'Third' } },
+        { id: 'comp-1', type: 'deck-text', props: { content: 'First' } },
+        { id: 'comp-2', type: 'deck-text', props: { content: 'Second' } },
+        { id: 'comp-3', type: 'deck-text', props: { content: 'Third' } },
       ];
       
       const ydoc = deckToYDoc(deck);
@@ -336,7 +336,7 @@ describe('diff and apply integration', () => {
     const slideId = Object.keys(prev.slides)[0];
     
     const next = JSON.parse(JSON.stringify(prev));
-    next.slides[slideId].components[0].props.text = 'Changed Title';
+    next.slides[slideId].components[0].props.content = 'Changed Title';
     next.slides[slideId].components[0].props.gridWidth = 6;
     
     const patches = diffDeck(prev, next);
@@ -346,8 +346,8 @@ describe('diff and apply integration', () => {
     
     const result = yDocToDeck(ydoc);
     const comp = result.slides[slideId].components[0];
-    if (comp.type === 'deck-title') {
-      expect(comp.props.text).toBe('Changed Title');
+    if (comp.type === 'deck-text') {
+      expect(comp.props.content).toBe('Changed Title');
       expect(comp.props.gridWidth).toBe(6);
     }
   });
@@ -384,8 +384,8 @@ describe('diff and apply integration', () => {
     next.slides[slideId].components = [];
     // Add new components
     next.slides[slideId].components.push(
-      { id: 'new-1', type: 'deck-title', props: { text: 'New 1' } },
-      { id: 'new-2', type: 'deck-title', props: { text: 'New 2' } }
+      { id: 'new-1', type: 'deck-text', props: { content: 'New 1' } },
+      { id: 'new-2', type: 'deck-text', props: { content: 'New 2' } }
     );
     
     const patches = diffDeck(prev, next);

@@ -18,22 +18,14 @@ export { registry, registerComponent } from './registry';
 
 // Components (each in its own directory)
 export { DeckSlide } from './components/deck-slide';
-export { DeckTitle } from './components/deck-title';
-export { DeckHeadlineSubhead } from './components/deck-headline-subhead';
 export { DeckText } from './components/deck-text';
-export { DeckList } from './components/deck-list';
 export { DeckImage } from './components/deck-image';
-export { DeckFloatingImage } from './components/deck-floating-image';
 export { DeckContainer } from './components/deck-container';
 
 // Import components for registration
 import { DeckSlide } from './components/deck-slide';
-import { DeckTitle } from './components/deck-title';
-import { DeckHeadlineSubhead } from './components/deck-headline-subhead';
 import { DeckText } from './components/deck-text';
-import { DeckList } from './components/deck-list';
 import { DeckImage } from './components/deck-image';
-import { DeckFloatingImage } from './components/deck-floating-image';
 import { DeckContainer } from './components/deck-container';
 import { registry } from './registry';
 
@@ -44,12 +36,8 @@ import { registry } from './registry';
 export function registerComponents(): void {
   // Add components to registry
   registry.add(DeckSlide);
-  registry.add(DeckTitle);
-  registry.add(DeckHeadlineSubhead);
   registry.add(DeckText);
-  registry.add(DeckList);
   registry.add(DeckImage);
-  registry.add(DeckFloatingImage);
   registry.add(DeckContainer);
   
   // Define custom elements

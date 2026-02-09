@@ -82,7 +82,7 @@ export function useYDoc(deckId: string): UseYDocResult {
     const root = ydoc.getMap('root');
     const undoManager = new Y.UndoManager([root], {
       trackedOrigins: new Set(['local']),
-      captureTimeout: 0,
+      captureTimeout: 500,
     });
     undoManagerRef.current = undoManager;
 

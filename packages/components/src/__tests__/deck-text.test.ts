@@ -30,120 +30,20 @@ describe('DeckText', () => {
     expect(el.shadowRoot?.mode).toBe('open');
   });
 
-  it('renders plain text content', () => {
+  // Plain text rendering
+  it('renders plain text content in a <p> tag', () => {
     const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Hello World' }]));
+    el.setAttribute('content', 'Hello World');
     document.body.appendChild(el);
 
     const p = el.shadowRoot?.querySelector('p');
+    expect(p).not.toBeNull();
     expect(p?.textContent).toBe('Hello World');
   });
 
-  it('renders bold text', () => {
+  it('escapes HTML in plain text mode', () => {
     const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Bold', bold: true }]));
-    document.body.appendChild(el);
-
-    const strong = el.shadowRoot?.querySelector('strong');
-    expect(strong?.textContent).toBe('Bold');
-  });
-
-  it('renders italic text', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Italic', italic: true }]));
-    document.body.appendChild(el);
-
-    const em = el.shadowRoot?.querySelector('em');
-    expect(em?.textContent).toBe('Italic');
-  });
-
-  it('renders underlined text', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Underline', underline: true }]));
-    document.body.appendChild(el);
-
-    const u = el.shadowRoot?.querySelector('u');
-    expect(u?.textContent).toBe('Underline');
-  });
-
-  it('renders code text', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'code', code: true }]));
-    document.body.appendChild(el);
-
-    const code = el.shadowRoot?.querySelector('code');
-    expect(code?.textContent).toBe('code');
-  });
-
-  it('renders links', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Click me', href: 'https://example.com' }]));
-    document.body.appendChild(el);
-
-    const a = el.shadowRoot?.querySelector('a');
-    expect(a?.textContent).toBe('Click me');
-    expect(a?.getAttribute('href')).toBe('https://example.com');
-    expect(a?.getAttribute('target')).toBe('_blank');
-  });
-
-  it('renders multiple spans', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([
-      { text: 'Normal ' },
-      { text: 'bold', bold: true },
-      { text: ' and ' },
-      { text: 'italic', italic: true },
-    ]));
-    document.body.appendChild(el);
-
-    const p = el.shadowRoot?.querySelector('p');
-    expect(p?.innerHTML).toContain('Normal');
-    expect(p?.querySelector('strong')?.textContent).toBe('bold');
-    expect(p?.querySelector('em')?.textContent).toBe('italic');
-  });
-
-  it('handles combined formatting', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Bold Italic', bold: true, italic: true }]));
-    document.body.appendChild(el);
-
-    const p = el.shadowRoot?.querySelector('p');
-    const strong = p?.querySelector('strong');
-    const em = strong?.querySelector('em') || p?.querySelector('em');
-    expect(em).not.toBeNull();
-  });
-
-  it('applies align attribute', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Centered' }]));
-    el.setAttribute('align', 'center');
-    document.body.appendChild(el);
-
-    const style = el.shadowRoot?.querySelector('style');
-    expect(style?.textContent).toContain('text-align: center');
-  });
-
-  it('handles invalid JSON as plain text', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', 'Just plain text');
-    document.body.appendChild(el);
-
-    const p = el.shadowRoot?.querySelector('p');
-    expect(p?.textContent).toBe('Just plain text');
-  });
-
-  it('handles empty content', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', '[]');
-    document.body.appendChild(el);
-
-    const p = el.shadowRoot?.querySelector('p');
-    expect(p?.textContent).toBe('');
-  });
-
-  it('escapes HTML in text', () => {
-    const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: '<script>alert("xss")</script>' }]));
+    el.setAttribute('content', '<script>alert("xss")</script>');
     document.body.appendChild(el);
 
     const p = el.shadowRoot?.querySelector('p');
@@ -151,19 +51,167 @@ describe('DeckText', () => {
     expect(p?.textContent).toContain('<script>');
   });
 
-  it('observes expected attributes', () => {
-    expect(DeckText.observedAttributes).toContain('content');
-    expect(DeckText.observedAttributes).toContain('align');
+  it('handles empty content', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', '');
+    document.body.appendChild(el);
+
+    const p = el.shadowRoot?.querySelector('p');
+    expect(p?.textContent).toBe('');
   });
 
+  // Markdown rendering
+  it('renders markdown content in a <div> when markdown=true', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', '**Bold text**');
+    el.setAttribute('markdown', 'true');
+    document.body.appendChild(el);
+
+    const div = el.shadowRoot?.querySelector('div.markdown');
+    expect(div).not.toBeNull();
+    const strong = div?.querySelector('strong');
+    expect(strong?.textContent).toBe('Bold text');
+  });
+
+  it('renders markdown lists', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', '- Item 1\n- Item 2\n- Item 3');
+    el.setAttribute('markdown', 'true');
+    document.body.appendChild(el);
+
+    const ul = el.shadowRoot?.querySelector('ul');
+    expect(ul).not.toBeNull();
+    const items = ul?.querySelectorAll('li');
+    expect(items?.length).toBe(3);
+  });
+
+  it('renders markdown links', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', '[Click here](https://example.com)');
+    el.setAttribute('markdown', 'true');
+    document.body.appendChild(el);
+
+    const a = el.shadowRoot?.querySelector('a');
+    expect(a?.textContent).toBe('Click here');
+    expect(a?.getAttribute('href')).toBe('https://example.com');
+  });
+
+  it('does NOT render markdown when markdown flag is absent', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', '**Not bold**');
+    document.body.appendChild(el);
+
+    // Should be plain text in a <p>, not rendered as markdown
+    const p = el.shadowRoot?.querySelector('p');
+    expect(p?.textContent).toBe('**Not bold**');
+    expect(el.shadowRoot?.querySelector('strong')).toBeNull();
+  });
+
+  // Size
+  it('applies size attribute to font-size', () => {
+    const sizes = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', 'display'];
+    for (const size of sizes) {
+      const el = document.createElement('deck-text') as DeckText;
+      el.setAttribute('content', 'test');
+      el.setAttribute('size', size);
+      document.body.appendChild(el);
+
+      const style = el.shadowRoot?.querySelector('style');
+      expect(style?.textContent).toContain('font-size:');
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('uses display font family for display size', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', 'Display');
+    el.setAttribute('size', 'display');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('--deck-font-display');
+  });
+
+  // Weight
+  it('applies weight attribute', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', 'Bold');
+    el.setAttribute('weight', 'bold');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('font-weight: 700');
+  });
+
+  // Align
+  it('applies align attribute', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', 'Centered');
+    el.setAttribute('align', 'center');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('text-align: center');
+  });
+
+  // Transform
+  it('applies transform attribute', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', 'upper');
+    el.setAttribute('transform', 'uppercase');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('text-transform: uppercase');
+  });
+
+  // Color
+  it('applies color attribute', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', 'Red');
+    el.setAttribute('color', '#ff0000');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('color: #ff0000');
+  });
+
+  // Observed attributes
+  it('observes expected attributes', () => {
+    expect(DeckText.observedAttributes).toContain('content');
+    expect(DeckText.observedAttributes).toContain('markdown');
+    expect(DeckText.observedAttributes).toContain('size');
+    expect(DeckText.observedAttributes).toContain('weight');
+    expect(DeckText.observedAttributes).toContain('align');
+    expect(DeckText.observedAttributes).toContain('transform');
+    expect(DeckText.observedAttributes).toContain('color');
+    expect(DeckText.observedAttributes).toContain('grid-width');
+  });
+
+  // Dynamic updates
   it('updates when content attribute changes', () => {
     const el = document.createElement('deck-text') as DeckText;
-    el.setAttribute('content', JSON.stringify([{ text: 'Original' }]));
+    el.setAttribute('content', 'Original');
     document.body.appendChild(el);
 
     expect(el.shadowRoot?.querySelector('p')?.textContent).toBe('Original');
 
-    el.setAttribute('content', JSON.stringify([{ text: 'Updated' }]));
+    el.setAttribute('content', 'Updated');
     expect(el.shadowRoot?.querySelector('p')?.textContent).toBe('Updated');
+  });
+
+  it('switches between plain and markdown mode', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', '**Bold**');
+    document.body.appendChild(el);
+
+    // Plain mode — no strong tag
+    expect(el.shadowRoot?.querySelector('p')).not.toBeNull();
+    expect(el.shadowRoot?.querySelector('strong')).toBeNull();
+
+    // Switch to markdown
+    el.setAttribute('markdown', 'true');
+    expect(el.shadowRoot?.querySelector('div.markdown')).not.toBeNull();
+    expect(el.shadowRoot?.querySelector('strong')?.textContent).toBe('Bold');
   });
 });

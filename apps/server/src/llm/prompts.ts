@@ -95,23 +95,25 @@ function buildBasePrompt(): string {
 
 ## Component Types
 
-Available components you can add:
+There are 3 component primitives:
 
-**Content Components (flow with grid layout):**
-- **deck-title**: Heading text. Props: text (string), level ("1"|"2"|"3"), align ("left"|"center"|"right"), gridWidth (number)
-- **deck-text**: Rich text paragraph. Props: content (array of {text, bold?, italic?, underline?, code?, href?}), align, gridWidth
-- **deck-list**: Bullet or numbered list. Props: items (string[]), ordered (boolean), gridWidth
-- **deck-image**: Image from assets. Props: assetId (string), alt, caption, fit ("contain"|"cover"|"fill"), darken (0-100), blur (0-20), maxHeight, gridWidth
-- **deck-headline-subhead**: Headline with subheading. Props: headline, subheading, category, isHero (boolean), variant ("dark"|"light"), align, gridWidth
+- **deck-text**: Universal text block — plain or markdown.
+  Props: content (string, required), markdown (boolean — opt-in for GH-flavored markdown rendering; default false), size ("xs"|"sm"|"md"|"lg"|"xl"|"2xl"|"display"), weight ("normal"|"medium"|"semibold"|"bold"), align ("left"|"center"|"right"), transform ("none"|"uppercase"|"lowercase"|"capitalize"), color (CSS color string), gridWidth (0-12, optional)
+  - For headings, use size="display" or "2xl" with weight="bold"
+  - For lists, use markdown=true with content like "- Item 1\n- Item 2"
+  - For simple body text, just set content (no markdown flag needed)
 
-**Layout Components:**
-- **deck-container**: Groups components in a sub-grid for multi-column layouts. Props: gridWidth (required, 1-12 - sets both span AND internal column count), background (color), padding ("none"|"sm"|"md"|"lg"), gap ("none"|"sm"|"md"|"lg"), borderRadius ("none"|"sm"|"md"|"lg"), border (e.g., "1px solid #ccc"), alignItems ("start"|"center"|"end"|"stretch"), justifyContent ("start"|"center"|"end"|"space-between")
+- **deck-image**: Image from assets.
+  Props: assetId (string, required), alt, caption, fit ("contain"|"cover"|"fill"), darken (0-100), blur (0-20), maxWidth (px), maxHeight (px), align ("left"|"center"|"right"), color (hex for SVG fill), gridWidth (0-12, optional)
+  Visual props (shared with container): borderRadius ("none"|"sm"|"md"|"lg"|"full"|"pill"), borderWidth (0-10), borderColor (CSS color), shadow ("none"|"sm"|"md"|"lg"), shadowColor (CSS color)
+
+- **deck-container**: Groups components in a sub-grid or floating layer.
+  Grid mode props: gridWidth (required, 1-12 — sets both span AND internal columns), background (color), padding ("none"|"sm"|"md"|"lg"), gap ("none"|"sm"|"md"|"lg"), alignItems ("start"|"center"|"end"|"stretch"), justifyContent ("start"|"center"|"end"|"space-between")
+  Visual props (shared with image): borderRadius ("none"|"sm"|"md"|"lg"|"full"|"pill"), borderWidth (0-10), borderColor (CSS color), shadow ("none"|"sm"|"md"|"lg"), shadowColor (CSS color)
+  Floating mode props (for absolute positioning outside content flow): anchorX ("left"|"right"), anchorY ("top"|"bottom"), x (offset like "20px" or "5%"), y, width, height (CSS values), opacity (0-100). A container is floating when anchorX or anchorY is set.
   - To add components inside a container, use the parentId parameter when calling add_component
   - Containers CANNOT be nested inside other containers (max 2 levels: slide → container → components)
-  - Children inherit the container's internal grid (e.g., container with gridWidth=4 has 4 internal columns for children)
-
-**Floating Components (absolute positioning, outside content padding):**
-- **deck-floating-image**: Image at specific coordinates. Props: assetId, alt, anchorX ("left"|"right"), anchorY ("top"|"bottom"), x (offset like "20" or "5%"), y, width, height, fit, opacity (0-100), borderRadius
+  - Children inherit the container's internal grid
 
 ## Slide Style Properties
 

@@ -177,4 +177,58 @@ export const CommonProperties = {
     step: 1,
     group: PropertyGroups.LAYOUT,
   }),
+
+  borderRadius: (): PropertyDescriptor => ({
+    type: 'enum',
+    label: 'Radius',
+    options: [
+      { value: 'none', label: 'None' },
+      { value: 'sm', label: 'Small' },
+      { value: 'md', label: 'Medium' },
+      { value: 'lg', label: 'Large' },
+      { value: 'full', label: 'Circle' },
+      { value: 'pill', label: 'Pill' },
+    ],
+    default: 'none',
+    group: PropertyGroups.STYLE,
+  }),
+
+  borderWidth: (): PropertyDescriptor => ({
+    type: 'number',
+    label: 'Border',
+    min: 0,
+    max: 10,
+    step: 1,
+    default: 0,
+    group: PropertyGroups.STYLE,
+    compact: true,
+  }),
+
+  borderColor: (): PropertyDescriptor => ({
+    type: 'color',
+    label: 'Border Color',
+    group: PropertyGroups.STYLE,
+    compact: true,
+  }),
+
+  shadow: (): PropertyDescriptor => ({
+    type: 'enum',
+    label: 'Shadow',
+    options: [
+      { value: 'none', label: 'None' },
+      { value: 'sm', label: 'Small' },
+      { value: 'md', label: 'Medium' },
+      { value: 'lg', label: 'Large' },
+    ],
+    default: 'none',
+    group: PropertyGroups.STYLE,
+    compact: true,
+  }),
+
+  shadowColor: (): PropertyDescriptor => ({
+    type: 'color',
+    label: 'Shadow Color',
+    group: PropertyGroups.STYLE,
+    compact: true,
+  }),
 };

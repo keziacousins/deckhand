@@ -1,220 +1,148 @@
 import { describe, it, expect } from 'vitest';
 import {
   ComponentSchema,
-  TitleComponentSchema,
-  SubtitleComponentSchema,
   TextComponentSchema,
-  ListComponentSchema,
   ImageComponentSchema,
-  CodeComponentSchema,
-  QuoteComponentSchema,
-  ColumnsComponentSchema,
-  SpacerComponentSchema,
-  HeadlineSubheadComponentSchema,
   ContainerComponentSchema,
   componentTypes,
 } from '../component';
 
-describe('TitleComponentSchema', () => {
-  it('validates minimal title component', () => {
+describe('TextComponentSchema', () => {
+  it('validates minimal text component', () => {
     const comp = {
       id: 'comp-1',
-      type: 'deck-title',
-      props: { text: 'Hello World' },
+      type: 'deck-text',
+      props: { content: 'Hello World' },
     };
-    expect(TitleComponentSchema.parse(comp)).toEqual(comp);
+    expect(TextComponentSchema.parse(comp)).toEqual(comp);
   });
 
-  it('validates title with all optional props', () => {
+  it('validates text with markdown flag', () => {
     const comp = {
       id: 'comp-1',
-      type: 'deck-title',
-      props: {
-        text: 'Hello',
-        level: '2',
-        align: 'center',
-        gridWidth: 6,
-      },
+      type: 'deck-text',
+      props: { content: '**Bold** and *italic*', markdown: true },
     };
-    const result = TitleComponentSchema.parse(comp);
-    expect(result.props.level).toBe('2');
-    expect(result.props.align).toBe('center');
-    expect(result.props.gridWidth).toBe(6);
+    const result = TextComponentSchema.parse(comp);
+    expect(result.props.markdown).toBe(true);
   });
 
-  it('validates level values', () => {
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', level: '1' }
-    }).props.level).toBe('1');
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', level: '2' }
-    }).props.level).toBe('2');
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', level: '3' }
-    }).props.level).toBe('3');
-    expect(() => TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', level: '4' }
+  it('markdown defaults to undefined (off)', () => {
+    const result = TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 'plain' },
+    });
+    expect(result.props.markdown).toBeUndefined();
+  });
+
+  it('validates size values', () => {
+    for (const size of ['xs', 'sm', 'md', 'lg', 'xl', '2xl', 'display']) {
+      expect(TextComponentSchema.parse({
+        id: 'c1', type: 'deck-text', props: { content: 't', size },
+      }).props.size).toBe(size);
+    }
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', size: 'huge' },
+    })).toThrow();
+  });
+
+  it('validates weight values', () => {
+    for (const weight of ['normal', 'medium', 'semibold', 'bold']) {
+      expect(TextComponentSchema.parse({
+        id: 'c1', type: 'deck-text', props: { content: 't', weight },
+      }).props.weight).toBe(weight);
+    }
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', weight: 'thin' },
     })).toThrow();
   });
 
   it('validates align values', () => {
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', align: 'left' }
-    }).props.align).toBe('left');
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', align: 'center' }
-    }).props.align).toBe('center');
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', align: 'right' }
-    }).props.align).toBe('right');
-    expect(() => TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', align: 'justify' }
+    for (const align of ['left', 'center', 'right']) {
+      expect(TextComponentSchema.parse({
+        id: 'c1', type: 'deck-text', props: { content: 't', align },
+      }).props.align).toBe(align);
+    }
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', align: 'justify' },
     })).toThrow();
   });
 
-  it('validates gridWidth range (0-12)', () => {
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 0 }
-    }).props.gridWidth).toBe(0); // 0 = full width
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 1 }
-    }).props.gridWidth).toBe(1);
-    expect(TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 12 }
-    }).props.gridWidth).toBe(12);
-    expect(() => TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: -1 }
+  it('validates transform values', () => {
+    for (const transform of ['none', 'uppercase', 'lowercase', 'capitalize']) {
+      expect(TextComponentSchema.parse({
+        id: 'c1', type: 'deck-text', props: { content: 't', transform },
+      }).props.transform).toBe(transform);
+    }
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', transform: 'small-caps' },
     })).toThrow();
-    expect(() => TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 't', gridWidth: 13 }
+  });
+
+  it('accepts color string', () => {
+    const result = TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', color: '#ff0000' },
+    });
+    expect(result.props.color).toBe('#ff0000');
+  });
+
+  it('validates all props together', () => {
+    const comp = {
+      id: 'comp-1',
+      type: 'deck-text',
+      props: {
+        content: '# Heading\n\nBody text',
+        markdown: true,
+        size: 'lg',
+        weight: 'bold',
+        align: 'center',
+        transform: 'uppercase',
+        color: 'var(--accent)',
+        gridWidth: 8,
+      },
+    };
+    const result = TextComponentSchema.parse(comp);
+    expect(result.props.content).toBe('# Heading\n\nBody text');
+    expect(result.props.markdown).toBe(true);
+    expect(result.props.size).toBe('lg');
+    expect(result.props.weight).toBe('bold');
+    expect(result.props.align).toBe('center');
+    expect(result.props.transform).toBe('uppercase');
+    expect(result.props.color).toBe('var(--accent)');
+    expect(result.props.gridWidth).toBe(8);
+  });
+
+  it('requires content string', () => {
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: {},
+    })).toThrow();
+  });
+
+  it('rejects non-string content', () => {
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: [{ text: 'rich' }] },
     })).toThrow();
   });
 
   it('gridWidth is optional', () => {
-    const result = TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 'test' }
+    const result = TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 'test' },
     });
     expect(result.props.gridWidth).toBeUndefined();
   });
 
-  it('text is optional (falls back to slide title)', () => {
-    const result = TitleComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: {}
-    });
-    expect(result.props.text).toBeUndefined();
-  });
-});
-
-describe('SubtitleComponentSchema', () => {
-  it('validates subtitle component', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-subtitle',
-      props: { text: 'A subtitle', align: 'left' },
-    };
-    expect(SubtitleComponentSchema.parse(comp)).toEqual(comp);
-  });
-
-  it('supports gridWidth', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-subtitle',
-      props: { text: 'Sub', gridWidth: 4 },
-    };
-    expect(SubtitleComponentSchema.parse(comp).props.gridWidth).toBe(4);
-  });
-});
-
-describe('TextComponentSchema', () => {
-  it('validates text component with rich text array', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-text',
-      props: {
-        content: [
-          { text: 'Hello ' },
-          { text: 'world', bold: true },
-        ],
-      },
-    };
-    const result = TextComponentSchema.parse(comp);
-    expect(Array.isArray(result.props.content)).toBe(true);
-    expect(result.props.content).toHaveLength(2);
-  });
-
-  it('validates text with formatting options', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-text',
-      props: {
-        content: [
-          { text: 'bold', bold: true },
-          { text: 'italic', italic: true },
-          { text: 'underline', underline: true },
-          { text: 'code', code: true },
-          { text: 'link', href: 'https://example.com' },
-        ],
-      },
-    };
-    const result = TextComponentSchema.parse(comp);
-    expect(result.props.content[0].bold).toBe(true);
-    expect(result.props.content[4].href).toBe('https://example.com');
-  });
-
-  it('supports gridWidth', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-text',
-      props: { content: [{ text: 'Text' }], gridWidth: 8 },
-    };
-    expect(TextComponentSchema.parse(comp).props.gridWidth).toBe(8);
-  });
-
-  it('rejects plain string content', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-text',
-      props: { content: 'Plain text' },
-    };
-    expect(() => TextComponentSchema.parse(comp)).toThrow();
-  });
-});
-
-describe('ListComponentSchema', () => {
-  it('validates list with items', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-list',
-      props: { items: ['Item 1', 'Item 2', 'Item 3'] },
-    };
-    expect(ListComponentSchema.parse(comp).props.items).toHaveLength(3);
-  });
-
-  it('validates ordered list', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-list',
-      props: { items: ['First', 'Second'], ordered: true },
-    };
-    expect(ListComponentSchema.parse(comp).props.ordered).toBe(true);
-  });
-
-  it('accepts empty items array', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-list',
-      props: { items: [] },
-    };
-    expect(ListComponentSchema.parse(comp).props.items).toEqual([]);
-  });
-
-  it('supports gridWidth', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-list',
-      props: { items: ['A'], gridWidth: 6 },
-    };
-    expect(ListComponentSchema.parse(comp).props.gridWidth).toBe(6);
+  it('validates gridWidth range (0-12)', () => {
+    expect(TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', gridWidth: 0 },
+    }).props.gridWidth).toBe(0);
+    expect(TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', gridWidth: 12 },
+    }).props.gridWidth).toBe(12);
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', gridWidth: -1 },
+    })).toThrow();
+    expect(() => TextComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't', gridWidth: 13 },
+    })).toThrow();
   });
 });
 
@@ -237,6 +165,17 @@ describe('ImageComponentSchema', () => {
         alt: 'Description',
         caption: 'Figure 1',
         fit: 'cover',
+        darken: 50,
+        blur: 5,
+        maxWidth: 800,
+        maxHeight: 600,
+        align: 'center',
+        color: '#333',
+        borderRadius: 'lg',
+        borderWidth: 2,
+        borderColor: '#000',
+        shadow: 'md',
+        shadowColor: 'rgba(0,0,0,0.3)',
         gridWidth: 4,
       },
     };
@@ -244,176 +183,109 @@ describe('ImageComponentSchema', () => {
     expect(result.props.alt).toBe('Description');
     expect(result.props.caption).toBe('Figure 1');
     expect(result.props.fit).toBe('cover');
+    expect(result.props.darken).toBe(50);
+    expect(result.props.blur).toBe(5);
+    expect(result.props.maxWidth).toBe(800);
+    expect(result.props.maxHeight).toBe(600);
+    expect(result.props.align).toBe('center');
+    expect(result.props.color).toBe('#333');
+    expect(result.props.borderRadius).toBe('lg');
+    expect(result.props.borderWidth).toBe(2);
+    expect(result.props.borderColor).toBe('#000');
+    expect(result.props.shadow).toBe('md');
+    expect(result.props.shadowColor).toBe('rgba(0,0,0,0.3)');
     expect(result.props.gridWidth).toBe(4);
   });
 
   it('validates fit values', () => {
-    expect(ImageComponentSchema.parse({
-      id: 'c1', type: 'deck-image', props: { assetId: 'a', fit: 'contain' }
-    }).props.fit).toBe('contain');
-    expect(ImageComponentSchema.parse({
-      id: 'c1', type: 'deck-image', props: { assetId: 'a', fit: 'cover' }
-    }).props.fit).toBe('cover');
-    expect(ImageComponentSchema.parse({
-      id: 'c1', type: 'deck-image', props: { assetId: 'a', fit: 'fill' }
-    }).props.fit).toBe('fill');
+    for (const fit of ['contain', 'cover', 'fill']) {
+      expect(ImageComponentSchema.parse({
+        id: 'c1', type: 'deck-image', props: { assetId: 'a', fit },
+      }).props.fit).toBe(fit);
+    }
     expect(() => ImageComponentSchema.parse({
-      id: 'c1', type: 'deck-image', props: { assetId: 'a', fit: 'stretch' }
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', fit: 'stretch' },
     })).toThrow();
   });
-});
 
-describe('CodeComponentSchema', () => {
-  it('validates code component', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-code',
-      props: { code: 'console.log("hello")' },
-    };
-    expect(CodeComponentSchema.parse(comp).props.code).toBe('console.log("hello")');
+  it('validates borderRadius values', () => {
+    for (const borderRadius of ['none', 'sm', 'md', 'lg', 'full']) {
+      expect(ImageComponentSchema.parse({
+        id: 'c1', type: 'deck-image', props: { assetId: 'a', borderRadius },
+      }).props.borderRadius).toBe(borderRadius);
+    }
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', borderRadius: 'xl' },
+    })).toThrow();
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', borderRadius: 'default' },
+    })).toThrow();
   });
 
-  it('validates optional language and line numbers', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-code',
-      props: {
-        code: 'const x = 1;',
-        language: 'typescript',
-        showLineNumbers: true,
-        gridWidth: 8,
-      },
-    };
-    const result = CodeComponentSchema.parse(comp);
-    expect(result.props.language).toBe('typescript');
-    expect(result.props.showLineNumbers).toBe(true);
-    expect(result.props.gridWidth).toBe(8);
-  });
-});
-
-describe('QuoteComponentSchema', () => {
-  it('validates quote component', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-quote',
-      props: { text: 'To be or not to be' },
-    };
-    expect(QuoteComponentSchema.parse(comp).props.text).toBe('To be or not to be');
+  it('validates borderWidth range (0-10)', () => {
+    expect(ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', borderWidth: 0 },
+    }).props.borderWidth).toBe(0);
+    expect(ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', borderWidth: 10 },
+    }).props.borderWidth).toBe(10);
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', borderWidth: -1 },
+    })).toThrow();
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', borderWidth: 11 },
+    })).toThrow();
   });
 
-  it('validates optional attribution', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-quote',
-      props: {
-        text: 'Stay hungry, stay foolish',
-        attribution: 'Steve Jobs',
-        gridWidth: 6,
-      },
-    };
-    const result = QuoteComponentSchema.parse(comp);
-    expect(result.props.attribution).toBe('Steve Jobs');
-    expect(result.props.gridWidth).toBe(6);
-  });
-});
-
-describe('ColumnsComponentSchema', () => {
-  it('validates columns layout', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-columns',
-      props: {
-        columns: [
-          { id: 'col-1', componentIds: ['comp-2', 'comp-3'] },
-          { id: 'col-2', componentIds: ['comp-4'] },
-        ],
-      },
-    };
-    const result = ColumnsComponentSchema.parse(comp);
-    expect(result.props.columns).toHaveLength(2);
-    expect(result.props.columns[0].componentIds).toEqual(['comp-2', 'comp-3']);
+  it('validates shadow values', () => {
+    for (const shadow of ['none', 'sm', 'md', 'lg']) {
+      expect(ImageComponentSchema.parse({
+        id: 'c1', type: 'deck-image', props: { assetId: 'a', shadow },
+      }).props.shadow).toBe(shadow);
+    }
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', shadow: 'xl' },
+    })).toThrow();
   });
 
-  it('validates optional gap', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-columns',
-      props: {
-        columns: [],
-        gap: '24px',
-        gridWidth: 12,
-      },
-    };
-    const result = ColumnsComponentSchema.parse(comp);
-    expect(result.props.gap).toBe('24px');
-    expect(result.props.gridWidth).toBe(12);
-  });
-});
-
-describe('SpacerComponentSchema', () => {
-  it('validates spacer with default', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-spacer',
-      props: {},
-    };
-    expect(SpacerComponentSchema.parse(comp).type).toBe('deck-spacer');
+  it('validates darken range (0-100)', () => {
+    expect(ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', darken: 0 },
+    }).props.darken).toBe(0);
+    expect(ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', darken: 100 },
+    }).props.darken).toBe(100);
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', darken: -1 },
+    })).toThrow();
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', darken: 101 },
+    })).toThrow();
   });
 
-  it('validates spacer with height', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-spacer',
-      props: { height: '48px', gridWidth: 12 },
-    };
-    const result = SpacerComponentSchema.parse(comp);
-    expect(result.props.height).toBe('48px');
-    expect(result.props.gridWidth).toBe(12);
-  });
-});
-
-describe('HeadlineSubheadComponentSchema', () => {
-  it('validates minimal headline-subhead', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-headline-subhead',
-      props: { headline: 'Welcome' },
-    };
-    expect(HeadlineSubheadComponentSchema.parse(comp).props.headline).toBe('Welcome');
+  it('validates blur range (0-20)', () => {
+    expect(ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', blur: 0 },
+    }).props.blur).toBe(0);
+    expect(ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', blur: 20 },
+    }).props.blur).toBe(20);
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: { assetId: 'a', blur: 21 },
+    })).toThrow();
   });
 
-  it('validates all optional props', () => {
-    const comp = {
-      id: 'comp-1',
-      type: 'deck-headline-subhead',
-      props: {
-        headline: 'Big News',
-        subheading: 'Important details follow',
-        category: 'Announcement',
-        isHero: true,
-        variant: 'dark',
-        align: 'center',
-        gridWidth: 8,
-      },
-    };
-    const result = HeadlineSubheadComponentSchema.parse(comp);
-    expect(result.props.subheading).toBe('Important details follow');
-    expect(result.props.category).toBe('Announcement');
-    expect(result.props.isHero).toBe(true);
-    expect(result.props.variant).toBe('dark');
-    expect(result.props.align).toBe('center');
-    expect(result.props.gridWidth).toBe(8);
+  it('validates align values', () => {
+    for (const align of ['left', 'center', 'right']) {
+      expect(ImageComponentSchema.parse({
+        id: 'c1', type: 'deck-image', props: { assetId: 'a', align },
+      }).props.align).toBe(align);
+    }
   });
 
-  it('validates variant values', () => {
-    expect(HeadlineSubheadComponentSchema.parse({
-      id: 'c1', type: 'deck-headline-subhead', props: { headline: 'H', variant: 'dark' }
-    }).props.variant).toBe('dark');
-    expect(HeadlineSubheadComponentSchema.parse({
-      id: 'c1', type: 'deck-headline-subhead', props: { headline: 'H', variant: 'light' }
-    }).props.variant).toBe('light');
-    expect(() => HeadlineSubheadComponentSchema.parse({
-      id: 'c1', type: 'deck-headline-subhead', props: { headline: 'H', variant: 'medium' }
+  it('requires assetId', () => {
+    expect(() => ImageComponentSchema.parse({
+      id: 'c1', type: 'deck-image', props: {},
     })).toThrow();
   });
 });
@@ -428,7 +300,7 @@ describe('ContainerComponentSchema', () => {
     expect(ContainerComponentSchema.parse(comp).props.gridWidth).toBe(6);
   });
 
-  it('validates all optional props', () => {
+  it('validates all grid/style props', () => {
     const comp = {
       id: 'comp-1',
       type: 'deck-container',
@@ -438,7 +310,10 @@ describe('ContainerComponentSchema', () => {
         padding: 'md',
         gap: 'sm',
         borderRadius: 'lg',
-        border: '1px solid #ccc',
+        borderWidth: 2,
+        borderColor: '#ccc',
+        shadow: 'md',
+        shadowColor: 'rgba(0,0,0,0.2)',
         alignItems: 'center',
         justifyContent: 'space-between',
       },
@@ -448,47 +323,86 @@ describe('ContainerComponentSchema', () => {
     expect(result.props.padding).toBe('md');
     expect(result.props.gap).toBe('sm');
     expect(result.props.borderRadius).toBe('lg');
-    expect(result.props.border).toBe('1px solid #ccc');
+    expect(result.props.borderWidth).toBe(2);
+    expect(result.props.borderColor).toBe('#ccc');
+    expect(result.props.shadow).toBe('md');
+    expect(result.props.shadowColor).toBe('rgba(0,0,0,0.2)');
     expect(result.props.alignItems).toBe('center');
     expect(result.props.justifyContent).toBe('space-between');
   });
 
   it('requires gridWidth', () => {
     expect(() => ContainerComponentSchema.parse({
-      id: 'c1', type: 'deck-container', props: {}
+      id: 'c1', type: 'deck-container', props: {},
     })).toThrow();
   });
 
   it('validates gridWidth range (1-12)', () => {
     expect(ContainerComponentSchema.parse({
-      id: 'c1', type: 'deck-container', props: { gridWidth: 1 }
+      id: 'c1', type: 'deck-container', props: { gridWidth: 1 },
     }).props.gridWidth).toBe(1);
     expect(ContainerComponentSchema.parse({
-      id: 'c1', type: 'deck-container', props: { gridWidth: 12 }
+      id: 'c1', type: 'deck-container', props: { gridWidth: 12 },
     }).props.gridWidth).toBe(12);
     expect(() => ContainerComponentSchema.parse({
-      id: 'c1', type: 'deck-container', props: { gridWidth: 0 }
+      id: 'c1', type: 'deck-container', props: { gridWidth: 0 },
     })).toThrow();
     expect(() => ContainerComponentSchema.parse({
-      id: 'c1', type: 'deck-container', props: { gridWidth: 13 }
+      id: 'c1', type: 'deck-container', props: { gridWidth: 13 },
     })).toThrow();
   });
 
   it('validates padding values', () => {
     for (const padding of ['none', 'sm', 'md', 'lg']) {
       expect(ContainerComponentSchema.parse({
-        id: 'c1', type: 'deck-container', props: { gridWidth: 6, padding }
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, padding },
       }).props.padding).toBe(padding);
     }
     expect(() => ContainerComponentSchema.parse({
-      id: 'c1', type: 'deck-container', props: { gridWidth: 6, padding: 'xl' }
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, padding: 'xl' },
     })).toThrow();
+  });
+
+  it('validates gap values', () => {
+    for (const gap of ['none', 'sm', 'md', 'lg']) {
+      expect(ContainerComponentSchema.parse({
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, gap },
+      }).props.gap).toBe(gap);
+    }
+  });
+
+  it('validates borderRadius values', () => {
+    for (const borderRadius of ['none', 'sm', 'md', 'lg', 'full']) {
+      expect(ContainerComponentSchema.parse({
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, borderRadius },
+      }).props.borderRadius).toBe(borderRadius);
+    }
+  });
+
+  it('validates visual props (borderWidth, shadow, shadowColor)', () => {
+    const result = ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: {
+        gridWidth: 6, borderWidth: 3, borderColor: '#f00', shadow: 'lg', shadowColor: '#000',
+      },
+    });
+    expect(result.props.borderWidth).toBe(3);
+    expect(result.props.borderColor).toBe('#f00');
+    expect(result.props.shadow).toBe('lg');
+    expect(result.props.shadowColor).toBe('#000');
+  });
+
+  it('rejects freeform border string (use borderWidth + borderColor instead)', () => {
+    const result = ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, border: '1px solid #ccc' },
+    });
+    // border is not in the schema — should be stripped
+    expect((result.props as Record<string, unknown>).border).toBeUndefined();
   });
 
   it('validates alignItems values', () => {
     for (const alignItems of ['start', 'center', 'end', 'stretch']) {
       expect(ContainerComponentSchema.parse({
-        id: 'c1', type: 'deck-container', props: { gridWidth: 6, alignItems }
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, alignItems },
       }).props.alignItems).toBe(alignItems);
     }
   });
@@ -496,12 +410,88 @@ describe('ContainerComponentSchema', () => {
   it('validates justifyContent values', () => {
     for (const justifyContent of ['start', 'center', 'end', 'space-between']) {
       expect(ContainerComponentSchema.parse({
-        id: 'c1', type: 'deck-container', props: { gridWidth: 6, justifyContent }
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, justifyContent },
       }).props.justifyContent).toBe(justifyContent);
     }
   });
 
-  it('supports parentId for nesting in parent', () => {
+  // Floating mode props
+  it('validates floating mode with anchorX and anchorY', () => {
+    const comp = {
+      id: 'comp-1',
+      type: 'deck-container',
+      props: {
+        gridWidth: 4,
+        anchorX: 'left',
+        anchorY: 'top',
+        x: '20px',
+        y: '10%',
+        width: '200px',
+        height: '150px',
+        opacity: 80,
+      },
+    };
+    const result = ContainerComponentSchema.parse(comp);
+    expect(result.props.anchorX).toBe('left');
+    expect(result.props.anchorY).toBe('top');
+    expect(result.props.x).toBe('20px');
+    expect(result.props.y).toBe('10%');
+    expect(result.props.width).toBe('200px');
+    expect(result.props.height).toBe('150px');
+    expect(result.props.opacity).toBe(80);
+  });
+
+  it('validates anchorX values', () => {
+    for (const anchorX of ['left', 'right']) {
+      expect(ContainerComponentSchema.parse({
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, anchorX },
+      }).props.anchorX).toBe(anchorX);
+    }
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, anchorX: 'center' },
+    })).toThrow();
+  });
+
+  it('validates anchorY values', () => {
+    for (const anchorY of ['top', 'bottom']) {
+      expect(ContainerComponentSchema.parse({
+        id: 'c1', type: 'deck-container', props: { gridWidth: 6, anchorY },
+      }).props.anchorY).toBe(anchorY);
+    }
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, anchorY: 'middle' },
+    })).toThrow();
+  });
+
+  it('validates opacity range (0-100)', () => {
+    expect(ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, opacity: 0 },
+    }).props.opacity).toBe(0);
+    expect(ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, opacity: 100 },
+    }).props.opacity).toBe(100);
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, opacity: -1 },
+    })).toThrow();
+    expect(() => ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6, opacity: 101 },
+    })).toThrow();
+  });
+
+  it('floating props are all optional', () => {
+    const result = ContainerComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6 },
+    });
+    expect(result.props.anchorX).toBeUndefined();
+    expect(result.props.anchorY).toBeUndefined();
+    expect(result.props.x).toBeUndefined();
+    expect(result.props.y).toBeUndefined();
+    expect(result.props.width).toBeUndefined();
+    expect(result.props.height).toBeUndefined();
+    expect(result.props.opacity).toBeUndefined();
+  });
+
+  it('supports parentId for nesting', () => {
     const comp = {
       id: 'comp-1',
       parentId: 'parent-container',
@@ -514,49 +504,75 @@ describe('ContainerComponentSchema', () => {
 
 describe('ComponentSchema (discriminated union)', () => {
   it('correctly discriminates by type', () => {
-    const title = ComponentSchema.parse({
-      id: 'c1', type: 'deck-title', props: { text: 'Hello' }
+    const text = ComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 'Hello' },
     });
-    expect(title.type).toBe('deck-title');
+    expect(text.type).toBe('deck-text');
 
-    const list = ComponentSchema.parse({
-      id: 'c2', type: 'deck-list', props: { items: ['a', 'b'] }
+    const image = ComponentSchema.parse({
+      id: 'c2', type: 'deck-image', props: { assetId: 'a' },
     });
-    expect(list.type).toBe('deck-list');
+    expect(image.type).toBe('deck-image');
+
+    const container = ComponentSchema.parse({
+      id: 'c3', type: 'deck-container', props: { gridWidth: 6 },
+    });
+    expect(container.type).toBe('deck-container');
   });
 
   it('rejects invalid component type', () => {
     expect(() => ComponentSchema.parse({
-      id: 'c1', type: 'invalid-component', props: {}
+      id: 'c1', type: 'invalid-component', props: {},
+    })).toThrow();
+  });
+
+  it('rejects old component types', () => {
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-title', props: { text: 'Hello' },
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-subtitle', props: { text: 'Sub' },
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-list', props: { items: ['a'] },
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-floating-image', props: { assetId: 'a' },
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-code', props: { code: 'x' },
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-quote', props: { text: 'q' },
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-columns', props: { columns: [] },
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-spacer', props: {},
+    })).toThrow();
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-headline-subhead', props: { headline: 'H' },
     })).toThrow();
   });
 
   it('rejects mismatched props for type', () => {
-    // deck-list requires items prop
+    // deck-image requires assetId
     expect(() => ComponentSchema.parse({
-      id: 'c1', type: 'deck-list', props: { text: 'hello' }
+      id: 'c1', type: 'deck-image', props: { content: 'hello' },
     })).toThrow();
   });
 });
 
 describe('componentTypes', () => {
   it('contains all expected component types', () => {
-    expect(componentTypes).toContain('deck-title');
-    expect(componentTypes).toContain('deck-subtitle');
     expect(componentTypes).toContain('deck-text');
-    expect(componentTypes).toContain('deck-list');
     expect(componentTypes).toContain('deck-image');
-    expect(componentTypes).toContain('deck-floating-image');
-    expect(componentTypes).toContain('deck-code');
-    expect(componentTypes).toContain('deck-quote');
-    expect(componentTypes).toContain('deck-columns');
-    expect(componentTypes).toContain('deck-spacer');
-    expect(componentTypes).toContain('deck-headline-subhead');
     expect(componentTypes).toContain('deck-container');
   });
 
-  it('has 12 component types', () => {
-    expect(componentTypes).toHaveLength(12);
+  it('has 3 component types', () => {
+    expect(componentTypes).toHaveLength(3);
   });
 });
 
@@ -566,7 +582,7 @@ describe('parentId on components', () => {
       id: 'child-1',
       parentId: 'container-1',
       type: 'deck-text',
-      props: { content: [{ text: 'Inside container' }] },
+      props: { content: 'Inside container' },
     };
     const result = ComponentSchema.parse(comp);
     expect(result.parentId).toBe('container-1');
@@ -575,84 +591,45 @@ describe('parentId on components', () => {
   it('parentId is optional', () => {
     const comp = {
       id: 'top-level',
-      type: 'deck-title',
-      props: { text: 'No parent' },
+      type: 'deck-text',
+      props: { content: 'No parent' },
     };
     const result = ComponentSchema.parse(comp);
     expect(result.parentId).toBeUndefined();
   });
 });
 
-describe('gridWidth across all components', () => {
-  // Grid-based components that support gridWidth (optional)
-  const gridComponentConfigs = [
-    { type: 'deck-title', props: { text: 'T' } },
-    { type: 'deck-subtitle', props: { text: 'S' } },
-    { type: 'deck-text', props: { content: [{ text: 'C' }] } },
-    { type: 'deck-list', props: { items: [] } },
-    { type: 'deck-image', props: { assetId: 'a' } },
-    { type: 'deck-code', props: { code: 'x' } },
-    { type: 'deck-quote', props: { text: 'Q' } },
-    { type: 'deck-columns', props: { columns: [] } },
-    { type: 'deck-spacer', props: {} },
-    { type: 'deck-headline-subhead', props: { headline: 'H' } },
-  ];
+describe('gridWidth across components', () => {
+  it('text and image have optional gridWidth', () => {
+    const textWithout = ComponentSchema.parse({
+      id: 'c1', type: 'deck-text', props: { content: 't' },
+    });
+    expect((textWithout.props as { gridWidth?: number }).gridWidth).toBeUndefined();
 
-  // Container component has required gridWidth
-  const containerComponentConfigs = [
-    { type: 'deck-container', props: { gridWidth: 6 } },
-  ];
+    const textWith = ComponentSchema.parse({
+      id: 'c2', type: 'deck-text', props: { content: 't', gridWidth: 6 },
+    });
+    expect((textWith.props as { gridWidth?: number }).gridWidth).toBe(6);
 
-  // Floating components that use absolute positioning (no gridWidth)
-  const floatingComponentConfigs = [
-    { type: 'deck-floating-image', props: { assetId: 'a' } },
-  ];
+    const imageWithout = ComponentSchema.parse({
+      id: 'c3', type: 'deck-image', props: { assetId: 'a' },
+    });
+    expect((imageWithout.props as { gridWidth?: number }).gridWidth).toBeUndefined();
 
-  it('grid component types support optional gridWidth', () => {
-    for (const config of gridComponentConfigs) {
-      const withGridWidth = {
-        id: 'test-id',
-        type: config.type,
-        props: { ...config.props, gridWidth: 6 },
-      };
-      const result = ComponentSchema.parse(withGridWidth);
-      expect((result.props as { gridWidth?: number }).gridWidth).toBe(6);
-    }
+    const imageWith = ComponentSchema.parse({
+      id: 'c4', type: 'deck-image', props: { assetId: 'a', gridWidth: 4 },
+    });
+    expect((imageWith.props as { gridWidth?: number }).gridWidth).toBe(4);
   });
 
-  it('grid component types work without gridWidth', () => {
-    for (const config of gridComponentConfigs) {
-      const withoutGridWidth = {
-        id: 'test-id',
-        type: config.type,
-        props: config.props,
-      };
-      const result = ComponentSchema.parse(withoutGridWidth);
-      expect((result.props as { gridWidth?: number }).gridWidth).toBeUndefined();
-    }
-  });
+  it('container has required gridWidth', () => {
+    const result = ComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: { gridWidth: 6 },
+    });
+    expect((result.props as { gridWidth: number }).gridWidth).toBe(6);
 
-  it('floating component types do not have gridWidth', () => {
-    for (const config of floatingComponentConfigs) {
-      const component = {
-        id: 'test-id',
-        type: config.type,
-        props: config.props,
-      };
-      const result = ComponentSchema.parse(component);
-      expect('gridWidth' in result.props).toBe(false);
-    }
-  });
-
-  it('container component has required gridWidth', () => {
-    for (const config of containerComponentConfigs) {
-      const withGridWidth = {
-        id: 'test-id',
-        type: config.type,
-        props: config.props,
-      };
-      const result = ComponentSchema.parse(withGridWidth);
-      expect((result.props as { gridWidth: number }).gridWidth).toBe(6);
-    }
+    expect(() => ComponentSchema.parse({
+      id: 'c1', type: 'deck-container', props: {},
+    })).toThrow();
   });
 });

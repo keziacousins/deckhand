@@ -19,7 +19,7 @@ describe('DeckImage', () => {
   it('has correct meta information', () => {
     expect(DeckImage.meta.type).toBe('deck-image');
     expect(DeckImage.meta.name).toBe('Image');
-    expect(DeckImage.meta.category).toBe('media');
+    expect(DeckImage.meta.category).toBe('content');
   });
 
   it('creates element with shadow DOM', () => {
@@ -149,6 +149,42 @@ describe('DeckImage', () => {
     expect(style?.textContent).toContain('50%');
   });
 
+  it('applies border-width and border-color', () => {
+    const el = document.createElement('deck-image') as DeckImage;
+    el.setAttribute('asset-id', 'img-123');
+    el.setAttribute('assets', JSON.stringify({ 'img-123': { url: '/test.png' } }));
+    el.setAttribute('border-width', '3');
+    el.setAttribute('border-color', '#ff0000');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('border: 3px solid #ff0000');
+  });
+
+  it('applies shadow attribute', () => {
+    const el = document.createElement('deck-image') as DeckImage;
+    el.setAttribute('asset-id', 'img-123');
+    el.setAttribute('assets', JSON.stringify({ 'img-123': { url: '/test.png' } }));
+    el.setAttribute('shadow', 'md');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('box-shadow:');
+  });
+
+  it('applies shadow with custom color', () => {
+    const el = document.createElement('deck-image') as DeckImage;
+    el.setAttribute('asset-id', 'img-123');
+    el.setAttribute('assets', JSON.stringify({ 'img-123': { url: '/test.png' } }));
+    el.setAttribute('shadow', 'lg');
+    el.setAttribute('shadow-color', 'rgba(255,0,0,0.5)');
+    document.body.appendChild(el);
+
+    const style = el.shadowRoot?.querySelector('style');
+    expect(style?.textContent).toContain('box-shadow:');
+    expect(style?.textContent).toContain('rgba(255,0,0,');
+  });
+
   it('observes expected attributes', () => {
     expect(DeckImage.observedAttributes).toContain('asset-id');
     expect(DeckImage.observedAttributes).toContain('assets');
@@ -156,6 +192,10 @@ describe('DeckImage', () => {
     expect(DeckImage.observedAttributes).toContain('fit');
     expect(DeckImage.observedAttributes).toContain('darken');
     expect(DeckImage.observedAttributes).toContain('blur');
+    expect(DeckImage.observedAttributes).toContain('border-width');
+    expect(DeckImage.observedAttributes).toContain('border-color');
+    expect(DeckImage.observedAttributes).toContain('shadow');
+    expect(DeckImage.observedAttributes).toContain('shadow-color');
   });
 
   it('updates when asset-id attribute changes', () => {

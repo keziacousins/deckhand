@@ -185,14 +185,14 @@ describe('diffDeck', () => {
       const slideId = Object.keys(prev.slides)[0];
       
       const next = JSON.parse(JSON.stringify(prev));
-      (next.slides[slideId].components[0].props as { text: string }).text = 'Updated Title';
+      (next.slides[slideId].components[0].props as { content: string }).content = 'Updated Title';
       
       const patches = diffDeck(prev, next);
-      // The diff produces a patch for the 'text' property change
+      // The diff produces a patch for the 'content' property change
       expect(patches.some(p => 
         p.op === 'set' && 
         p.path.includes('props') &&
-        p.path.includes('text') &&
+        p.path.includes('content') &&
         p.value === 'Updated Title'
       )).toBe(true);
     });
@@ -202,8 +202,8 @@ describe('diffDeck', () => {
       const slideId = Object.keys(prev.slides)[0];
       const newComp = {
         id: 'comp-new',
-        type: 'deck-title' as const,
-        props: { text: 'New Component' },
+        type: 'deck-text' as const,
+        props: { content: 'New Component' },
       };
       
       const next = {
@@ -269,8 +269,8 @@ describe('diffDeck', () => {
       
       // Add two more components
       const comp1 = prev.slides[slideId].components[0];
-      const comp2 = { id: 'comp-2', type: 'deck-title' as const, props: { text: 'Second' } };
-      const comp3 = { id: 'comp-3', type: 'deck-title' as const, props: { text: 'Third' } };
+      const comp2 = { id: 'comp-2', type: 'deck-text' as const, props: { content: 'Second' } };
+      const comp3 = { id: 'comp-3', type: 'deck-text' as const, props: { content: 'Third' } };
       
       prev.slides[slideId].components = [comp1, comp2, comp3];
       
@@ -339,54 +339,44 @@ describe('diffDeck', () => {
     });
   });
 
-  describe('atomic arrays (rich text)', () => {
-    it('replaces atomic arrays wholesale', () => {
-      // Rich text arrays have no IDs, so they're treated atomically
+  describe('text content changes', () => {
+    it('detects string content change', () => {
       const prev = createTestDeck();
       const slideId = Object.keys(prev.slides)[0];
       
-      // Add a text component with rich text
       prev.slides[slideId].components.push({
         id: 'text-comp',
         type: 'deck-text' as any,
-        props: { content: [{ text: 'Hello' }] },
+        props: { content: 'Hello' },
       });
       
       const next = JSON.parse(JSON.stringify(prev));
-      next.slides[slideId].components[1].props.content = [
-        { text: 'Hello ' },
-        { text: 'World', bold: true },
-      ];
+      next.slides[slideId].components[1].props.content = 'Hello World';
       
       const patches = diffDeck(prev, next);
-      // Should replace the entire content array, not individual spans
       expect(patches.some(p => 
         p.op === 'set' && 
-        Array.isArray(p.value) &&
-        (p.value as unknown[]).length === 2
+        p.value === 'Hello World'
       )).toBe(true);
     });
 
-    it('does not diff individual list items (strings)', () => {
+    it('detects markdown content change', () => {
       const prev = createTestDeck();
       const slideId = Object.keys(prev.slides)[0];
       
-      // Add a list component
       prev.slides[slideId].components.push({
-        id: 'list-comp',
-        type: 'deck-list' as any,
-        props: { items: ['One', 'Two', 'Three'] },
+        id: 'md-comp',
+        type: 'deck-text' as any,
+        props: { content: '- One\n- Two\n- Three', markdown: true },
       });
       
       const next = JSON.parse(JSON.stringify(prev));
-      next.slides[slideId].components[1].props.items = ['One', 'Two Modified', 'Three'];
+      next.slides[slideId].components[1].props.content = '- One\n- Two Modified\n- Three';
       
       const patches = diffDeck(prev, next);
-      // Should replace items array wholesale
       expect(patches.some(p => 
         p.op === 'set' && 
-        Array.isArray(p.value) &&
-        (p.value as string[]).includes('Two Modified')
+        p.value === '- One\n- Two Modified\n- Three'
       )).toBe(true);
     });
   });

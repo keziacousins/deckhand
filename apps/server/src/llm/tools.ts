@@ -97,12 +97,12 @@ export const tools: Anthropic.Tool[] = [
           properties: {
             type: {
               type: 'string',
-              enum: ['deck-title', 'deck-text', 'deck-list', 'deck-image', 'deck-floating-image', 'deck-headline-subhead', 'deck-container'],
+              enum: ['deck-text', 'deck-image', 'deck-container'],
               description: 'The component type',
             },
             props: {
               type: 'object',
-              description: 'Component properties (varies by type). For deck-container: gridWidth (required, 1-12), background, padding, gap, borderRadius, border, alignItems, justifyContent. For deck-image: assetId, alt, caption, fit (contain/cover/fill), darken, blur, maxWidth (pixels), maxHeight (pixels), align (left/center/right), color (hex color for SVG fill)',
+              description: 'Component properties (varies by type). For deck-text: content (string, required), markdown (boolean, opt-in for GH-flavored markdown), size (xs/sm/md/lg/xl/2xl/display), weight (normal/medium/semibold/bold), align (left/center/right), transform (none/uppercase/lowercase/capitalize), color (CSS color string), gridWidth (0-12, optional). For deck-image: assetId, alt, caption, fit (contain/cover/fill), darken (0-100), blur (0-20), maxWidth (px), maxHeight (px), align, color (SVG fill), gridWidth. For deck-container: gridWidth (required 1-12), background, padding (none/sm/md/lg), gap, alignItems, justifyContent. Floating mode: anchorX (left/right), anchorY (top/bottom), x, y, width, height (CSS values), opacity (0-100). Visual props (image & container): borderRadius (none/sm/md/lg/full/pill), borderWidth (0-10), borderColor (CSS color), shadow (none/sm/md/lg), shadowColor (CSS color).',
             },
           },
           required: ['type', 'props'],

@@ -19,7 +19,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@deckhand/schema": "*"
+    "@deckhand/schema": "*",
+    "marked": "^17.0.1"
   },
   "devDependencies": {
     "@vitest/browser": "^2.0.0",

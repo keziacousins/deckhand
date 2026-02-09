@@ -12,18 +12,23 @@ import { useInspectorExpansion } from '../context/InspectorExpansionContext';
 const HEADER_HEIGHT = 41; /* 8px padding + 24px content + 8px padding + 1px border */
 
 /** Get summary text shown in the collapsed header for a component */
-function getSummaryMeta(component: Component, slideTitle?: string): string | null {
+function getSummaryMeta(component: Component): string | null {
   const props = component.props as Record<string, unknown>;
 
   switch (component.type) {
-    case 'deck-title':
-      return (props.text as string) || null;
+    case 'deck-text': {
+      const content = props.content as string | undefined;
+      if (content) {
+        const truncated = content.length > 30 ? content.slice(0, 30) + '...' : content;
+        return truncated;
+      }
+      return null;
+    }
     case 'deck-container': {
       const gw = props.gridWidth as number | undefined;
       return gw ? `${gw} col` : null;
     }
     default: {
-      // Show gridWidth for any component that has one
       const gw = props.gridWidth as number | undefined;
       return gw && gw > 0 ? `${gw} col` : null;
     }
@@ -57,8 +62,6 @@ interface ComponentCardProps {
   stickyIndex?: number;
   /** Ref forwarded to the header element for scroll-into-view */
   headerRef?: React.Ref<HTMLDivElement>;
-  /** Slide title, used as fallback text for deck-title components */
-  slideTitle?: string;
 }
 
 function ComponentCard({
@@ -83,7 +86,6 @@ function ComponentCard({
   dropIndicator = null,
   stickyIndex = 0,
   headerRef,
-  slideTitle,
 }: ComponentCardProps) {
   const meta = registry.getMeta(component.type);
   const componentName = meta?.name ?? component.type;
@@ -153,7 +155,7 @@ function ComponentCard({
         onDragOver={onDragOver}
         onDrop={onDrop}
         onDragEnd={(e) => { onDragEnd(); /* reset after a short delay so click doesn't fire */ setTimeout(() => { didDragRef.current = false; }, 0); }}
-        onClick={() => { if (didDragRef.current) return; if (!isExpanded) onExpand(); }}
+        onClick={() => { if (didDragRef.current) return; onExpand(); }}
       >
         {/* Drag handle */}
         <div className="section-header-drag-handle" title="Drag to reorder">
@@ -187,7 +189,7 @@ function ComponentCard({
         <div className="section-header-title">
           <span className="section-header-name">{componentName}</span>
           {!isExpanded && (() => {
-            const meta = getSummaryMeta(component, slideTitle);
+            const meta = getSummaryMeta(component);
             return meta ? <span className="section-header-meta">{meta}</span> : null;
           })()}
         </div>
@@ -253,7 +255,6 @@ function ComponentCard({
                       <div className="component-group-label">{name}</div>
                     )}
                     {properties.map(([key, descriptor]) => {
-                      const isTitleText = component.type === 'deck-title' && key === 'text';
                       const currentValue = (component.props as Record<string, unknown>)[key];
                       return (
                         <PropertyEditor
@@ -263,11 +264,6 @@ function ComponentCard({
                           value={currentValue}
                           onChange={(value) => onUpdateProp(key, value)}
                           assets={assets}
-                          {...(isTitleText && slideTitle ? {
-                            placeholder: slideTitle,
-                            allowClear: !!currentValue,
-                            onClear: () => onUpdateProp('text', undefined),
-                          } : {})}
                         />
                       );
                     })}
@@ -519,7 +515,6 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
         dropIndicator={cardDropIndicator}
         stickyIndex={cardStickyIndex}
         headerRef={refCallback}
-        slideTitle={selectedSlide?.title}
       />
     );
 

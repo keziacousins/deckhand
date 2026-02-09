@@ -1,41 +1,72 @@
 /**
- * <deck-text> - Text/paragraph component for slides.
- * 
- * A rich text block for body copy, descriptions, etc.
- * Supports formatting (bold, italic, underline, code, links) and alignment.
- * 
- * The content attribute accepts a JSON array of rich text spans:
- * [{ text: "Hello ", bold: true }, { text: "world" }]
+ * <deck-text> - Universal text primitive for slides.
+ *
+ * Content is a plain string. When markdown="true", rendered as
+ * GitHub-flavored markdown via `marked`. Otherwise rendered as
+ * escaped plain text in a <p> tag.
+ *
+ * Supports size, weight, alignment, text-transform, and color overrides.
  */
 
 import { DeckComponent } from '../../base';
 import type { ComponentMeta } from '../../types';
 import { PropertyGroups, CommonProperties } from '../../types';
+import { marked } from 'marked';
 import { styles } from './styles';
 
-interface RichTextSpan {
-  text: string;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  code?: boolean;
-  href?: string;
-}
+// Configure marked for synchronous, inline-friendly rendering
+marked.setOptions({ async: false, gfm: true, breaks: true });
 
 export class DeckText extends DeckComponent {
   static meta: ComponentMeta = {
     type: 'deck-text',
     name: 'Text',
-    description: 'A rich text block for body copy and paragraphs',
+    description: 'Universal text block — plain or markdown',
     category: 'content',
     icon: 'text',
     properties: {
       content: {
-        type: 'richtext',
+        type: 'text',
         label: 'Content',
         required: true,
         placeholder: 'Enter text...',
         group: PropertyGroups.CONTENT,
+      },
+      markdown: {
+        type: 'boolean',
+        label: 'Markdown',
+        default: false,
+        group: PropertyGroups.CONTENT,
+        compact: true,
+      },
+      size: {
+        type: 'enum',
+        label: 'Size',
+        options: [
+          { value: 'xs', label: 'XS' },
+          { value: 'sm', label: 'SM' },
+          { value: 'md', label: 'MD' },
+          { value: 'lg', label: 'LG' },
+          { value: 'xl', label: 'XL' },
+          { value: '2xl', label: '2XL' },
+          { value: 'display', label: 'Display' },
+        ],
+        default: 'md',
+        group: PropertyGroups.STYLE,
+        compact: true,
+      },
+      weight: {
+        type: 'enum',
+        label: 'Weight',
+        options: [
+          { value: 'normal', label: 'Normal' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'semibold', label: 'Semibold' },
+          { value: 'bold', label: 'Bold' },
+        ],
+        default: 'normal',
+        group: PropertyGroups.STYLE,
+        compact: true,
       },
       align: {
         type: 'enum',
@@ -49,6 +80,25 @@ export class DeckText extends DeckComponent {
         group: PropertyGroups.LAYOUT,
         compact: true,
       },
+      transform: {
+        type: 'enum',
+        label: 'Transform',
+        options: [
+          { value: 'none', label: 'None' },
+          { value: 'uppercase', label: 'Uppercase' },
+          { value: 'lowercase', label: 'Lowercase' },
+          { value: 'capitalize', label: 'Capitalize' },
+        ],
+        default: 'none',
+        group: PropertyGroups.STYLE,
+        compact: true,
+      },
+      color: {
+        type: 'color',
+        label: 'Color',
+        group: PropertyGroups.STYLE,
+        compact: true,
+      },
       gridWidth: {
         ...CommonProperties.gridWidth(),
         compact: true,
@@ -56,38 +106,70 @@ export class DeckText extends DeckComponent {
     },
     preview: {
       sampleProps: {
-        content: [{ text: 'This is a sample text block with ' }, { text: 'rich text', bold: true }, { text: ' support.' }],
+        content: 'This is a sample text block.',
+        size: 'md',
         align: 'left',
       },
     },
   };
 
-  static observedAttributes = ['content', 'align', 'editable', 'grid-width'];
+  static observedAttributes = [
+    'content', 'markdown', 'size', 'weight', 'align',
+    'transform', 'color', 'editable', 'grid-width',
+  ];
 
   attributeChangedCallback(): void {
     this.render();
   }
 
   protected render(): void {
-    const contentAttr = this.getAttr('content', '[]');
+    const content = this.getAttr('content', '');
+    const isMarkdown = this.getAttrBool('markdown');
+    const size = this.getAttr('size', 'md');
+    const weight = this.getAttr('weight', 'normal');
     const align = this.getAttr('align', 'left');
+    const transform = this.getAttr('transform', 'none');
+    const color = this.getAttr('color', '');
     const editable = this.getAttrBool('editable');
 
-    // Parse rich text content
-    let spans: RichTextSpan[] = [];
-    try {
-      spans = JSON.parse(contentAttr);
-      if (!Array.isArray(spans)) {
-        spans = [];
-      }
-    } catch {
-      // If not valid JSON, treat as plain text
-      spans = contentAttr ? [{ text: contentAttr }] : [];
-    }
+    const sizeMap: Record<string, string> = {
+      xs: 'var(--deck-font-size-xs, 0.75rem)',
+      sm: 'var(--deck-font-size-sm, 0.875rem)',
+      md: 'var(--deck-font-size-md, 1rem)',
+      lg: 'var(--deck-font-size-lg, 1.25rem)',
+      xl: 'var(--deck-font-size-xl, 1.5rem)',
+      '2xl': 'var(--deck-font-size-2xl, 2rem)',
+      display: 'var(--deck-font-size-5xl, 4rem)',
+    };
+
+    const weightMap: Record<string, string> = {
+      normal: '400',
+      medium: '500',
+      semibold: '600',
+      bold: '700',
+    };
+
+    const fontFamily = size === 'display'
+      ? 'var(--deck-font-display, system-ui, sans-serif)'
+      : 'var(--deck-font-body, system-ui, sans-serif)';
 
     const dynamicStyles = `
-      :host { text-align: ${align}; }
+      :host {
+        text-align: ${align};
+        font-size: ${sizeMap[size] || sizeMap.md};
+        font-weight: ${weightMap[weight] || '400'};
+        font-family: ${fontFamily};
+        text-transform: ${transform === 'none' ? 'none' : transform};
+        ${color ? `color: ${color};` : ''}
+      }
     `;
+
+    let bodyHtml: string;
+    if (isMarkdown) {
+      bodyHtml = `<div class="text markdown"${editable ? ' contenteditable="true" data-placeholder="Enter markdown..."' : ''}>${marked.parse(content) as string}</div>`;
+    } else {
+      bodyHtml = `<p class="text"${editable ? ' contenteditable="true" data-placeholder="Enter text..."' : ''}>${this.escapeHtml(content)}</p>`;
+    }
 
     this.shadow.innerHTML = `
       <style>
@@ -95,7 +177,7 @@ export class DeckText extends DeckComponent {
         ${styles}
         ${dynamicStyles}
       </style>
-      <p class="text"${editable ? ' contenteditable="true" data-placeholder="Enter text..."' : ''}>${this.renderSpans(spans)}</p>
+      ${bodyHtml}
     `;
 
     if (editable) {
@@ -103,48 +185,19 @@ export class DeckText extends DeckComponent {
     }
   }
 
-  /**
-   * Render rich text spans to HTML
-   */
-  private renderSpans(spans: RichTextSpan[]): string {
-    return spans.map(span => {
-      let html = this.escapeHtml(span.text);
-      
-      // Apply formatting - order matters for nesting
-      if (span.code) {
-        html = `<code>${html}</code>`;
-      }
-      if (span.bold) {
-        html = `<strong>${html}</strong>`;
-      }
-      if (span.italic) {
-        html = `<em>${html}</em>`;
-      }
-      if (span.underline) {
-        html = `<u>${html}</u>`;
-      }
-      if (span.href) {
-        html = `<a href="${this.escapeHtml(span.href)}" target="_blank" rel="noopener">${html}</a>`;
-      }
-      
-      return html;
-    }).join('');
-  }
-
   private setupEditing(): void {
-    const p = this.shadow.querySelector('p');
-    if (!p) return;
+    const el = this.shadow.querySelector('.text');
+    if (!el) return;
 
-    p.addEventListener('blur', () => {
-      // For now, emit as plain text - rich text editing would need more work
-      this.emitChange('content', [{ text: p.textContent || '' }]);
+    el.addEventListener('blur', () => {
+      this.emitChange('content', (el as HTMLElement).textContent || '');
     });
 
-    p.addEventListener('keydown', (e: Event) => {
+    el.addEventListener('keydown', (e: Event) => {
       const ke = e as KeyboardEvent;
       if (ke.key === 'Escape') {
         e.preventDefault();
-        p.blur();
+        (el as HTMLElement).blur();
       }
     });
   }

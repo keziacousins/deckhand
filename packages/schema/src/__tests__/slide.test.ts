@@ -161,14 +161,14 @@ describe('SlideSchema', () => {
       components: [
         {
           id: 'comp-1',
-          type: 'deck-title',
-          props: { text: 'Hello' },
+          type: 'deck-text',
+          props: { content: 'Hello' },
         },
       ],
     };
     const result = SlideSchema.parse(slide);
     expect(result.components).toHaveLength(1);
-    expect(result.components[0].type).toBe('deck-title');
+    expect(result.components[0].type).toBe('deck-text');
   });
 
   it('validates optional gridColumns override', () => {

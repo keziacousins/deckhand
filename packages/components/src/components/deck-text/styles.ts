@@ -1,7 +1,7 @@
 /**
  * Styles for deck-text component
- * 
- * A rich text block with formatting support.
+ *
+ * Covers plain text mode and markdown mode.
  * Uses theme tokens via CSS custom properties.
  */
 export const styles = `
@@ -10,28 +10,50 @@ export const styles = `
   }
 
   .text {
-    font-family: var(--deck-font-body, system-ui, sans-serif);
-    font-size: var(--deck-font-size-md, 1rem);
     line-height: 1.6;
-    color: var(--deck-color-text-primary, #1a1a2e);
+    color: inherit;
     margin: 0;
     white-space: pre-wrap;
   }
 
-  /* Rich text formatting */
-  .text strong {
+  /* Markdown mode — rendered HTML gets styling */
+  .text.markdown {
+    white-space: normal;
+  }
+
+  .text.markdown h1,
+  .text.markdown h2,
+  .text.markdown h3,
+  .text.markdown h4,
+  .text.markdown h5,
+  .text.markdown h6 {
+    margin-top: 0;
+    margin-bottom: 0.5em;
+    line-height: 1.3;
+    font-weight: 700;
+  }
+
+  .text.markdown h1 { font-size: 1.6em; }
+  .text.markdown h2 { font-size: 1.35em; }
+  .text.markdown h3 { font-size: 1.15em; }
+
+  .text.markdown p {
+    margin: 0 0 0.75em;
+  }
+
+  .text.markdown p:last-child {
+    margin-bottom: 0;
+  }
+
+  .text.markdown strong {
     font-weight: 600;
   }
 
-  .text em {
+  .text.markdown em {
     font-style: italic;
   }
 
-  .text u {
-    text-decoration: underline;
-  }
-
-  .text code {
+  .text.markdown code {
     font-family: var(--deck-font-mono, ui-monospace, monospace);
     font-size: 0.9em;
     background: var(--deck-color-surface, rgba(0, 0, 0, 0.05));
@@ -39,13 +61,55 @@ export const styles = `
     border-radius: 3px;
   }
 
-  .text a {
+  .text.markdown pre {
+    background: var(--deck-color-surface, rgba(0, 0, 0, 0.05));
+    padding: 0.75em 1em;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0 0 0.75em;
+  }
+
+  .text.markdown pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.85em;
+  }
+
+  .text.markdown ul,
+  .text.markdown ol {
+    margin: 0 0 0.75em;
+    padding-left: 1.5em;
+  }
+
+  .text.markdown li {
+    margin-bottom: 0.25em;
+  }
+
+  .text.markdown li:last-child {
+    margin-bottom: 0;
+  }
+
+  .text.markdown blockquote {
+    border-left: 3px solid var(--deck-color-accent, #3b82f6);
+    padding-left: 1em;
+    margin: 0 0 0.75em;
+    opacity: 0.85;
+  }
+
+  .text.markdown a {
     color: var(--deck-color-accent, #3b82f6);
     text-decoration: underline;
   }
 
-  .text a:hover {
+  .text.markdown a:hover {
     text-decoration: none;
+  }
+
+  .text.markdown hr {
+    border: none;
+    border-top: 1px solid var(--deck-color-text-secondary, #64748b);
+    opacity: 0.3;
+    margin: 1em 0;
   }
 
   /* Editable state */

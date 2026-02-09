@@ -215,8 +215,8 @@ export function createEmptyDeck(title: string = 'Untitled Deck'): Deck {
         components: [
           {
             id: `comp-${crypto.randomUUID().slice(0, 8)}`,
-            type: 'deck-title',
-            props: { text: title, level: '1' },
+            type: 'deck-text',
+            props: { content: title, size: 'display', weight: 'bold', align: 'center' },
           },
         ],
         position: { x: 0, y: 0 },

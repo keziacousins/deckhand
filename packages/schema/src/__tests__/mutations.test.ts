@@ -29,8 +29,8 @@ function createTestDeck(): Deck {
   // Add a slide with a component
   const { deck: deck1, slideId } = addSlide(deck, { title: 'Slide 1' });
   const { deck: deck2 } = addComponent(deck1, slideId, {
-    type: 'deck-title',
-    props: { text: 'Hello World' },
+    type: 'deck-text',
+    props: { content: 'Hello World' },
   });
   return deck2;
 }
@@ -210,7 +210,7 @@ describe('addComponent', () => {
     const slideId = Object.keys(deck.slides)[0];
     const { deck: newDeck, componentId } = addComponent(deck, slideId, {
       type: 'deck-text',
-      props: { text: 'Some text' },
+      props: { content: 'Some text' },
     });
 
     expect(componentId).toMatch(/^comp-/);
@@ -218,7 +218,7 @@ describe('addComponent', () => {
     const component = slide.components.find((c) => c.id === componentId);
     expect(component).toBeDefined();
     expect(component?.type).toBe('deck-text');
-    expect(component?.props.text).toBe('Some text');
+    expect(component?.props.content).toBe('Some text');
   });
 
   it('adds component at specified position', () => {
@@ -226,7 +226,7 @@ describe('addComponent', () => {
     const slideId = Object.keys(deck.slides)[0];
     const { deck: newDeck, componentId } = addComponent(deck, slideId, {
       type: 'deck-text',
-      props: { text: 'Inserted' },
+      props: { content: 'Inserted' },
       position: 0,
     });
 
@@ -246,7 +246,7 @@ describe('addComponent', () => {
     // Then add a child component
     const { deck: deck2, componentId: childId } = addComponent(deck1, slideId, {
       type: 'deck-text',
-      props: { text: 'Child' },
+      props: { content: 'Child' },
       parentId: containerId,
     });
 
@@ -314,11 +314,11 @@ describe('updateComponent', () => {
     const componentId = deck.slides[slideId].components[0].id;
 
     const newDeck = updateComponent(deck, slideId, componentId, {
-      text: 'Updated text',
+      content: 'Updated text',
     });
 
     const component = newDeck.slides[slideId].components[0];
-    expect(component.props.text).toBe('Updated text');
+    expect(component.props.content).toBe('Updated text');
   });
 
   it('merges props updates', () => {
@@ -326,18 +326,18 @@ describe('updateComponent', () => {
     const slideId = Object.keys(deck.slides)[0];
     const componentId = deck.slides[slideId].components[0].id;
 
-    const deck1 = updateComponent(deck, slideId, componentId, { text: 'New text' });
+    const deck1 = updateComponent(deck, slideId, componentId, { content: 'New text' });
     const deck2 = updateComponent(deck1, slideId, componentId, { gridWidth: 6 });
 
     const component = deck2.slides[slideId].components[0];
-    expect(component.props.text).toBe('New text');
+    expect(component.props.content).toBe('New text');
     expect(component.props.gridWidth).toBe(6);
   });
 
   it('throws error for non-existent slide', () => {
     const deck = createTestDeck();
     expect(() =>
-      updateComponent(deck, 'non-existent', 'comp-1', { text: 'Test' })
+      updateComponent(deck, 'non-existent', 'comp-1', { content: 'Test' })
     ).toThrow('Slide non-existent not found');
   });
 
@@ -345,7 +345,7 @@ describe('updateComponent', () => {
     const deck = createTestDeck();
     const slideId = Object.keys(deck.slides)[0];
     expect(() =>
-      updateComponent(deck, slideId, 'non-existent', { text: 'Test' })
+      updateComponent(deck, slideId, 'non-existent', { content: 'Test' })
     ).toThrow('Component non-existent not found');
   });
 });
@@ -375,7 +375,7 @@ describe('deleteComponent', () => {
     });
     const { deck: deck2, componentId: childId } = addComponent(deck1, slideId, {
       type: 'deck-text',
-      props: { text: 'Child' },
+      props: { content: 'Child' },
       parentId: containerId,
     });
 
@@ -415,7 +415,7 @@ describe('reorderComponent', () => {
     // Add second component
     const { deck: deck1, componentId: secondId } = addComponent(deck, slideId, {
       type: 'deck-text',
-      props: { text: 'Second' },
+      props: { content: 'Second' },
     });
 
     const newDeck = reorderComponent(deck1, slideId, secondId, 'up');
@@ -430,7 +430,7 @@ describe('reorderComponent', () => {
     // Add second component
     const { deck: deck1 } = addComponent(deck, slideId, {
       type: 'deck-text',
-      props: { text: 'Second' },
+      props: { content: 'Second' },
     });
 
     const newDeck = reorderComponent(deck1, slideId, firstId, 'down');
@@ -473,11 +473,11 @@ describe('moveComponent', () => {
     // Add more components
     const { deck: deck1, componentId: secondId } = addComponent(deck, slideId, {
       type: 'deck-text',
-      props: { text: 'Second' },
+      props: { content: 'Second' },
     });
     const { deck: deck2 } = addComponent(deck1, slideId, {
       type: 'deck-text',
-      props: { text: 'Third' },
+      props: { content: 'Third' },
     });
 
     const newDeck = moveComponent(deck2, slideId, firstId, 2);
@@ -492,7 +492,7 @@ describe('moveComponent', () => {
 
     const { deck: deck1, componentId: secondId } = addComponent(deck, slideId, {
       type: 'deck-text',
-      props: { text: 'Second' },
+      props: { content: 'Second' },
     });
 
     const newDeck = moveComponent(deck1, slideId, firstId, { newIndex: 1 });
@@ -509,7 +509,7 @@ describe('moveComponent', () => {
     });
     const { deck: deck2, componentId: textId } = addComponent(deck1, slideId, {
       type: 'deck-text',
-      props: { text: 'Move me' },
+      props: { content: 'Move me' },
     });
 
     const newDeck = moveComponent(deck2, slideId, textId, {
@@ -533,7 +533,7 @@ describe('moveComponent', () => {
     });
     const { deck: deck2, componentId: textId } = addComponent(deck1, slideId, {
       type: 'deck-text',
-      props: { text: 'Child' },
+      props: { content: 'Child' },
       parentId: containerId,
     });
 

@@ -130,8 +130,6 @@ export function generateImageBackgroundHtml(options: ImageRenderOptions): {
  */
 export function borderRadiusToCss(radius: string | undefined): string {
   switch (radius) {
-    case 'none':
-      return '0';
     case 'sm':
       return 'var(--deck-radius-sm, 4px)';
     case 'md':
@@ -140,9 +138,54 @@ export function borderRadiusToCss(radius: string | undefined): string {
       return 'var(--deck-radius-lg, 16px)';
     case 'full':
       return '50%';
-    case 'default':
+    case 'pill':
+      return '9999px';
+    case 'none':
     default:
-      return 'var(--deck-radius-md, 8px)';
+      return '0';
+  }
+}
+
+/**
+ * Map shadow preset + optional color to CSS box-shadow value.
+ * 
+ * Uses a two-layer shadow for natural depth. The shadowColor is used
+ * with varying alpha for each layer.
+ */
+export function shadowToCss(shadow: string | undefined, shadowColor?: string): string {
+  const color = shadowColor || 'rgba(0,0,0,0.2)';
+
+  // Parse color to RGB components — supports hex (#rgb, #rrggbb) and rgb()/rgba()
+  let r = '0', g = '0', b = '0';
+  const hexMatch = color.match(/^#([0-9a-f]{3,8})$/i);
+  const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (hexMatch) {
+    const hex = hexMatch[1];
+    if (hex.length === 3) {
+      r = String(parseInt(hex[0] + hex[0], 16));
+      g = String(parseInt(hex[1] + hex[1], 16));
+      b = String(parseInt(hex[2] + hex[2], 16));
+    } else {
+      r = String(parseInt(hex.slice(0, 2), 16));
+      g = String(parseInt(hex.slice(2, 4), 16));
+      b = String(parseInt(hex.slice(4, 6), 16));
+    }
+  } else if (rgbMatch) {
+    r = rgbMatch[1];
+    g = rgbMatch[2];
+    b = rgbMatch[3];
+  }
+
+  switch (shadow) {
+    case 'sm':
+      return `0 2px 4px rgba(${r},${g},${b},0.2), 0 1px 3px rgba(${r},${g},${b},0.15)`;
+    case 'md':
+      return `0 6px 12px rgba(${r},${g},${b},0.2), 0 3px 6px rgba(${r},${g},${b},0.12)`;
+    case 'lg':
+      return `0 15px 35px rgba(${r},${g},${b},0.25), 0 6px 15px rgba(${r},${g},${b},0.15)`;
+    case 'none':
+    default:
+      return 'none';
   }
 }
 
@@ -156,7 +199,11 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
   maxHeight?: number;
   align?: 'left' | 'center' | 'right';
   color?: string; // SVG fill color (for currentColor SVGs)
-  borderRadius?: 'default' | 'none' | 'sm' | 'md' | 'lg' | 'full';
+  borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+  borderWidth?: number;
+  borderColor?: string;
+  shadow?: 'none' | 'sm' | 'md' | 'lg';
+  shadowColor?: string;
 }): {
   html: string;
   styles: string;
@@ -171,6 +218,9 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
   const align = options.align || 'left';
   const color = options.color;
   const borderRadius = borderRadiusToCss(options.borderRadius);
+  const borderWidth = options.borderWidth || 0;
+  const borderColor = options.borderColor || '#000';
+  const boxShadow = shadowToCss(options.shadow, options.shadowColor);
 
   if (!url) {
     // Placeholder when no image
@@ -240,6 +290,8 @@ export function generateImageElementHtml(options: ImageRenderOptions & {
       position: relative;
       overflow: hidden;
       border-radius: ${borderRadius};
+      ${borderWidth > 0 ? `border: ${borderWidth}px solid ${borderColor};` : ''}
+      ${boxShadow !== 'none' ? `box-shadow: ${boxShadow};` : ''}
       ${maxWidth ? `max-width: ${maxWidth}px;` : ''}
       ${maxHeight ? `height: ${maxHeight}px;` : ''}
       ${alignStyles}

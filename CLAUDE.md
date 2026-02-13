@@ -63,6 +63,13 @@ npm run db:init --workspace=apps/server
 4. Patches applied to YDoc, which syncs to all connected clients
 5. Web components in `@deckhand/components` render the slide content
 
+**Component model — 3 primitives:**
+- `deck-text` — All text content. Plain string with opt-in `markdown: true` for GH-flavored markdown (via `marked`). Props: size, weight, align, transform, color.
+- `deck-image` — Images from asset system. Props: assetId, fit, darken, blur, maxWidth/maxHeight, align, color (SVG fill).
+- `deck-container` — Layout grouping. Grid mode (gridWidth sets span + internal columns) or floating mode (anchorX/anchorY for absolute positioning). Props: background, padding, gap, alignItems, justifyContent.
+- Shared `VisualPropsSchema` on image + container: borderRadius (none/sm/md/lg/full/pill), borderWidth, borderColor, shadow (none/sm/md/lg), shadowColor.
+- `CommonProperties` in `packages/components/src/types.ts` provides reusable inspector meta descriptors.
+
 **Key design decisions:**
 - Documents use objects keyed by ID (not arrays) for efficient CRDT sync
 - Web components use Shadow DOM for complete style isolation from editor UI
@@ -72,10 +79,10 @@ npm run db:init --workspace=apps/server
 ## Testing
 
 **Unit tests** use Vitest and are located in `__tests__` directories within each package:
-- `packages/schema/src/__tests__/` - Schema and mutations tests (490 tests)
-- `packages/sync/src/__tests__/` - YDoc diffing/patching tests (190 tests)
-- `packages/components/src/__tests__/` - Web component tests with happy-dom (105 tests)
-- `apps/server/src/__tests__/` - API integration tests with in-memory SQLite (28 tests)
+- `packages/schema/src/__tests__/` - Schema and mutations tests (~290 tests)
+- `packages/sync/src/__tests__/` - YDoc diffing/patching tests (~190 tests)
+- `packages/components/src/__tests__/` - Web component tests with happy-dom (~80 tests)
+- `apps/server/src/__tests__/` - API integration tests with in-memory SQLite (~28 tests)
 
 **E2E tests** use Playwright and are in `tests/` at the project root:
 - `tests/grid-layout.spec.ts` - CSS grid layout verification

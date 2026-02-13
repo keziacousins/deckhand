@@ -288,6 +288,13 @@ export function deleteComponent(deck: Deck, slideId: string, componentId: string
 
   const components = slide.components.filter(c => !idsToDelete.has(c.id));
 
+  // Remove edges that reference any deleted component as source
+  const remainingEdges = Object.fromEntries(
+    Object.entries(deck.flow.edges).filter(
+      ([, edge]) => !idsToDelete.has(edge.from)
+    )
+  );
+
   return {
     ...deck,
     slides: {
@@ -296,6 +303,10 @@ export function deleteComponent(deck: Deck, slideId: string, componentId: string
         ...slide,
         components,
       },
+    },
+    flow: {
+      ...deck.flow,
+      edges: remainingEdges,
     },
   };
 }
@@ -358,12 +369,14 @@ export interface AddEdgeOptions {
 export function addEdge(deck: Deck, options: AddEdgeOptions): { deck: Deck; edgeId: string } {
   const edgeId = generateId('edge');
   
-  // Validate that 'from' exists (slide or start point)
+  // Validate that 'from' exists (slide, start point, or component)
   const fromIsSlide = deck.slides[options.from] !== undefined;
   const fromIsStartPoint = deck.flow.startPoints?.[options.from] !== undefined;
+  const fromIsComponent = !fromIsSlide && !fromIsStartPoint && 
+    Object.values(deck.slides).some(slide => slide.components.some(c => c.id === options.from));
   
-  if (!fromIsSlide && !fromIsStartPoint) {
-    throw new Error(`Source ${options.from} not found (must be a slide or start point)`);
+  if (!fromIsSlide && !fromIsStartPoint && !fromIsComponent) {
+    throw new Error(`Source ${options.from} not found (must be a slide, start point, or component)`);
   }
   
   // Validate that 'to' exists (must be a slide)

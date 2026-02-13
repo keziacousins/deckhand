@@ -490,6 +490,50 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
     [onUpdateDeck, selection.startPointId, clearSelection]
   );
 
+  const handleComponentLinkChange = useCallback(
+    (componentId: string, targetSlideId: string | null) => {
+      onUpdateDeck((d) => {
+        // Find existing edge from this component
+        const existingEntry = Object.entries(d.flow.edges).find(([, e]) => e.from === componentId);
+
+        if (targetSlideId === null) {
+          // Remove link
+          if (!existingEntry) return d;
+          const { [existingEntry[0]]: _, ...remainingEdges } = d.flow.edges;
+          return { ...d, flow: { ...d.flow, edges: remainingEdges } };
+        }
+
+        if (existingEntry) {
+          // Update existing edge target
+          return {
+            ...d,
+            flow: {
+              ...d.flow,
+              edges: {
+                ...d.flow.edges,
+                [existingEntry[0]]: { ...existingEntry[1], to: targetSlideId },
+              },
+            },
+          };
+        }
+
+        // Create new edge
+        const edgeId = `edge-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        return {
+          ...d,
+          flow: {
+            ...d.flow,
+            edges: {
+              ...d.flow.edges,
+              [edgeId]: { id: edgeId, from: componentId, to: targetSlideId, trigger: 'default' as const },
+            },
+          },
+        };
+      });
+    },
+    [onUpdateDeck]
+  );
+
   const context: InspectorContext = useMemo(() => {
     const selectedSlide = selection.slideId ? deck.slides[selection.slideId] : null;
     const selectedComponent =
@@ -508,8 +552,9 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
       onReorderComponent: handleReorderComponent,
       onReorderComponents: handleReorderComponents,
       onMoveComponentToContainer: handleMoveComponentToContainer,
+      onComponentLinkChange: handleComponentLinkChange,
     };
-  }, [deck, selection, handleUpdate, handleAddComponent, handleDeleteComponent, handleReorderComponent, handleReorderComponents, handleMoveComponentToContainer]);
+  }, [deck, selection, handleUpdate, handleAddComponent, handleDeleteComponent, handleReorderComponent, handleReorderComponents, handleMoveComponentToContainer, handleComponentLinkChange]);
 
   const hasSlideSelected = context.selectedSlide !== null;
   const selectedEdge = isEdgeSelected(selection) ? deck.flow.edges[selection.edgeId] : null;

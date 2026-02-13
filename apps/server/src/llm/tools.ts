@@ -194,13 +194,13 @@ export const tools: Anthropic.Tool[] = [
   // Edge tools
   {
     name: 'add_edge',
-    description: 'Add a navigation connection between two slides or from a start point to a slide',
+    description: 'Add a navigation connection. Source can be a slide, start point, or component (for clickable component links in presentation mode).',
     input_schema: {
       type: 'object' as const,
       properties: {
         from: {
           type: 'string',
-          description: 'Source slide ID or start point ID',
+          description: 'Source: slide ID, start point ID, or component ID (for component links)',
         },
         to: {
           type: 'string',

@@ -14,6 +14,8 @@ export interface InspectorContext {
   onReorderComponent?: (slideId: string, componentId: string, direction: 'up' | 'down') => void;
   onReorderComponents?: (slideId: string, components: Component[]) => void;
   onMoveComponentToContainer?: (slideId: string, componentId: string, newParentId: string | null) => void;
+  /** Add, update, or remove a component link (edge from component to slide) */
+  onComponentLinkChange?: (componentId: string, targetSlideId: string | null) => void;
 }
 
 export type InspectorUpdate =

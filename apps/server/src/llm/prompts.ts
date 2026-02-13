@@ -158,6 +158,7 @@ ${generateToolDocumentation()}
 - After making changes, briefly confirm what you did.
 - If the request is ambiguous, ask for clarification rather than guessing.
 - For navigation flow, use edges to connect slides. Start points provide named entry points for different presentation paths.
+- **Component links**: Use add_edge with a component ID as 'from' to make any component clickable in presentation mode. Clicking navigates to the target slide. Example: add_edge({ from: "comp-abc123", to: "slide-metrics" })
 - Use get_deck_state or list_assets to see current state if you need to reference existing content.
 
 Be concise in your responses. The user can see the changes in real-time.`;

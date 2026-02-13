@@ -230,6 +230,36 @@ export function createEmptyDeck(title: string = 'Untitled Deck'): Deck {
 }
 
 /**
+ * Resolve an edge source ID to its type and location.
+ * Sources can be slides, start points, or components (for component links).
+ */
+export function resolveEdgeSource(deck: Deck, sourceId: string):
+  | { type: 'slide'; slideId: string }
+  | { type: 'startPoint'; startPointId: string }
+  | { type: 'component'; slideId: string; componentId: string }
+  | null {
+
+  // Check if it's a slide
+  if (deck.slides[sourceId]) {
+    return { type: 'slide', slideId: sourceId };
+  }
+
+  // Check if it's a start point
+  if (deck.flow.startPoints?.[sourceId]) {
+    return { type: 'startPoint', startPointId: sourceId };
+  }
+
+  // Check if it's a component (search all slides)
+  for (const [slideId, slide] of Object.entries(deck.slides)) {
+    if (slide.components.some(c => c.id === sourceId)) {
+      return { type: 'component', slideId, componentId: sourceId };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Validate a deck document
  */
 export function validateDeck(data: unknown): { success: true; data: Deck } | { success: false; errors: z.ZodError } {

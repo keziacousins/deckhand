@@ -20,11 +20,12 @@ import {
 import { SlideNode, type SlideNodeType } from './SlideNode';
 import { StartPointNode, type StartPointNodeType } from './StartPointNode';
 import { TransitionEdge } from './TransitionEdge';
+import { ComponentLinkEdge } from './ComponentLinkEdge';
 import { ContextMenu } from './ContextMenu';
 import { CanvasHeader } from './CanvasHeader';
 import { useSelection } from '../selection';
 import type { Deck, Slide, StartPoint } from '@deckhand/schema';
-import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS } from '@deckhand/schema';
+import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS, resolveEdgeSource } from '@deckhand/schema';
 import { findClosestTargetHandle } from './handleUtils';
 
 const nodeTypes = {
@@ -34,6 +35,7 @@ const nodeTypes = {
 
 const edgeTypes = {
   transition: TransitionEdge,
+  componentLink: ComponentLinkEdge,
 };
 
 // Union type for all node types
@@ -96,6 +98,18 @@ export function Canvas({
   const slideNodes = useMemo(() => {
     const deckGridColumns = deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
     const assets = deck.assets ?? {};
+    
+    // Pre-compute linked component IDs per slide
+    const linkedComponentsBySlide = new Map<string, string[]>();
+    for (const edge of Object.values(deck.flow.edges)) {
+      const source = resolveEdgeSource(deck, edge.from);
+      if (source?.type === 'component') {
+        const existing = linkedComponentsBySlide.get(source.slideId) ?? [];
+        existing.push(source.componentId);
+        linkedComponentsBySlide.set(source.slideId, existing);
+      }
+    }
+    
     return Object.values(deck.slides).map((slide): SlideNodeType => ({
       id: slide.id,
       type: 'slide',
@@ -110,10 +124,11 @@ export function Canvas({
         selectedComponentId: slide.id === selectedSlideId ? selectedComponentId : null,
         allSlides: deck.slides,
         defaultBackdropSlideId: deck.defaultBackdropSlideId,
+        linkedComponentIds: linkedComponentsBySlide.get(slide.id),
       },
       selected: slide.id === selectedSlideId,
     }));
-  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, deck.assets, deck.defaultBackdropSlideId, showGrid, selectedSlideId, selectedComponentId]);
+  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, deck.assets, deck.defaultBackdropSlideId, deck.flow.edges, showGrid, selectedSlideId, selectedComponentId]);
 
   // Derive start point nodes from deck state
   const startPointNodes = useMemo(() => {
@@ -134,19 +149,39 @@ export function Canvas({
 
   // Derive edges from deck state
   const deckEdges = useMemo((): Edge[] => {
-    return Object.values(deck.flow.edges).map((edge) => ({
-      id: edge.id,
-      source: edge.from,
-      target: edge.to,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      type: 'transition',
-      data: {
-        transition: edge.transition,
-        label: edge.label,
-      },
-    }));
-  }, [deck.flow.edges]);
+    return Object.values(deck.flow.edges).map((edge) => {
+      const source = resolveEdgeSource(deck, edge.from);
+      
+      if (source?.type === 'component') {
+        // Component link edge — source is the slide, uses standard slide handle
+        return {
+          id: edge.id,
+          source: source.slideId,
+          target: edge.to,
+          sourceHandle: edge.sourceHandle ?? 'source-right',
+          targetHandle: edge.targetHandle,
+          type: 'componentLink',
+          data: {
+            componentId: source.componentId,
+          },
+        };
+      }
+      
+      // Slide or start point edge (existing logic)
+      return {
+        id: edge.id,
+        source: edge.from,
+        target: edge.to,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        type: 'transition',
+        data: {
+          transition: edge.transition,
+          label: edge.label,
+        },
+      };
+    });
+  }, [deck.flow.edges, deck.slides]);
 
   // Use React Flow's state management - initialize with empty, sync via effect
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNodeType>([]);
@@ -305,10 +340,11 @@ export function Canvas({
 
       // Update deck state - edges will update via deckEdges memo
       onUpdateDeck((d) => {
-        const sourceId = connection.source!;
         const targetId = connection.target!;
         
-        // Enforce single outgoing edge per node (slide or start point)
+        const sourceId = connection.source!;
+        
+        // Enforce single outgoing edge per source (slide, start point, or component)
         let newEdges = { ...d.flow.edges };
         for (const [existingEdgeId, edge] of Object.entries(newEdges)) {
           if (edge.from === sourceId) {

@@ -1,11 +1,11 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import type { InspectorSectionProps } from '../types';
 import { scrollHeaderToSticky } from '../types';
-import type { Component, Asset } from '@deckhand/schema';
+import type { Component, Asset, Edge, Slide } from '@deckhand/schema';
 import { registry } from '@deckhand/components';
 import type { PropertyDescriptor } from '@deckhand/components';
 import { PropertyGroups } from '@deckhand/components';
-import { PropertyEditor } from '../fields';
+import { PropertyEditor, SelectField } from '../fields';
 import { useSelection } from '../../selection';
 import { useInspectorExpansion } from '../context/InspectorExpansionContext';
 
@@ -62,6 +62,12 @@ interface ComponentCardProps {
   stickyIndex?: number;
   /** Ref forwarded to the header element for scroll-into-view */
   headerRef?: React.Ref<HTMLDivElement>;
+  /** Existing edge from this component (if linked) */
+  linkEdge?: Edge;
+  /** Slides available as link targets */
+  linkTargetSlides?: Slide[];
+  /** Callback to add/update/remove a component link */
+  onLinkChange?: (componentId: string, targetSlideId: string | null) => void;
 }
 
 function ComponentCard({
@@ -86,6 +92,9 @@ function ComponentCard({
   dropIndicator = null,
   stickyIndex = 0,
   headerRef,
+  linkEdge,
+  linkTargetSlides,
+  onLinkChange,
 }: ComponentCardProps) {
   const meta = registry.getMeta(component.type);
   const componentName = meta?.name ?? component.type;
@@ -269,6 +278,20 @@ function ComponentCard({
                     })}
                   </div>
                 ))}
+                {onLinkChange && linkTargetSlides && (
+                  <div className="component-property-group">
+                    <div className="component-group-label">Link</div>
+                    <SelectField
+                      label="Navigate to"
+                      value={linkEdge?.to ?? ''}
+                      options={[
+                        { value: '', label: 'None' },
+                        ...linkTargetSlides.map(s => ({ value: s.id, label: s.title || 'Untitled' })),
+                      ]}
+                      onChange={(value) => onLinkChange(component.id, value || null)}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -282,6 +305,24 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
   const { deck, selectedSlide, selection, onUpdate, onDeleteComponent, onReorderComponent, onReorderComponents, onMoveComponentToContainer } = context;
   const assets = deck.assets ?? {};
   const { selectComponent } = useSelection();
+
+  // Component link data
+  const componentEdgeMap = useMemo(() => {
+    const map = new Map<string, Edge>();
+    for (const edge of Object.values(deck.flow.edges)) {
+      // Check if this edge's source is a component (not a slide or start point)
+      if (!deck.slides[edge.from] && !deck.flow.startPoints?.[edge.from]) {
+        map.set(edge.from, edge);
+      }
+    }
+    return map;
+  }, [deck.flow.edges, deck.slides, deck.flow.startPoints]);
+
+  const linkTargetSlides = useMemo(() => {
+    if (!selection.slideId) return [];
+    return Object.values(deck.slides).filter(s => s.id !== selection.slideId);
+  }, [deck.slides, selection.slideId]);
+  const { onComponentLinkChange } = context;
   const { isComponentExpanded, expandComponent, collapseComponent, resetComponents } = useInspectorExpansion();
   
   // Drag and drop state - track by component ID
@@ -515,6 +556,9 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
         dropIndicator={cardDropIndicator}
         stickyIndex={cardStickyIndex}
         headerRef={refCallback}
+        linkEdge={componentEdgeMap.get(component.id)}
+        linkTargetSlides={linkTargetSlides}
+        onLinkChange={onComponentLinkChange}
       />
     );
 
@@ -530,6 +574,7 @@ export function ComponentList({ context, stickyIndex = 0 }: InspectorSectionProp
     components, draggedComponentId, dropTargetId, dropIndicator, slideId, isComponentExpanded, assets,
     handleExpand, handleCollapse, onDeleteComponent, onReorderComponent, onMoveComponentToContainer, onUpdate,
     handleDragStart, handleDragOver, handleDrop, handleDragEnd, getChildComponents, topLevelComponents,
+    componentEdgeMap, linkTargetSlides, onComponentLinkChange,
   ]);
 
   // Early returns AFTER all hooks

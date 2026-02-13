@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useYDoc } from '../sync';
-import type { Deck, Slide, TransitionType } from '@deckhand/schema';
-import { DEFAULT_GRID_COLUMNS, SLIDE_WIDTH, getSlideHeight, themeToCssProperties, DEFAULT_TRANSITION_DURATION } from '@deckhand/schema';
+import type { Deck, Slide, TransitionType, Edge } from '@deckhand/schema';
+import { DEFAULT_GRID_COLUMNS, SLIDE_WIDTH, getSlideHeight, themeToCssProperties, DEFAULT_TRANSITION_DURATION, resolveEdgeSource } from '@deckhand/schema';
 import { renderComponent, getTopLevelComponents } from '../utils/renderComponent';
 import './Presentation.css';
+
+const RADIUS_MAP: Record<string, string> = {
+  sm: '4px',
+  md: '8px',
+  lg: '16px',
+  full: '50%',
+  pill: '9999px',
+};
 
 interface PresentationProps {
   deckId: string;
@@ -95,11 +103,16 @@ function SlideRenderer({
   deck,
   visitedSlideIds = new Set(),
   isBackdrop = false,
+  componentLinks,
+  onComponentClick,
 }: { 
   slide: Slide; 
   deck: Deck;
   visitedSlideIds?: Set<string>;
   isBackdrop?: boolean;
+  /** Map of componentId → edge for this slide's linked components */
+  componentLinks?: Map<string, Edge>;
+  onComponentClick?: (componentId: string) => void;
 }) {
   const gridColumns = slide.gridColumns ?? deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
   const style = slide.style ?? {};
@@ -205,9 +218,31 @@ function SlideRenderer({
         background-blur={hasBackdrop ? undefined : style.backgroundBlur?.toString()}
         background-transparent={useTransparentBg ? 'true' : undefined}
       >
-        {getTopLevelComponents(slide.components).map((component) => 
-          renderComponent(component, { assets, allComponents: slide.components })
-        )}
+        {getTopLevelComponents(slide.components).map((component) => {
+          const isLinked = componentLinks?.has(component.id);
+          const rendered = renderComponent(component, { assets, allComponents: slide.components });
+          
+          if (isLinked && onComponentClick) {
+            const props = component.props as Record<string, unknown>;
+            const br = props.borderRadius as string | undefined;
+            const borderRadius = br && br !== 'none' ? RADIUS_MAP[br] : undefined;
+            return (
+              <div
+                key={component.id}
+                className="component-link"
+                data-component-id={component.id}
+                style={{
+                  gridColumn: props.gridWidth ? `span ${props.gridWidth}` : undefined,
+                  borderRadius,
+                }}
+              >
+                {rendered}
+              </div>
+            );
+          }
+          
+          return rendered;
+        })}
       </deck-slide>
     </div>
   );
@@ -228,6 +263,12 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const [transition, setTransition] = useState<TransitionState | null>(null);
+  // Play order start slide — changes when a component link jumps outside
+  // the current linear order.
+  const [playOrderStart, setPlayOrderStart] = useState<string | undefined>(undefined);
+  // Navigation history stack — tracks positions before component link jumps
+  // so "back" returns to the jump origin rather than the linear predecessor.
+  const [navHistory, setNavHistory] = useState<Array<{ start: string | undefined; index: number }>>([]);
 
   // Calculate scale to fit slide in viewport while maintaining aspect ratio
   useEffect(() => {
@@ -252,12 +293,11 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     return () => window.removeEventListener('resize', updateScale);
   }, [deck]);
 
-  // Compute play order once deck is loaded
+  // Compute play order — recomputes when a component link jumps to a new start
   const playOrder = useMemo(() => {
     if (!deck) return [];
     
-    // Determine starting slide - use provided slide or fall back to first slide
-    let start = startSlideId;
+    let start = playOrderStart ?? startSlideId;
     if (!start || !deck.slides[start]) {
       const slideIds = Object.keys(deck.slides);
       start = slideIds[0];
@@ -265,14 +305,66 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     
     if (!start) return [];
     return computePlayOrder(deck, start);
-  }, [deck, startSlideId]);
+  }, [deck, startSlideId, playOrderStart]);
 
   const currentEntry = playOrder[currentIndex];
   const currentSlideId = currentEntry?.slideId;
   const currentSlide = deck?.slides[currentSlideId];
   
   const canGoNext = currentIndex < playOrder.length - 1 && !transition?.isTransitioning;
-  const canGoPrev = currentIndex > 0 && !transition?.isTransitioning;
+  const canGoPrev = (currentIndex > 0 || navHistory.length > 0) && !transition?.isTransitioning;
+
+  // Component links for the current slide.
+  // If a linked component is nested inside a container, bubble the link
+  // up to the top-level ancestor (same logic as the editor badge).
+  const componentLinks = useMemo(() => {
+    if (!deck || !currentSlideId) return new Map<string, Edge>();
+    const slide = deck.slides[currentSlideId];
+    if (!slide) return new Map<string, Edge>();
+    
+    const links = new Map<string, Edge>();
+    for (const edge of Object.values(deck.flow.edges)) {
+      const source = resolveEdgeSource(deck, edge.from);
+      if (source?.type === 'component' && source.slideId === currentSlideId) {
+        // Walk up to top-level ancestor
+        let comp = slide.components.find(c => c.id === source.componentId);
+        while (comp?.parentId) {
+          comp = slide.components.find(c => c.id === comp!.parentId);
+        }
+        const topLevelId = comp?.id ?? source.componentId;
+        links.set(topLevelId, edge);
+      }
+    }
+    return links;
+  }, [deck, currentSlideId]);
+
+  // Navigate to a slide by ID (for component links).
+  // Pushes current position onto navHistory so "back" returns here.
+  const navigateToSlide = useCallback((targetSlideId: string, edgeTransition?: TransitionType) => {
+    if (!deck || transition?.isTransitioning) return;
+    if (!deck.slides[targetSlideId]) return;
+    
+    // Save current position so back returns here
+    setNavHistory(h => [...h, { start: playOrderStart, index: currentIndex }]);
+    
+    const targetIndex = playOrder.findIndex(e => e.slideId === targetSlideId);
+    
+    if (targetIndex !== -1) {
+      // Target is in current play order — just jump to it
+      setCurrentIndex(targetIndex);
+    } else {
+      // Target not in current play order — recompute from target slide
+      setPlayOrderStart(targetSlideId);
+      setCurrentIndex(0);
+    }
+  }, [deck, transition, playOrder, currentIndex, playOrderStart]);
+
+  const handleComponentClick = useCallback((componentId: string) => {
+    const edge = componentLinks.get(componentId);
+    if (edge) {
+      navigateToSlide(edge.to, edge.transition);
+    }
+  }, [componentLinks, navigateToSlide]);
 
   const goNext = useCallback(() => {
     if (!canGoNext || !deck) return;
@@ -310,6 +402,15 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   const goPrev = useCallback(() => {
     if (!canGoPrev || !deck) return;
     
+    // If at the start of current play order and there's history, pop back
+    if (currentIndex === 0 && navHistory.length > 0) {
+      const prev = navHistory[navHistory.length - 1];
+      setNavHistory(h => h.slice(0, -1));
+      setPlayOrderStart(prev.start);
+      setCurrentIndex(prev.index);
+      return;
+    }
+    
     const prevIndex = currentIndex - 1;
     // Use the edge that led to the current slide, but reverse direction
     const { type, duration } = getTransitionInfo(deck, currentEntry.incomingEdgeId, 'backward');
@@ -338,7 +439,7 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
         setTransition(null);
       }, duration * 1000);
     }
-  }, [canGoPrev, currentIndex, currentEntry, deck]);
+  }, [canGoPrev, currentIndex, currentEntry, deck, navHistory]);
 
   // Track if we were ever in fullscreen (to know if exiting fullscreen should exit presentation)
   const wasInFullscreen = useRef(false);
@@ -413,14 +514,28 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goNext, goPrev, onExit, playOrder.length]);
 
-  // Click to advance
+  // Click to advance (or follow component link)
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // Don't advance if clicking on interactive elements
     const target = e.target as HTMLElement;
+
+    // Don't advance if clicking on interactive elements
     if (target.closest('a, button, input, textarea')) return;
-    
+
+    // Check if click is inside a component link.
+    // Use composedPath to pierce Shadow DOM boundaries.
+    const path = e.nativeEvent.composedPath();
+    for (const el of path) {
+      if (el instanceof HTMLElement && el.classList.contains('component-link')) {
+        const compId = el.getAttribute('data-component-id');
+        if (compId) {
+          handleComponentClick(compId);
+          return;
+        }
+      }
+    }
+
     goNext();
-  }, [goNext]);
+  }, [goNext, handleComponentClick, componentLinks]);
 
   // Show loading state
   if (status === 'connecting' || (status === 'connected' && !deck)) {
@@ -490,7 +605,12 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
           </div>
         ) : (
           // Normal: show current slide
-          <SlideRenderer slide={currentSlide} deck={deck} />
+          <SlideRenderer
+            slide={currentSlide}
+            deck={deck}
+            componentLinks={componentLinks}
+            onComponentClick={handleComponentClick}
+          />
         )}
       </div>
       

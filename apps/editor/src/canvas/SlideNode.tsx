@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import type { Slide, Theme, AspectRatio, Asset, SlidesMap } from '@deckhand/schema';
 import { SLIDE_WIDTH, getSlideHeight, themeToCssProperties } from '@deckhand/schema';
@@ -17,6 +17,8 @@ type SlideNodeData = {
   // For backdrop slide rendering
   allSlides: SlidesMap;
   defaultBackdropSlideId?: string;
+  // Component IDs that are edge sources (component links)
+  linkedComponentIds?: string[];
 };
 
 export type SlideNodeType = Node<SlideNodeData, 'slide'>;
@@ -111,12 +113,35 @@ export const SlideNode = memo(function SlideNode({
   selected,
   id,
 }: NodeProps<SlideNodeType>) {
-  const { slide, theme, aspectRatio, gridColumns, assets, showGrid, selectedComponentId, allSlides, defaultBackdropSlideId } = data;
+  const { slide, theme, aspectRatio, gridColumns, assets, showGrid, selectedComponentId, allSlides, defaultBackdropSlideId, linkedComponentIds } = data;
   const slideHeight = getSlideHeight(aspectRatio);
   // Use slide-specific gridColumns if set, otherwise use deck default
   const effectiveGridColumns = slide.gridColumns ?? gridColumns;
   const { selectComponent, selectSlide } = useSelection();
   const assetsJson = JSON.stringify(assets);
+  const nodeRef = useRef<HTMLDivElement>(null);
+  // Build the set of component IDs that should show a link badge.
+  // If a linked component is nested inside a container, bubble the badge
+  // up to the top-level ancestor so it doesn't get clipped.
+  const linkedComponentIdSet = useMemo(() => {
+    if (!linkedComponentIds?.length) return new Set<string>();
+    const badgeIds = new Set<string>();
+    for (const compId of linkedComponentIds) {
+      const comp = slide.components.find(c => c.id === compId);
+      if (!comp) continue;
+      if (comp.parentId) {
+        // Walk up to the top-level ancestor
+        let ancestor = slide.components.find(c => c.id === comp.parentId);
+        while (ancestor?.parentId) {
+          ancestor = slide.components.find(c => c.id === ancestor!.parentId);
+        }
+        badgeIds.add(ancestor?.id ?? compId);
+      } else {
+        badgeIds.add(compId);
+      }
+    }
+    return badgeIds;
+  }, [linkedComponentIds, slide.components]);
 
   // Handle clicks on the slide content to select components
   const handleDetailClick = useCallback((e: React.MouseEvent) => {
@@ -160,6 +185,7 @@ export const SlideNode = memo(function SlideNode({
 
   return (
     <div
+      ref={nodeRef}
       className={`slide-node ${selected ? 'selected' : ''}`}
       style={{ width: SLIDE_WIDTH, height: slideHeight }}
     >
@@ -224,6 +250,7 @@ export const SlideNode = memo(function SlideNode({
               selectedComponentId: selectedComponentId ?? undefined,
               assets,
               allComponents: slide.components,
+              linkedComponentIds: linkedComponentIdSet,
             })
           )}
         </deck-slide>

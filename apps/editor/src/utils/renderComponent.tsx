@@ -108,6 +108,8 @@ function isFloatingComponent(component: Component): boolean {
 interface RenderComponentOptions extends RenderOptions {
   /** All components in the slide, needed for rendering container children */
   allComponents?: Component[];
+  /** Component IDs that have links (for rendering link badge in editor) */
+  linkedComponentIds?: Set<string>;
 }
 
 /**
@@ -139,18 +141,93 @@ export function renderComponent(
       renderComponent(child, { ...options, allComponents: options.allComponents })
     );
     
-    return React.createElement(
-      component.type,
-      { key: component.id, ...attrs },
-      ...childElements
+    return wrapIfLinked(
+      React.createElement(
+        component.type,
+        { key: component.id, ...attrs },
+        ...childElements
+      ),
+      component,
+      options,
     );
   }
 
   // Use createElement to dynamically create the custom element
-  return React.createElement(component.type, {
+  return wrapIfLinked(
+    React.createElement(component.type, {
+      key: component.id,
+      ...attrs,
+    }),
+    component,
+    options,
+  );
+}
+
+/** Link icon badge — small chain-link SVG */
+const LinkBadge = React.createElement(
+  'div',
+  {
+    className: 'component-link-badge',
+    title: 'Linked to another slide',
+  },
+  React.createElement(
+    'svg',
+    { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+    React.createElement('path', { d: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' }),
+    React.createElement('path', { d: 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' }),
+  )
+);
+
+/**
+ * If the component has a link, wrap it in a div with a link badge.
+ * The wrapper inherits grid-width and data-component-id so slotting and
+ * click-to-select still work.
+ */
+function wrapIfLinked(
+  element: React.ReactElement,
+  component: Component,
+  options: RenderComponentOptions,
+): React.ReactElement {
+  if (!options.linkedComponentIds?.has(component.id)) return element;
+
+  // Move grid-width and data-component-id to the wrapper so
+  // <deck-slide>'s ::slotted() rules and click-to-select still work.
+  const props = component.props as Record<string, unknown>;
+  const gridWidth = props.gridWidth;
+  const borderRadius = props.borderRadius as string | undefined;
+
+  const wrapperStyle: React.CSSProperties = { position: 'relative' };
+  if (borderRadius && borderRadius !== 'none') {
+    const radiusMap: Record<string, string> = {
+      sm: '4px',
+      md: '8px',
+      lg: '16px',
+      full: '50%',
+      pill: '9999px',
+    };
+    wrapperStyle.borderRadius = radiusMap[borderRadius] ?? '0';
+  }
+
+  const wrapperAttrs: Record<string, unknown> = {
     key: component.id,
-    ...attrs,
-  });
+    className: 'component-link-wrapper',
+    style: wrapperStyle,
+  };
+  if (gridWidth !== undefined) {
+    wrapperAttrs['grid-width'] = String(gridWidth);
+  }
+  if (options.editorMode) {
+    wrapperAttrs['data-component-id'] = component.id;
+  }
+
+  // Strip grid-width and data-component-id from inner element so they
+  // don't duplicate on the slotted element
+  const innerProps = { ...element.props };
+  delete innerProps['grid-width'];
+  delete innerProps['data-component-id'];
+  const innerElement = React.cloneElement(element, innerProps);
+
+  return React.createElement('div', wrapperAttrs, innerElement, LinkBadge);
 }
 
 /**

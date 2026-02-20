@@ -37,6 +37,7 @@ export const TextComponentSchema = BaseComponentSchema.extend({
   props: GridPropsSchema.extend({
     content: z.string(),
     markdown: z.boolean().optional(),
+    tableStriped: z.boolean().optional(),
     size: z.enum(['xs', 'sm', 'md', 'lg', 'xl', '2xl', 'display']).optional(),
     weight: z.enum(['normal', 'medium', 'semibold', 'bold']).optional(),
     align: z.enum(['left', 'center', 'right']).optional(),

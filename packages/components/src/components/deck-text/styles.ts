@@ -112,6 +112,35 @@ export const styles = `
     margin: 1em 0;
   }
 
+  /* Tables */
+  .text.markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 0.75em;
+    font-size: 0.95em;
+  }
+
+  .text.markdown table:last-child {
+    margin-bottom: 0;
+  }
+
+  .text.markdown th,
+  .text.markdown td {
+    padding: 0.4em 0.75em;
+    border: 1px solid color-mix(in srgb, var(--deck-color-text-secondary, #64748b) 30%, transparent);
+    text-align: left;
+  }
+
+  .text.markdown th {
+    font-weight: 600;
+    background: var(--deck-color-surface, rgba(0, 0, 0, 0.05));
+  }
+
+  /* Striped rows (opt-in) */
+  .text.markdown.table-striped tr:nth-child(even) td {
+    background: var(--deck-color-surface, rgba(0, 0, 0, 0.05));
+  }
+
   /* Editable state */
   .text[contenteditable="true"] {
     cursor: text;

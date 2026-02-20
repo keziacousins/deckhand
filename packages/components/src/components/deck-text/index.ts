@@ -39,6 +39,13 @@ export class DeckText extends DeckComponent {
         group: PropertyGroups.CONTENT,
         compact: true,
       },
+      tableStriped: {
+        type: 'boolean',
+        label: 'Striped tables',
+        default: false,
+        group: PropertyGroups.STYLE,
+        compact: true,
+      },
       size: {
         type: 'enum',
         label: 'Size',
@@ -115,7 +122,8 @@ export class DeckText extends DeckComponent {
 
   static observedAttributes = [
     'content', 'markdown', 'size', 'weight', 'align',
-    'transform', 'color', 'editable', 'grid-width',
+    'transform', 'color', 'editable', 'grid-width', 'linked',
+    'table-striped',
   ];
 
   attributeChangedCallback(): void {
@@ -131,6 +139,7 @@ export class DeckText extends DeckComponent {
     const transform = this.getAttr('transform', 'none');
     const color = this.getAttr('color', '');
     const editable = this.getAttrBool('editable');
+    const tableStriped = this.getAttrBool('table-striped');
 
     const sizeMap: Record<string, string> = {
       xs: 'var(--deck-font-size-xs, 0.75rem)',
@@ -166,16 +175,29 @@ export class DeckText extends DeckComponent {
 
     let bodyHtml: string;
     if (isMarkdown) {
-      bodyHtml = `<div class="text markdown"${editable ? ' contenteditable="true" data-placeholder="Enter markdown..."' : ''}>${marked.parse(content) as string}</div>`;
+      const mdClasses = `text markdown${tableStriped ? ' table-striped' : ''}`;
+      bodyHtml = `<div class="${mdClasses}"${editable ? ' contenteditable="true" data-placeholder="Enter markdown..."' : ''}>${marked.parse(content) as string}</div>`;
     } else {
       bodyHtml = `<p class="text"${editable ? ' contenteditable="true" data-placeholder="Enter text..."' : ''}>${this.escapeHtml(content)}</p>`;
     }
+
+    const linkedStyles = `
+      :host([linked]) {
+        transition: box-shadow 200ms ease, transform 200ms ease;
+      }
+      :host([linked]:hover) {
+        box-shadow: 0 0 0 3px var(--deck-color-accent, #3b82f6),
+                    0 0 12px 2px color-mix(in srgb, var(--deck-color-accent, #3b82f6) 40%, transparent);
+        transform: scale(1.02);
+      }
+    `;
 
     this.shadow.innerHTML = `
       <style>
         ${this.getBaseStyles()}
         ${styles}
         ${dynamicStyles}
+        ${linkedStyles}
       </style>
       ${bodyHtml}
     `;

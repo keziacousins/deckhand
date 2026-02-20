@@ -177,22 +177,21 @@
 }
 
 /* ===========================================
-   Component Link Hover Affordance
+   Component Link Wrapper
    =========================================== */
 
 .component-link {
   cursor: pointer !important;
   transition: box-shadow 200ms ease, transform 200ms ease;
-  overflow: hidden;
+  outline: none;
 }
 
-/* Ensure cursor propagates through all descendants including Shadow DOM hosts */
 .component-link * {
   cursor: pointer !important;
 }
 
 .component-link:hover {
-  box-shadow: 0 0 0 2px var(--deck-color-accent, #3b82f6),
+  box-shadow: 0 0 0 3px var(--deck-color-accent, #3b82f6),
               0 0 12px 2px color-mix(in srgb, var(--deck-color-accent, #3b82f6) 40%, transparent);
   transform: scale(1.02);
 }

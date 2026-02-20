@@ -110,6 +110,8 @@ interface RenderComponentOptions extends RenderOptions {
   allComponents?: Component[];
   /** Component IDs that have links (for rendering link badge in editor) */
   linkedComponentIds?: Set<string>;
+  /** When true, sets the `linked` attribute on the component for hover glow */
+  linked?: boolean;
 }
 
 /**
@@ -134,11 +136,17 @@ export function renderComponent(
     attrs['slot'] = 'floating';
   }
 
+  // Set linked attribute for Shadow DOM hover glow
+  if (options.linked) {
+    attrs['linked'] = 'true';
+  }
+
   // For containers, render children inside
   if (component.type === 'deck-container' && options.allComponents) {
     const children = options.allComponents.filter(c => c.parentId === component.id);
+    const childOptions = { ...options, linked: undefined };
     const childElements = children.map(child => 
-      renderComponent(child, { ...options, allComponents: options.allComponents })
+      renderComponent(child, childOptions)
     );
     
     return wrapIfLinked(

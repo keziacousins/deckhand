@@ -174,6 +174,7 @@ export class DeckContainer extends DeckComponent {
     'width',
     'height',
     'opacity',
+    'linked',
   ];
 
   attributeChangedCallback(): void {
@@ -282,6 +283,18 @@ export class DeckContainer extends DeckComponent {
       dynamicStyles.push('overflow: hidden;');
     }
 
+    const linkedStyles = `
+      :host([linked]) {
+        transition: box-shadow 200ms ease, transform 200ms ease;
+        cursor: pointer !important;
+      }
+      :host([linked]:hover) {
+        box-shadow: 0 0 0 3px var(--deck-color-accent, #3b82f6),
+                    0 0 12px 2px color-mix(in srgb, var(--deck-color-accent, #3b82f6) 40%, transparent) !important;
+        transform: scale(1.02);
+      }
+    `;
+
     this.shadow.innerHTML = `
       <style>
         ${this.getBaseStyles()}
@@ -289,6 +302,7 @@ export class DeckContainer extends DeckComponent {
         :host {
           ${dynamicStyles.join('\n          ')}
         }
+        ${linkedStyles}
       </style>
       <slot></slot>
     `;

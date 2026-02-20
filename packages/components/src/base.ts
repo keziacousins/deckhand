@@ -89,6 +89,10 @@ export abstract class DeckComponent extends HTMLElement {
         display: none;
       }
 
+      :host([linked]) {
+        cursor: pointer !important;
+      }
+
       * {
         box-sizing: border-box;
         margin: 0;

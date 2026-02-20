@@ -128,7 +128,7 @@ export class DeckImage extends DeckComponent {
     },
   };
 
-  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-width', 'max-height', 'align', 'color', 'border-radius', 'border-width', 'border-color', 'shadow', 'shadow-color', 'grid-width'];
+  static observedAttributes = ['asset-id', 'assets', 'alt', 'caption', 'fit', 'darken', 'blur', 'max-width', 'max-height', 'align', 'color', 'border-radius', 'border-width', 'border-color', 'shadow', 'shadow-color', 'grid-width', 'linked'];
 
   attributeChangedCallback(): void {
     this.render();
@@ -172,11 +172,26 @@ export class DeckImage extends DeckComponent {
       shadowColor: shadowColor || undefined,
     });
 
+    // Always include linked styles — they only activate when the linked attribute is present.
+    // This avoids re-render timing issues since attributeChangedCallback may fire
+    // after initial connectedCallback render.
+    const linkedStyles = `
+      :host([linked]) .image-wrapper {
+        transition: box-shadow 200ms ease, transform 200ms ease;
+      }
+      :host([linked]:hover) .image-wrapper {
+        box-shadow: 0 0 0 3px var(--deck-color-accent, #3b82f6),
+                    0 0 12px 2px color-mix(in srgb, var(--deck-color-accent, #3b82f6) 40%, transparent) !important;
+        transform: scale(1.02);
+      }
+    `;
+
     this.shadow.innerHTML = `
       <style>
         ${this.getBaseStyles()}
         ${styles}
         ${imageStyles}
+        ${linkedStyles}
       </style>
       ${content}
     `;

@@ -13,6 +13,14 @@ const RADIUS_MAP: Record<string, string> = {
   pill: '9999px',
 };
 
+/** Resolve effective border-radius for the link wrapper.
+ *  Images default to 'md' (matches their Shadow DOM default). */
+function componentBorderRadius(type: string, borderRadius: string | undefined): string | undefined {
+  if (borderRadius && borderRadius !== 'none') return RADIUS_MAP[borderRadius];
+  if (type === 'deck-image') return RADIUS_MAP.md;
+  return undefined;
+}
+
 interface PresentationProps {
   deckId: string;
   startSlideId?: string;
@@ -220,12 +228,15 @@ function SlideRenderer({
       >
         {getTopLevelComponents(slide.components).map((component) => {
           const isLinked = componentLinks?.has(component.id);
-          const rendered = renderComponent(component, { assets, allComponents: slide.components });
+          const rendered = renderComponent(component, {
+            assets,
+            allComponents: slide.components,
+            linked: isLinked ? true : undefined,
+          });
           
           if (isLinked && onComponentClick) {
             const props = component.props as Record<string, unknown>;
-            const br = props.borderRadius as string | undefined;
-            const borderRadius = br && br !== 'none' ? RADIUS_MAP[br] : undefined;
+            const br = componentBorderRadius(component.type, props.borderRadius as string | undefined);
             return (
               <div
                 key={component.id}
@@ -233,7 +244,8 @@ function SlideRenderer({
                 data-component-id={component.id}
                 style={{
                   gridColumn: props.gridWidth ? `span ${props.gridWidth}` : undefined,
-                  borderRadius,
+                  borderRadius: br,
+                  overflow: 'hidden',
                 }}
               >
                 {rendered}

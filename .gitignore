@@ -42,3 +42,6 @@ apps/server/deck-data/
 
 # Coverage reports
 coverage/
+
+# MCP config (local)
+.mcp.json

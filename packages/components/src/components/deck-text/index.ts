@@ -44,7 +44,6 @@ export class DeckText extends DeckComponent {
         label: 'Striped tables',
         default: false,
         group: PropertyGroups.STYLE,
-        compact: true,
       },
       size: {
         type: 'enum',

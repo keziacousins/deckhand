@@ -11,6 +11,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Y from 'yjs';
 import { yDocToDeck, diffDeck, applyPatchesToYDoc } from '@deckhand/sync';
 import type { Deck } from '@deckhand/schema';
+import { getAuthToken } from '../api/decks';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -127,7 +128,11 @@ export function useYDoc(deckId: string): UseYDocResult {
         return;
       }
 
-      const ws = new WebSocket(`${WS_BASE}/ws/${deckId}`);
+      const token = getAuthToken();
+      const wsUrl = token
+        ? `${WS_BASE}/ws/${deckId}?token=${encodeURIComponent(token)}`
+        : `${WS_BASE}/ws/${deckId}`;
+      const ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
 

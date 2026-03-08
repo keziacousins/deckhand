@@ -14,15 +14,20 @@ import {
 } from '../db/decks.js';
 import { createEmptyDeck, generateDeckId, validateDeck } from '@deckhand/schema';
 import { getActiveSession } from '../sessions.js';
+import { getAuthUser } from '../middleware/auth.js';
+import { requireDeckRole } from '../middleware/permissions.js';
 
 export const decksRouter = Router();
 
 /**
- * GET /api/decks - List all decks
+ * GET /api/decks - List decks the user owns or has access to
  */
-decksRouter.get('/', async (_req, res) => {
+decksRouter.get('/', async (req, res) => {
   try {
-    const decks = await listDecks();
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+    const decks = await listDecks(user.sub);
     res.json(decks);
   } catch (error) {
     console.error('[API] Error listing decks:', error);
@@ -31,9 +36,9 @@ decksRouter.get('/', async (_req, res) => {
 });
 
 /**
- * GET /api/decks/:id - Get a single deck
+ * GET /api/decks/:id - Get a single deck (viewer+)
  */
-decksRouter.get('/:id', async (req, res) => {
+decksRouter.get('/:id', requireDeckRole('owner', 'editor', 'viewer'), async (req, res) => {
   try {
     const deck = await getDeck(req.params.id);
     if (!deck) {
@@ -45,6 +50,7 @@ decksRouter.get('/:id', async (req, res) => {
       description: deck.description,
       content: JSON.parse(deck.content),
       slideCount: deck.slide_count,
+      role: req.deckRole,
       createdAt: deck.created_at,
       updatedAt: deck.updated_at,
     });
@@ -55,10 +61,13 @@ decksRouter.get('/:id', async (req, res) => {
 });
 
 /**
- * POST /api/decks - Create a new deck
+ * POST /api/decks - Create a new deck (any authenticated user)
  */
 decksRouter.post('/', async (req, res) => {
   try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
     const { title, description } = req.body;
 
     const deck = createEmptyDeck(title || 'Untitled Deck');
@@ -66,12 +75,13 @@ decksRouter.post('/', async (req, res) => {
       deck.meta.description = description;
     }
 
-    const row = await createDeck(deck);
+    const row = await createDeck(deck, user.sub);
     res.status(201).json({
       id: row.id,
       title: row.title,
       description: row.description,
       slideCount: row.slide_count,
+      role: 'owner',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     });
@@ -82,9 +92,9 @@ decksRouter.post('/', async (req, res) => {
 });
 
 /**
- * PUT /api/decks/:id - Update deck content
+ * PUT /api/decks/:id - Update deck content (editor+)
  */
-decksRouter.put('/:id', async (req, res) => {
+decksRouter.put('/:id', requireDeckRole('owner', 'editor'), async (req, res) => {
   try {
     const { content } = req.body;
 
@@ -116,9 +126,9 @@ decksRouter.put('/:id', async (req, res) => {
 });
 
 /**
- * PATCH /api/decks/:id - Update deck metadata only
+ * PATCH /api/decks/:id - Update deck metadata only (editor+)
  */
-decksRouter.patch('/:id', async (req, res) => {
+decksRouter.patch('/:id', requireDeckRole('owner', 'editor'), async (req, res) => {
   try {
     const { title, description } = req.body;
 
@@ -142,9 +152,9 @@ decksRouter.patch('/:id', async (req, res) => {
 });
 
 /**
- * DELETE /api/decks/:id - Delete a deck
+ * DELETE /api/decks/:id - Delete a deck (owner only)
  */
-decksRouter.delete('/:id', async (req, res) => {
+decksRouter.delete('/:id', requireDeckRole('owner'), async (req, res) => {
   try {
     const session = getActiveSession(req.params.id);
     if (session) {
@@ -167,12 +177,15 @@ decksRouter.delete('/:id', async (req, res) => {
 });
 
 /**
- * POST /api/decks/:id/duplicate - Duplicate a deck
+ * POST /api/decks/:id/duplicate - Duplicate a deck (viewer+, new deck owned by current user)
  */
-decksRouter.post('/:id/duplicate', async (req, res) => {
+decksRouter.post('/:id/duplicate', requireDeckRole('owner', 'editor', 'viewer'), async (req, res) => {
   try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'Authentication required' });
+
     const newId = generateDeckId();
-    const row = await duplicateDeck(req.params.id, newId);
+    const row = await duplicateDeck(req.params.id, newId, user.sub);
 
     if (!row) {
       return res.status(404).json({ error: 'Deck not found' });
@@ -183,6 +196,7 @@ decksRouter.post('/:id/duplicate', async (req, res) => {
       title: row.title,
       description: row.description,
       slideCount: row.slide_count,
+      role: 'owner',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     });

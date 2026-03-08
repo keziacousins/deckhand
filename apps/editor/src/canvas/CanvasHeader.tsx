@@ -13,6 +13,7 @@ interface CanvasHeaderProps {
   onPlayWindow: () => void;
   inspectorVisible: boolean;
   onToggleInspector: () => void;
+  onShare?: () => void;
   connectionStatus: ConnectionStatusType;
   connectionError?: string | null;
 }
@@ -26,6 +27,7 @@ export function CanvasHeader({
   onPlayWindow,
   inspectorVisible,
   onToggleInspector,
+  onShare,
   connectionStatus,
   connectionError,
 }: CanvasHeaderProps) {
@@ -163,6 +165,25 @@ export function CanvasHeader({
             <path d="M6.5 6L10 8L6.5 10V6Z" fill="currentColor" />
           </svg>
         </button>
+
+        {/* Share button (owner only) */}
+        {onShare && (
+          <>
+            <div className="header-separator" />
+            <button
+              className="header-button"
+              onClick={onShare}
+              title="Share Deck"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.5" />
+                <circle cx="4" cy="8" r="2" stroke="currentColor" strokeWidth="1.5" />
+                <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M6 7l4-2M6 9l4 2" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
 
       <div className="canvas-header-right">

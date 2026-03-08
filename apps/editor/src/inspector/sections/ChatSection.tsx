@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { apiFetch } from '../../api/decks';
 import type { InspectorContext } from '../types';
 import './ChatSection.css';
 
@@ -49,7 +50,7 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
   useEffect(() => {
     async function loadSessions() {
       try {
-        const response = await fetch(`/api/decks/${deckId}/chat/sessions`);
+        const response = await apiFetch(`/api/decks/${deckId}/chat/sessions`);
         if (response.ok) {
           const data = await response.json();
           setSessions(data.sessions || []);
@@ -76,7 +77,7 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
 
       setHistoryLoading(true);
       try {
-        const response = await fetch(`/api/decks/${deckId}/chat/sessions/${currentSessionId}/messages`);
+        const response = await apiFetch(`/api/decks/${deckId}/chat/sessions/${currentSessionId}/messages`);
         if (response.ok) {
           const data = await response.json();
           setMessages(data.messages || []);
@@ -94,7 +95,7 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
   useEffect(() => {
     async function loadModels() {
       try {
-        const response = await fetch('/api/models');
+        const response = await apiFetch('/api/models');
         if (response.ok) {
           const data = await response.json();
           setModels(data.models || []);
@@ -150,7 +151,7 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
   const deleteSession = useCallback(async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const response = await fetch(`/api/decks/${deckId}/chat/sessions/${sessionId}`, {
+      const response = await apiFetch(`/api/decks/${deckId}/chat/sessions/${sessionId}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -183,7 +184,7 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
     setTimeout(() => textareaRef.current?.focus(), 0);
 
     try {
-      const response = await fetch(`/api/decks/${deckId}/chat`, {
+      const response = await apiFetch(`/api/decks/${deckId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

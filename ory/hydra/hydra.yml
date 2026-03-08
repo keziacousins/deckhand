@@ -21,10 +21,10 @@ serve:
 
 urls:
   self:
-    issuer: http://localhost:4444
-  login: http://localhost:3008/api/auth/login
-  consent: http://localhost:3008/api/auth/consent
-  logout: http://localhost:3008/api/auth/logout
+    issuer: ${URLS_SELF_ISSUER:-http://localhost:4444}
+  login: ${URLS_LOGIN:-http://localhost:3008/api/auth/login}
+  consent: ${URLS_CONSENT:-http://localhost:3008/api/auth/consent}
+  logout: ${URLS_LOGOUT:-http://localhost:3008/api/auth/logout}
 
 strategies:
   access_token: jwt

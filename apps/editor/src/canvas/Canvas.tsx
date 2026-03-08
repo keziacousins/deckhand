@@ -52,6 +52,7 @@ interface CanvasProps {
   onPlayWindow: () => void;
   inspectorVisible: boolean;
   onToggleInspector: () => void;
+  onShare?: () => void;
   showGrid?: boolean;
   connectionStatus: ConnectionStatusType;
   connectionError?: string | null;
@@ -66,6 +67,7 @@ export function Canvas({
   onPlayWindow,
   inspectorVisible,
   onToggleInspector,
+  onShare,
   showGrid,
   connectionStatus,
   connectionError,
@@ -907,6 +909,7 @@ export function Canvas({
           onPlayWindow={onPlayWindow}
           inspectorVisible={inspectorVisible}
           onToggleInspector={onToggleInspector}
+          onShare={onShare}
           connectionStatus={connectionStatus}
           connectionError={connectionError}
         />

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { apiFetch } from '../../api/decks';
 import type { InspectorSectionProps } from '../types';
 import type { Asset } from '@deckhand/schema';
 import { Section } from '../components/Section';
@@ -32,7 +33,7 @@ export function AssetsSection({ context, stickyIndex = 0 }: InspectorSectionProp
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`/api/decks/${deckId}/assets`, {
+      const response = await apiFetch(`/api/decks/${deckId}/assets`, {
         method: 'POST',
         body: formData,
       });
@@ -98,7 +99,7 @@ export function AssetsSection({ context, stickyIndex = 0 }: InspectorSectionProp
     if (!assetToDelete) return;
 
     try {
-      const response = await fetch(`/api/decks/${deckId}/assets/${assetId}`, {
+      const response = await apiFetch(`/api/decks/${deckId}/assets/${assetId}`, {
         method: 'DELETE',
       });
 

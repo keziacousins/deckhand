@@ -14,21 +14,30 @@ export function hashContent(content: string): string {
 }
 
 /**
- * List all decks (metadata only)
+ * List decks the user owns or has been shared with.
  */
-export async function listDecks(): Promise<DeckMetadata[]> {
+export async function listDecks(userId: string): Promise<DeckMetadata[]> {
   const { rows } = await pool.query(
-    `SELECT id, title, description, slide_count, cover_url, created_at, updated_at
-     FROM decks
-     ORDER BY updated_at DESC`
+    `SELECT d.id, d.title, d.description, d.slide_count, d.cover_url,
+            d.created_at, d.updated_at,
+            CASE
+              WHEN d.owner_id = $1 THEN 'owner'
+              ELSE ds.role
+            END AS role
+     FROM decks d
+     LEFT JOIN deck_shares ds ON ds.deck_id = d.id AND ds.user_id = $1
+     WHERE d.owner_id = $1 OR ds.user_id = $1
+     ORDER BY d.updated_at DESC`,
+    [userId]
   );
 
-  return rows.map((row: DeckRow) => ({
+  return rows.map((row: any) => ({
     id: row.id,
     title: row.title,
     description: row.description,
     slideCount: row.slide_count,
     coverUrl: row.cover_url,
+    role: row.role,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
@@ -45,14 +54,14 @@ export async function getDeck(id: string): Promise<DeckRow | null> {
 /**
  * Create a new deck
  */
-export async function createDeck(deck: Deck): Promise<DeckRow> {
+export async function createDeck(deck: Deck, ownerId: string): Promise<DeckRow> {
   const content = JSON.stringify(deck);
   const contentHash = hashContent(content);
   const slideCount = Object.keys(deck.slides).length;
 
   await pool.query(
-    `INSERT INTO decks (id, title, description, content, content_hash, slide_count)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+    `INSERT INTO decks (id, title, description, content, content_hash, slide_count, owner_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [
       deck.meta.id,
       deck.meta.title,
@@ -60,6 +69,7 @@ export async function createDeck(deck: Deck): Promise<DeckRow> {
       content,
       contentHash,
       slideCount,
+      ownerId,
     ]
   );
 
@@ -138,7 +148,7 @@ export async function deleteDeck(id: string): Promise<boolean> {
 /**
  * Duplicate a deck with a new ID
  */
-export async function duplicateDeck(id: string, newId: string): Promise<DeckRow | null> {
+export async function duplicateDeck(id: string, newId: string, ownerId: string): Promise<DeckRow | null> {
   const original = await getDeck(id);
   if (!original) return null;
 
@@ -150,7 +160,7 @@ export async function duplicateDeck(id: string, newId: string): Promise<DeckRow 
   deck.meta.created = now;
   deck.meta.updated = now;
 
-  return createDeck(deck);
+  return createDeck(deck, ownerId);
 }
 
 /**

@@ -11,12 +11,23 @@ export function setAuthToken(token: string | null) {
   _authToken = token;
 }
 
-function authHeaders(): Record<string, string> {
-  if (_authToken) {
-    return { Authorization: `Bearer ${_authToken}` };
-  }
-  return {};
+export function getAuthToken(): string | null {
+  return _authToken;
 }
+
+/**
+ * Authenticated fetch wrapper. Automatically attaches Authorization header.
+ * Use this for all /api/* calls instead of raw fetch().
+ */
+export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  if (_authToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${_authToken}`);
+  }
+  return fetch(input, { ...init, headers });
+}
+
+export type DeckRole = 'owner' | 'editor' | 'viewer';
 
 export interface DeckMetadata {
   id: string;
@@ -24,6 +35,7 @@ export interface DeckMetadata {
   description: string | null;
   slideCount: number;
   coverUrl: string | null;
+  role: DeckRole;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,9 +66,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
  * List all decks
  */
 export async function listDecks(): Promise<DeckMetadata[]> {
-  const response = await fetch(`${API_BASE}/decks`, {
-    headers: authHeaders(),
-  });
+  const response = await apiFetch(`${API_BASE}/decks`);
   return handleResponse(response);
 }
 
@@ -64,9 +74,7 @@ export async function listDecks(): Promise<DeckMetadata[]> {
  * Get a single deck with content
  */
 export async function getDeck(id: string): Promise<DeckFull> {
-  const response = await fetch(`${API_BASE}/decks/${id}`, {
-    headers: authHeaders(),
-  });
+  const response = await apiFetch(`${API_BASE}/decks/${id}`);
   return handleResponse(response);
 }
 
@@ -77,9 +85,9 @@ export async function createDeck(data: {
   title?: string;
   description?: string;
 }): Promise<DeckMetadata> {
-  const response = await fetch(`${API_BASE}/decks`, {
+  const response = await apiFetch(`${API_BASE}/decks`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   return handleResponse(response);
@@ -92,9 +100,9 @@ export async function updateDeckMetadata(
   id: string,
   data: { title?: string; description?: string }
 ): Promise<DeckMetadata> {
-  const response = await fetch(`${API_BASE}/decks/${id}`, {
+  const response = await apiFetch(`${API_BASE}/decks/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   return handleResponse(response);
@@ -104,9 +112,8 @@ export async function updateDeckMetadata(
  * Delete a deck
  */
 export async function deleteDeck(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/decks/${id}`, {
+  const response = await apiFetch(`${API_BASE}/decks/${id}`, {
     method: 'DELETE',
-    headers: authHeaders(),
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -118,9 +125,66 @@ export async function deleteDeck(id: string): Promise<void> {
  * Duplicate a deck
  */
 export async function duplicateDeck(id: string): Promise<DeckMetadata> {
-  const response = await fetch(`${API_BASE}/decks/${id}/duplicate`, {
+  const response = await apiFetch(`${API_BASE}/decks/${id}/duplicate`, {
     method: 'POST',
-    headers: authHeaders(),
   });
   return handleResponse(response);
+}
+
+// ============================================================================
+// Share API
+// ============================================================================
+
+export interface DeckShare {
+  id: string;
+  userId: string;
+  email: string | null;
+  name: string | null;
+  role: 'editor' | 'viewer';
+  createdAt: string;
+}
+
+export async function listShares(deckId: string): Promise<DeckShare[]> {
+  const response = await apiFetch(`${API_BASE}/decks/${deckId}/shares`);
+  const data = await handleResponse<{ shares: DeckShare[] }>(response);
+  return data.shares;
+}
+
+export async function addShare(
+  deckId: string,
+  email: string,
+  role: 'editor' | 'viewer'
+): Promise<DeckShare> {
+  const response = await apiFetch(`${API_BASE}/decks/${deckId}/shares`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, role }),
+  });
+  return handleResponse(response);
+}
+
+export async function updateShare(
+  deckId: string,
+  shareId: string,
+  role: 'editor' | 'viewer'
+): Promise<void> {
+  const response = await apiFetch(`${API_BASE}/decks/${deckId}/shares/${shareId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new ApiError(response.status, error.error || 'Request failed');
+  }
+}
+
+export async function removeShare(deckId: string, shareId: string): Promise<void> {
+  const response = await apiFetch(`${API_BASE}/decks/${deckId}/shares/${shareId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new ApiError(response.status, error.error || 'Request failed');
+  }
 }

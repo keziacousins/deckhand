@@ -177,6 +177,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Handle incoming tokens (from callback or refresh)
   const handleTokens = useCallback(
     (accessToken: string, refreshToken?: string) => {
+      // Sync token to API module immediately (before React re-renders)
+      setAuthToken(accessToken);
       setToken(accessToken);
       setUser(extractUser(accessToken));
 
@@ -272,6 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
+    setAuthToken(null);
     setToken(null);
     setUser(null);
     localStorage.removeItem('deckhand_refresh_token');
@@ -279,11 +282,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Redirect to logout via backend proxy
     window.location.href = '/api/auth/end-session';
   }, []);
-
-  // Sync token to API module
-  useEffect(() => {
-    setAuthToken(token);
-  }, [token]);
 
   // Cleanup timer on unmount
   useEffect(() => {

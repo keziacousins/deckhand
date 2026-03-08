@@ -84,8 +84,21 @@ export async function initSchema(): Promise<void> {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
+    -- Deck shares table: per-user access grants
+    CREATE TABLE IF NOT EXISTS deck_shares (
+      id TEXT PRIMARY KEY,
+      deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL CHECK (role IN ('viewer', 'editor')),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(deck_id, user_id)
+    );
+
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_decks_updated_at ON decks(updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_decks_owner_id ON decks(owner_id);
+    CREATE INDEX IF NOT EXISTS idx_deck_shares_user ON deck_shares(user_id);
+    CREATE INDEX IF NOT EXISTS idx_deck_shares_deck ON deck_shares(deck_id);
     CREATE INDEX IF NOT EXISTS idx_assets_deck_id ON assets(deck_id);
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_deck_id ON chat_sessions(deck_id, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id, created_at);
@@ -108,14 +121,25 @@ export interface UserRow {
 /**
  * Deck metadata returned from list queries
  */
+export type DeckRole = 'owner' | 'editor' | 'viewer';
+
 export interface DeckMetadata {
   id: string;
   title: string;
   description: string | null;
   slideCount: number;
   coverUrl: string | null;
+  role: DeckRole;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DeckShareRow {
+  id: string;
+  deck_id: string;
+  user_id: string;
+  role: 'viewer' | 'editor';
+  created_at: string;
 }
 
 /**

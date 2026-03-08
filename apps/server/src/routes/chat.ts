@@ -15,6 +15,7 @@ import { pool, type ChatMessageRow, type ChatSessionRow } from '../db/schema.js'
 import * as Y from 'yjs';
 import { tools, executeToolCall } from '../llm/tools.js';
 import { buildSystemPrompt, buildContinuationPrompt } from '../llm/prompts.js';
+import { requireDeckRole } from '../middleware/permissions.js';
 
 const router = Router();
 
@@ -113,7 +114,7 @@ interface ChatRequest {
 /**
  * GET /api/decks/:deckId/chat/sessions
  */
-router.get('/:deckId/chat/sessions', async (req, res) => {
+router.get('/:deckId/chat/sessions', requireDeckRole('owner', 'editor', 'viewer'), async (req, res) => {
   const { deckId } = req.params;
 
   try {
@@ -139,7 +140,7 @@ router.get('/:deckId/chat/sessions', async (req, res) => {
 /**
  * POST /api/decks/:deckId/chat/sessions
  */
-router.post('/:deckId/chat/sessions', async (req, res) => {
+router.post('/:deckId/chat/sessions', requireDeckRole('owner', 'editor'), async (req, res) => {
   const { deckId } = req.params;
   const { title } = req.body as { title?: string };
 
@@ -158,7 +159,7 @@ router.post('/:deckId/chat/sessions', async (req, res) => {
 /**
  * DELETE /api/decks/:deckId/chat/sessions/:sessionId
  */
-router.delete('/:deckId/chat/sessions/:sessionId', async (req, res) => {
+router.delete('/:deckId/chat/sessions/:sessionId', requireDeckRole('owner', 'editor'), async (req, res) => {
   const { sessionId } = req.params;
 
   try {
@@ -173,7 +174,7 @@ router.delete('/:deckId/chat/sessions/:sessionId', async (req, res) => {
 /**
  * PATCH /api/decks/:deckId/chat/sessions/:sessionId
  */
-router.patch('/:deckId/chat/sessions/:sessionId', async (req, res) => {
+router.patch('/:deckId/chat/sessions/:sessionId', requireDeckRole('owner', 'editor'), async (req, res) => {
   const { sessionId } = req.params;
   const { title } = req.body as { title?: string };
 
@@ -195,7 +196,7 @@ router.patch('/:deckId/chat/sessions/:sessionId', async (req, res) => {
 /**
  * GET /api/decks/:deckId/chat/sessions/:sessionId/messages
  */
-router.get('/:deckId/chat/sessions/:sessionId/messages', async (req, res) => {
+router.get('/:deckId/chat/sessions/:sessionId/messages', requireDeckRole('owner', 'editor', 'viewer'), async (req, res) => {
   const { sessionId } = req.params;
 
   try {
@@ -225,7 +226,7 @@ router.get('/:deckId/chat/sessions/:sessionId/messages', async (req, res) => {
 /**
  * GET /api/decks/:deckId/chat/history (DEPRECATED - for backward compatibility)
  */
-router.get('/:deckId/chat/history', async (req, res) => {
+router.get('/:deckId/chat/history', requireDeckRole('owner', 'editor', 'viewer'), async (req, res) => {
   const { deckId } = req.params;
 
   try {
@@ -263,7 +264,7 @@ router.get('/:deckId/chat/history', async (req, res) => {
 /**
  * DELETE /api/decks/:deckId/chat/history (DEPRECATED - for backward compatibility)
  */
-router.delete('/:deckId/chat/history', async (req, res) => {
+router.delete('/:deckId/chat/history', requireDeckRole('owner', 'editor'), async (req, res) => {
   const { deckId } = req.params;
 
   try {
@@ -282,7 +283,7 @@ router.delete('/:deckId/chat/history', async (req, res) => {
 /**
  * POST /api/decks/:deckId/chat
  */
-router.post('/:deckId/chat', async (req, res) => {
+router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res) => {
   if (!isLLMEnabled()) {
     return res.status(503).json({
       error: 'LLM features not available. Set ANTHROPIC_API_KEY in server environment.'

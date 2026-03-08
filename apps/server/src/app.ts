@@ -9,6 +9,7 @@ import assetsRouter from './routes/assets.js';
 import chatRouter from './routes/chat.js';
 import modelsRouter from './routes/models.js';
 import { authRouter } from './routes/auth.js';
+import { sharesRouter } from './routes/shares.js';
 import { jwtMiddleware } from './middleware/auth.js';
 import { getAllSessions } from './sessions.js';
 
@@ -53,6 +54,9 @@ export function createApp(options: AppOptions = {}): Express {
 
   // Deck routes
   app.use('/api/decks', decksRouter);
+
+  // Share routes
+  app.use('/api/decks/:deckId/shares', sharesRouter);
 
   // Asset routes (includes /api/decks/:deckId/assets paths)
   app.use('/api', assetsRouter);

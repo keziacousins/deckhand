@@ -13,6 +13,7 @@ export async function clearTestData(): Promise<void> {
   await pool.query('DELETE FROM chat_messages');
   await pool.query('DELETE FROM chat_sessions');
   await pool.query('DELETE FROM assets');
+  await pool.query('DELETE FROM deck_shares');
   await pool.query('DELETE FROM ydoc_states');
   await pool.query('DELETE FROM decks');
   await pool.query('DELETE FROM users');

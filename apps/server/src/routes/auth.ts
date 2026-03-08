@@ -273,6 +273,14 @@ authRouter.post('/refresh', async (req, res) => {
       return res.status(response.status).json(data);
     }
 
+    // Debug: log the issuer in the new access token
+    if (data.access_token) {
+      try {
+        const payload = JSON.parse(Buffer.from(data.access_token.split('.')[1], 'base64').toString());
+        console.log('[Auth] Refreshed token issuer:', payload.iss);
+      } catch {}
+    }
+
     return res.json(data);
   } catch (error) {
     console.error('[Auth] Token refresh error:', error);

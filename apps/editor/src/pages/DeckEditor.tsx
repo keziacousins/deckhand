@@ -3,10 +3,12 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { Canvas } from '../canvas/Canvas';
 import { Inspector } from '../inspector/Inspector';
 import { StartPresentationModal } from '../components/StartPresentationModal';
+import { ShareDialog } from '../components/ShareDialog';
 import { SelectionProvider, useSelection } from '../selection';
 import { useYDoc } from '../sync';
 import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
 import { useCoverCapture } from '../hooks/useCoverCapture';
+import { getDeck, type DeckRole } from '../api/decks';
 import type { Deck } from '@deckhand/schema';
 import '../styles/layout.css';
 
@@ -24,6 +26,16 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   const [showGrid, setShowGrid] = useState(false);
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
   const hasCapturedInitialCover = useRef(false);
+  const [deckRole, setDeckRole] = useState<DeckRole | null>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+
+  // Fetch deck role (ref guard prevents double-fetch in React strict mode)
+  const roleFetchedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (roleFetchedFor.current === deckId) return;
+    roleFetchedFor.current = deckId;
+    getDeck(deckId).then((d) => setDeckRole(d.role)).catch(() => {});
+  }, [deckId]);
 
   // Register undo/redo keyboard shortcuts
   useUndoRedoShortcuts({ undo, redo, canUndo, canRedo });
@@ -238,6 +250,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
             onPlayWindow={handlePlayWindow}
             inspectorVisible={inspectorVisible}
             onToggleInspector={toggleInspector}
+            onShare={deckRole === 'owner' ? () => setShowShareDialog(true) : undefined}
             showGrid={showGrid}
             connectionStatus={status}
             connectionError={error}
@@ -263,6 +276,10 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         />
       )}
       
+      {showShareDialog && (
+        <ShareDialog deckId={deckId} onClose={() => setShowShareDialog(false)} />
+      )}
+
       {isSaving && (
         <div className="saving-overlay">
           <div className="saving-spinner" />

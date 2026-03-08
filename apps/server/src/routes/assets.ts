@@ -9,6 +9,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { pool, type AssetRow } from '../db/schema.js';
 import { uploadObject, getObject, deleteObject, deleteByPrefix } from '../storage.js';
+import { requireDeckRole } from '../middleware/permissions.js';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ const upload = multer({
  * GET /api/decks/:deckId/assets
  * List all assets for a deck
  */
-router.get('/decks/:deckId/assets', async (req: Request, res: Response) => {
+router.get('/decks/:deckId/assets', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
   const { deckId } = req.params;
 
   try {
@@ -81,6 +82,7 @@ router.get('/decks/:deckId/assets', async (req: Request, res: Response) => {
  */
 router.post(
   '/decks/:deckId/assets',
+  requireDeckRole('owner', 'editor'),
   upload.single('file'),
   async (req: Request, res: Response) => {
     const { deckId } = req.params;
@@ -135,7 +137,7 @@ router.post(
  * GET /api/decks/:deckId/assets/:assetId
  * Serve an asset file
  */
-router.get('/decks/:deckId/assets/:assetId', async (req: Request, res: Response) => {
+router.get('/decks/:deckId/assets/:assetId', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
   const { deckId, assetId } = req.params;
 
   try {
@@ -164,7 +166,7 @@ router.get('/decks/:deckId/assets/:assetId', async (req: Request, res: Response)
  * DELETE /api/decks/:deckId/assets/:assetId
  * Delete an asset
  */
-router.delete('/decks/:deckId/assets/:assetId', async (req: Request, res: Response) => {
+router.delete('/decks/:deckId/assets/:assetId', requireDeckRole('owner', 'editor'), async (req: Request, res: Response) => {
   const { deckId, assetId } = req.params;
 
   try {
@@ -199,6 +201,7 @@ router.delete('/decks/:deckId/assets/:assetId', async (req: Request, res: Respon
  */
 router.post(
   '/decks/:deckId/cover',
+  requireDeckRole('owner', 'editor'),
   upload.single('file'),
   async (req: Request, res: Response) => {
     const { deckId } = req.params;
@@ -243,7 +246,7 @@ router.post(
  * GET /api/decks/:deckId/cover
  * Serve the deck's cover image
  */
-router.get('/decks/:deckId/cover', async (req: Request, res: Response) => {
+router.get('/decks/:deckId/cover', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
   const { deckId } = req.params;
 
   try {

@@ -1,5 +1,6 @@
 import { expressjwt } from 'express-jwt';
 import jwksRsa from 'jwks-rsa';
+import jwt from 'jsonwebtoken';
 import { oryConfig } from '../config.js';
 import type { Request } from 'express';
 
@@ -19,10 +20,21 @@ export interface JWTClaims {
   iat: number;
 }
 
+// Shared JWKS client for both Express middleware and manual verification
+const jwksClient = jwksRsa({
+  cache: true,
+  rateLimit: true,
+  jwksRequestsPerMinute: 5,
+  jwksUri: `${oryConfig.hydraPublicUrl}/.well-known/jwks.json`,
+});
+
 /**
  * JWT validation middleware.
  * Requires a valid token — returns 401 if missing or invalid.
  */
+// Debug: log expected issuer on startup
+console.log('[Auth] Expected JWT issuer:', oryConfig.hydraPublicUrl);
+
 export const jwtMiddleware = expressjwt({
   secret: jwksRsa.expressJwtSecret({
     cache: true,
@@ -31,7 +43,7 @@ export const jwtMiddleware = expressjwt({
     jwksUri: `${oryConfig.hydraPublicUrl}/.well-known/jwks.json`,
   }) as jwksRsa.GetVerificationKey,
   algorithms: ['RS256'],
-  issuer: `${oryConfig.hydraPublicUrl}/`,
+  issuer: oryConfig.hydraPublicUrl,
   credentialsRequired: true,
 });
 
@@ -41,4 +53,27 @@ export const jwtMiddleware = expressjwt({
  */
 export function getAuthUser(req: Request): JWTClaims | null {
   return (req as any).auth ?? null;
+}
+
+/**
+ * Verify a JWT token string directly (for WebSocket upgrade).
+ * Returns decoded claims or null if invalid.
+ */
+export async function verifyToken(token: string): Promise<JWTClaims | null> {
+  try {
+    const decoded = jwt.decode(token, { complete: true });
+    if (!decoded || !decoded.header.kid) return null;
+
+    const key = await jwksClient.getSigningKey(decoded.header.kid);
+    const signingKey = key.getPublicKey();
+
+    const verified = jwt.verify(token, signingKey, {
+      algorithms: ['RS256'],
+      issuer: oryConfig.hydraPublicUrl,
+    });
+
+    return verified as JWTClaims;
+  } catch {
+    return null;
+  }
 }

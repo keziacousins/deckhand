@@ -1,12 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   listDecks,
   createDeck,
   deleteDeck,
   duplicateDeck,
+  apiFetch,
   type DeckMetadata,
 } from '../api/decks';
 import './DeckList.css';
+
+/** Fetches a cover image via authenticated apiFetch and renders as blob URL. */
+function CoverImage({ src }: { src: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let revoke: string | null = null;
+    apiFetch(src).then((res) => {
+      if (!res.ok) return;
+      return res.blob();
+    }).then((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      revoke = url;
+      setBlobUrl(url);
+    }).catch(() => {});
+
+    return () => { if (revoke) URL.revokeObjectURL(revoke); };
+  }, [src]);
+
+  if (!blobUrl) return null;
+  return <img src={blobUrl} alt="" className="deck-card-cover" />;
+}
 
 interface DeckListProps {
   onOpenDeck: (id: string) => void;
@@ -30,7 +54,10 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
     }
   };
 
+  const hasFetched = useRef(false);
   useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
     fetchDecks();
   }, []);
 
@@ -77,7 +104,7 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
   return (
     <div className="deck-list-page">
       <header className="deck-list-header">
-        <h1>My Decks</h1>
+        <h1>Decks</h1>
         <button className="create-deck-button" onClick={handleCreateDeck}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -118,18 +145,19 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
             >
               <div className="deck-card-preview">
                 {deck.coverUrl && (
-                  <img
-                    src={deck.coverUrl}
-                    alt=""
-                    className="deck-card-cover"
-                  />
+                  <CoverImage src={deck.coverUrl} />
                 )}
                 <span className="deck-card-slide-count">
                   {deck.slideCount} slide{deck.slideCount !== 1 ? 's' : ''}
                 </span>
               </div>
               <div className="deck-card-info">
-                <h3 className="deck-card-title">{deck.title}</h3>
+                <h3 className="deck-card-title">
+                  {deck.title}
+                  {deck.role && deck.role !== 'owner' && (
+                    <span className="deck-card-role-badge">{deck.role}</span>
+                  )}
+                </h3>
                 {deck.description && (
                   <p className="deck-card-description">{deck.description}</p>
                 )}
@@ -158,20 +186,22 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
                     />
                   </svg>
                 </button>
-                <button
-                  className="deck-card-action deck-card-action-danger"
-                  onClick={(e) => handleDeleteDeck(deck.id, e)}
-                  title="Delete"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path
-                      d="M3 4h10M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
+                {deck.role === 'owner' && (
+                  <button
+                    className="deck-card-action deck-card-action-danger"
+                    onClick={(e) => handleDeleteDeck(deck.id, e)}
+                    title="Delete"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M3 4h10M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
           ))}

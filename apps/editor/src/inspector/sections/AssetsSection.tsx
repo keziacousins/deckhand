@@ -3,6 +3,7 @@ import { apiFetch } from '../../api/decks';
 import type { InspectorSectionProps } from '../types';
 import type { Asset } from '@deckhand/schema';
 import { Section } from '../components/Section';
+import { AuthImage } from '../../components/AuthImage';
 import './AssetsSection.css';
 
 // Counter for unique upload IDs when multiple files are uploaded simultaneously
@@ -196,7 +197,7 @@ export function AssetsSection({ context, stickyIndex = 0 }: InspectorSectionProp
               <div key={asset.id} className="asset-item" title={asset.filename}>
                 <div className="asset-thumbnail">
                   {asset.mimeType?.startsWith('image/') ? (
-                    <img src={asset.url} alt={asset.filename} />
+                    <AuthImage src={asset.url} alt={asset.filename} />
                   ) : (
                     <div className="asset-icon">
                       {asset.mimeType?.startsWith('audio/') ? (

@@ -1,5 +1,6 @@
 import type { Asset } from '@deckhand/schema';
 import { Modal } from '../../components/Modal';
+import { AuthImage } from '../../components/AuthImage';
 import './AssetPickerModal.css';
 
 interface AssetPickerModalProps {
@@ -34,7 +35,7 @@ export function AssetPickerModal({ assets, selectedAssetId, onSelect, onClose }:
               title={asset.filename}
               type="button"
             >
-              <img src={asset.url} alt={asset.filename} />
+              <AuthImage src={asset.url} alt={asset.filename} />
               <div className="asset-picker-modal-item-name">{asset.filename}</div>
             </button>
           ))}

@@ -4,33 +4,10 @@ import {
   createDeck,
   deleteDeck,
   duplicateDeck,
-  apiFetch,
   type DeckMetadata,
 } from '../api/decks';
+import { AuthImage } from '../components/AuthImage';
 import './DeckList.css';
-
-/** Fetches a cover image via authenticated apiFetch and renders as blob URL. */
-function CoverImage({ src }: { src: string }) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let revoke: string | null = null;
-    apiFetch(src).then((res) => {
-      if (!res.ok) return;
-      return res.blob();
-    }).then((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      revoke = url;
-      setBlobUrl(url);
-    }).catch(() => {});
-
-    return () => { if (revoke) URL.revokeObjectURL(revoke); };
-  }, [src]);
-
-  if (!blobUrl) return null;
-  return <img src={blobUrl} alt="" className="deck-card-cover" />;
-}
 
 interface DeckListProps {
   onOpenDeck: (id: string) => void;
@@ -145,7 +122,7 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
             >
               <div className="deck-card-preview">
                 {deck.coverUrl && (
-                  <CoverImage src={deck.coverUrl} />
+                  <AuthImage src={deck.coverUrl} className="deck-card-cover" />
                 )}
                 <span className="deck-card-slide-count">
                   {deck.slideCount} slide{deck.slideCount !== 1 ? 's' : ''}

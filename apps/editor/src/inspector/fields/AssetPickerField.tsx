@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Asset } from '@deckhand/schema';
 import { AssetPickerModal } from './AssetPickerModal';
+import { AuthImage } from '../../components/AuthImage';
 import './AssetPickerField.css';
 
 interface AssetPickerFieldProps {
@@ -45,7 +46,7 @@ export function AssetPickerField({ label, value, assets, onChange }: AssetPicker
         {selectedAsset ? (
           <>
             <div className="asset-picker-thumbnail">
-              <img src={selectedAsset.url} alt={selectedAsset.filename} />
+              <AuthImage src={selectedAsset.url} alt={selectedAsset.filename} />
             </div>
             <div className="asset-picker-info">
               <span className="asset-picker-filename">{selectedAsset.filename}</span>

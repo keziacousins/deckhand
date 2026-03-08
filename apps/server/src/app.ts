@@ -12,7 +12,11 @@ import { authRouter } from './routes/auth.js';
 import { jwtMiddleware } from './middleware/auth.js';
 import { getAllSessions } from './sessions.js';
 
-export function createApp(): Express {
+interface AppOptions {
+  skipAuth?: boolean;
+}
+
+export function createApp(options: AppOptions = {}): Express {
   const app = express();
 
   // JSON body parsing
@@ -37,9 +41,10 @@ export function createApp(): Express {
   // Auth routes (before JWT middleware — these ARE the auth flow)
   app.use('/api/auth', authRouter);
 
-  // JWT middleware for all subsequent /api routes
-  // credentialsRequired: false — anonymous requests pass through
-  app.use('/api', jwtMiddleware);
+  // JWT middleware for all subsequent /api routes — requires valid token
+  if (!options.skipAuth) {
+    app.use('/api', jwtMiddleware);
+  }
 
   // Sessions endpoint
   app.get('/api/sessions', (_req, res) => {

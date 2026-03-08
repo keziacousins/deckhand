@@ -20,9 +20,8 @@ export interface JWTClaims {
 }
 
 /**
- * JWT validation middleware (permissive mode).
- * Validates token if present, passes through if absent.
- * Invalid/expired tokens return 401.
+ * JWT validation middleware.
+ * Requires a valid token — returns 401 if missing or invalid.
  */
 export const jwtMiddleware = expressjwt({
   secret: jwksRsa.expressJwtSecret({
@@ -33,7 +32,7 @@ export const jwtMiddleware = expressjwt({
   }) as jwksRsa.GetVerificationKey,
   algorithms: ['RS256'],
   issuer: `${oryConfig.hydraPublicUrl}/`,
-  credentialsRequired: false,
+  credentialsRequired: true,
 });
 
 /**

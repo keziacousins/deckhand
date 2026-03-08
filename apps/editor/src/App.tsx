@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { DeckList } from './pages/DeckList';
 import { DeckEditor } from './pages/DeckEditor';
 import { Presentation } from './pages/Presentation';
-import { AuthProvider } from './auth/AuthProvider';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { LoginPage } from './auth/LoginPage';
 import { SignupPage } from './auth/SignupPage';
 import { ForgotPasswordPage } from './auth/ForgotPasswordPage';
@@ -79,6 +79,9 @@ function AppRoutes({
   route: Route;
   navigateTo: (r: Route) => void;
 }) {
+  const { user, isLoading } = useAuth();
+
+  // Auth pages are always accessible
   switch (route.type) {
     case 'login':
       return <LoginPage />;
@@ -87,12 +90,30 @@ function AppRoutes({
     case 'forgot-password':
       return <ForgotPasswordPage />;
     case 'callback':
-      // Callback is handled by AuthProvider's useEffect — show loading
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
           <p>Completing login...</p>
         </div>
       );
+  }
+
+  // Wait for auth state to resolve before deciding
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // Not authenticated — redirect to login
+  if (!user) {
+    window.location.href = '/login';
+    return null;
+  }
+
+  // Authenticated app routes
+  switch (route.type) {
     case 'present':
       return (
         <Presentation

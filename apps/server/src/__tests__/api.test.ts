@@ -48,7 +48,7 @@ describe('API Integration Tests', () => {
       return;
     }
     await initSchema();
-    app = createApp();
+    app = createApp({ skipAuth: true });
   });
 
   afterAll(async () => {

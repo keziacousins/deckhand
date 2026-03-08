@@ -44,7 +44,7 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: http://host.docker.internal:3008/api/auth/hooks/registration
+                url: ${DECKHAND_API_URL:-http://host.docker.internal:3008}/api/auth/hooks/registration
                 method: POST
                 body: file:///etc/kratos/webhook.registration.jsonnet
                 response:

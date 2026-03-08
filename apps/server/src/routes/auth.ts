@@ -366,10 +366,29 @@ authRouter.get('/consent', async (req, res) => {
       consentChallenge: challenge,
     });
 
-    // Look up local user for custom JWT claims
-    const user = consentRequest.subject
+    // Ensure local user record exists (fetch identity from Kratos if needed)
+    let user = consentRequest.subject
       ? await getUser(consentRequest.subject)
       : null;
+
+    if (!user && consentRequest.subject) {
+      try {
+        const identityRes = await fetch(
+          `${oryConfig.kratosAdminUrl}/admin/identities/${consentRequest.subject}`
+        );
+        if (identityRes.ok) {
+          const identity = await identityRes.json();
+          const email = identity.traits?.email;
+          const name = identity.traits?.name ?? null;
+          if (email) {
+            user = await upsertUser(consentRequest.subject, email, name);
+            console.log(`[Auth] Auto-created user from consent: ${email}`);
+          }
+        }
+      } catch (err) {
+        console.error('[Auth] Failed to fetch identity from Kratos:', err);
+      }
+    }
 
     const { data: completion } = await hydraAdmin.acceptOAuth2ConsentRequest({
       consentChallenge: challenge,

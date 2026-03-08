@@ -52,11 +52,11 @@ export function createApp(options: AppOptions = {}): Express {
     res.json(getAllSessions());
   });
 
+  // Share routes (before decks router so /api/decks/:deckId/shares matches first)
+  app.use('/api/decks/:deckId/shares', sharesRouter);
+
   // Deck routes
   app.use('/api/decks', decksRouter);
-
-  // Share routes
-  app.use('/api/decks/:deckId/shares', sharesRouter);
 
   // Asset routes (includes /api/decks/:deckId/assets paths)
   app.use('/api', assetsRouter);

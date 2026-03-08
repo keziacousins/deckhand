@@ -64,6 +64,7 @@ services:
       SECRETS_CIPHER: ${KRATOS_CIPHER_SECRET:-change-me-in-prod-32-char-key!!!}
       SERVE_PUBLIC_BASE_URL: ${KRATOS_PUBLIC_URL:-http://localhost:4433}/
       SERVE_ADMIN_BASE_URL: ${KRATOS_ADMIN_URL:-http://localhost:4434}/
+      DECKHAND_API_URL: ${DECKHAND_API_URL:-http://host.docker.internal:3008}
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully

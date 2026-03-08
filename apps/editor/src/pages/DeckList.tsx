@@ -122,7 +122,7 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
             >
               <div className="deck-card-preview">
                 {deck.coverUrl && (
-                  <AuthImage src={deck.coverUrl} className="deck-card-cover" />
+                  <AuthImage src={`${deck.coverUrl}?v=${deck.updatedAt}`} className="deck-card-cover" />
                 )}
                 <span className="deck-card-slide-count">
                   {deck.slideCount} slide{deck.slideCount !== 1 ? 's' : ''}

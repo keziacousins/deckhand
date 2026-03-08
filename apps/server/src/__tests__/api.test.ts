@@ -1,89 +1,66 @@
 /**
  * API integration tests for deck endpoints.
+ * Requires Docker Postgres running on port 5433.
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import request from 'supertest';
-import Database from 'better-sqlite3';
 import { createApp } from '../app.js';
 import { createEmptyDeck } from '@deckhand/schema';
+import { pool, initSchema } from '../db/schema.js';
 import type { Express } from 'express';
 
-// Test database (in-memory)
-let testDb: Database.Database;
 let app: Express;
+let pgAvailable = false;
 
-/**
- * Initialize test database schema
- */
-function initTestSchema(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS decks (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT,
-      content TEXT NOT NULL,
-      content_hash TEXT NOT NULL,
-      slide_count INTEGER DEFAULT 0,
-      cover_url TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS ydoc_states (
-      deck_id TEXT PRIMARY KEY,
-      data BLOB NOT NULL,
-      updated_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (deck_id) REFERENCES decks(id) ON DELETE CASCADE
-    );
-  `);
+async function clearTestData(): Promise<void> {
+  await pool.query('DELETE FROM chat_messages');
+  await pool.query('DELETE FROM chat_sessions');
+  await pool.query('DELETE FROM assets');
+  await pool.query('DELETE FROM ydoc_states');
+  await pool.query('DELETE FROM decks');
+  await pool.query('DELETE FROM users');
 }
 
-function clearTestData(): void {
-  testDb.exec('DELETE FROM ydoc_states');
-  testDb.exec('DELETE FROM decks');
-}
-
-// Helper to create a test deck directly in db
-function insertTestDeck(deck: ReturnType<typeof createEmptyDeck>): void {
+async function insertTestDeck(deck: ReturnType<typeof createEmptyDeck>): Promise<void> {
   const content = JSON.stringify(deck);
-  const stmt = testDb.prepare(`
-    INSERT INTO decks (id, title, description, content, content_hash, slide_count)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  stmt.run(
-    deck.meta.id,
-    deck.meta.title,
-    deck.meta.description || null,
-    content,
-    'test-hash',
-    Object.keys(deck.slides).length
+  await pool.query(
+    `INSERT INTO decks (id, title, description, content, content_hash, slide_count)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      deck.meta.id,
+      deck.meta.title,
+      deck.meta.description || null,
+      content,
+      'test-hash',
+      Object.keys(deck.slides).length,
+    ]
   );
 }
 
 describe('API Integration Tests', () => {
   beforeAll(async () => {
-    // Create in-memory database
-    testDb = new Database(':memory:');
-    testDb.pragma('foreign_keys = ON');
-    initTestSchema(testDb);
-
-    // Replace the db in schema module
-    const schemaModule = await import('../db/schema.js');
-    Object.defineProperty(schemaModule, 'db', {
-      value: testDb,
-      writable: true,
-    });
-
+    try {
+      await pool.query('SELECT 1');
+      pgAvailable = true;
+    } catch {
+      console.warn('Postgres not available at DATABASE_URL, skipping tests');
+      return;
+    }
+    await initSchema();
     app = createApp();
   });
 
-  afterAll(() => {
-    testDb.close();
+  afterAll(async () => {
+    await pool.end();
   });
 
-  beforeEach(() => {
-    clearTestData();
+  beforeEach(async (ctx) => {
+    if (!pgAvailable) {
+      ctx.skip();
+      return;
+    }
+    await clearTestData();
   });
 
   describe('GET /api/health', () => {
@@ -104,8 +81,8 @@ describe('API Integration Tests', () => {
     it('returns list of decks', async () => {
       const deck1 = createEmptyDeck('First Deck');
       const deck2 = createEmptyDeck('Second Deck');
-      insertTestDeck(deck1);
-      insertTestDeck(deck2);
+      await insertTestDeck(deck1);
+      await insertTestDeck(deck2);
 
       const res = await request(app).get('/api/decks');
       expect(res.status).toBe(200);
@@ -117,7 +94,7 @@ describe('API Integration Tests', () => {
     it('returns decks with metadata', async () => {
       const deck = createEmptyDeck('With Metadata');
       deck.meta.description = 'Test description';
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app).get('/api/decks');
       expect(res.status).toBe(200);
@@ -138,7 +115,7 @@ describe('API Integration Tests', () => {
 
     it('returns deck by id', async () => {
       const deck = createEmptyDeck('My Deck');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app).get(`/api/decks/${deck.meta.id}`);
       expect(res.status).toBe(200);
@@ -150,7 +127,7 @@ describe('API Integration Tests', () => {
 
     it('returns deck content as parsed JSON', async () => {
       const deck = createEmptyDeck('JSON Test');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app).get(`/api/decks/${deck.meta.id}`);
       expect(typeof res.body.content).toBe('object');
@@ -214,7 +191,7 @@ describe('API Integration Tests', () => {
 
     it('updates deck content', async () => {
       const deck = createEmptyDeck('Original');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const updatedDeck = { ...deck, meta: { ...deck.meta, title: 'Updated' } };
       const res = await request(app)
@@ -227,7 +204,7 @@ describe('API Integration Tests', () => {
 
     it('returns 400 for invalid content', async () => {
       const deck = createEmptyDeck('Test');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app)
         .put(`/api/decks/${deck.meta.id}`)
@@ -239,9 +216,8 @@ describe('API Integration Tests', () => {
 
     it('updates slide count when slides change', async () => {
       const deck = createEmptyDeck('Test');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
-      // Add a second slide
       const slideId = `slide-new-${Date.now()}`;
       const updatedDeck = {
         ...deck,
@@ -276,7 +252,7 @@ describe('API Integration Tests', () => {
 
     it('updates deck title', async () => {
       const deck = createEmptyDeck('Old Title');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app)
         .patch(`/api/decks/${deck.meta.id}`)
@@ -288,7 +264,7 @@ describe('API Integration Tests', () => {
 
     it('updates deck description', async () => {
       const deck = createEmptyDeck('Test');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app)
         .patch(`/api/decks/${deck.meta.id}`)
@@ -300,7 +276,7 @@ describe('API Integration Tests', () => {
 
     it('updates both title and description', async () => {
       const deck = createEmptyDeck('Test');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app)
         .patch(`/api/decks/${deck.meta.id}`)
@@ -320,7 +296,7 @@ describe('API Integration Tests', () => {
 
     it('deletes existing deck', async () => {
       const deck = createEmptyDeck('To Delete');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const deleteRes = await request(app).delete(`/api/decks/${deck.meta.id}`);
       expect(deleteRes.status).toBe(204);
@@ -331,7 +307,7 @@ describe('API Integration Tests', () => {
 
     it('removes deck from list', async () => {
       const deck = createEmptyDeck('To Delete');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       await request(app).delete(`/api/decks/${deck.meta.id}`);
 
@@ -348,7 +324,7 @@ describe('API Integration Tests', () => {
 
     it('duplicates existing deck', async () => {
       const deck = createEmptyDeck('Original');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const res = await request(app).post(`/api/decks/${deck.meta.id}/duplicate`);
       expect(res.status).toBe(201);
@@ -358,10 +334,10 @@ describe('API Integration Tests', () => {
 
     it('creates independent copy', async () => {
       const deck = createEmptyDeck('Original');
-      insertTestDeck(deck);
+      await insertTestDeck(deck);
 
       const dupRes = await request(app).post(`/api/decks/${deck.meta.id}/duplicate`);
-      
+
       // Modify the original
       await request(app)
         .patch(`/api/decks/${deck.meta.id}`)

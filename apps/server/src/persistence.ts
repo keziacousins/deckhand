@@ -14,7 +14,6 @@ import {
   saveYDocState,
   deleteYDocState,
   hashContent,
-  getDeck,
 } from './db/decks.js';
 import { deckToYDoc, yDocToDeck } from '@deckhand/sync';
 import type { Deck } from '@deckhand/schema';
@@ -26,8 +25,8 @@ import type { Deck } from '@deckhand/schema';
  * we use the binary state (faster, preserves collaboration history).
  * Otherwise, we bootstrap fresh from JSON (handles external edits).
  */
-export function loadYDoc(deckId: string): Y.Doc | null {
-  const result = getDeckWithYDocState(deckId);
+export async function loadYDoc(deckId: string): Promise<Y.Doc | null> {
+  const result = await getDeckWithYDocState(deckId);
   if (!result) {
     console.log(`[Persistence] Deck ${deckId} not found`);
     return null;
@@ -51,7 +50,7 @@ export function loadYDoc(deckId: string): Y.Doc | null {
 
     // Delete stale YDoc state if it existed
     if (ydocState) {
-      deleteYDocState(deckId);
+      await deleteYDocState(deckId);
     }
   }
 
@@ -62,7 +61,7 @@ export function loadYDoc(deckId: string): Y.Doc | null {
  * Save a YDoc to the database.
  * Converts to JSON, computes hash, and saves both binary and JSON.
  */
-export function saveYDoc(deckId: string, ydoc: Y.Doc): void {
+export async function saveYDoc(deckId: string, ydoc: Y.Doc): Promise<void> {
   try {
     // Convert YDoc to deck JSON
     const deck = yDocToDeck(ydoc);
@@ -74,7 +73,7 @@ export function saveYDoc(deckId: string, ydoc: Y.Doc): void {
     }
 
     // Update the deck content in database
-    const updated = updateDeckContent(deckId, deck);
+    const updated = await updateDeckContent(deckId, deck);
     if (!updated) {
       console.error(`[Persistence] Failed to update deck ${deckId}`);
       return;
@@ -82,7 +81,7 @@ export function saveYDoc(deckId: string, ydoc: Y.Doc): void {
 
     // Save binary YDoc state
     const state = Y.encodeStateAsUpdate(ydoc);
-    saveYDocState(deckId, Buffer.from(state));
+    await saveYDocState(deckId, Buffer.from(state));
 
     console.log(`[Persistence] Saved ${deckId} (${Object.keys(deck.slides).length} slides)`);
   } catch (error) {
@@ -104,9 +103,9 @@ export function debouncedSaveYDoc(deckId: string, ydoc: Y.Doc): void {
   }
 
   // Set new timer
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     saveTimers.delete(deckId);
-    saveYDoc(deckId, ydoc);
+    await saveYDoc(deckId, ydoc);
   }, SAVE_DEBOUNCE_MS);
 
   saveTimers.set(deckId, timer);
@@ -115,7 +114,7 @@ export function debouncedSaveYDoc(deckId: string, ydoc: Y.Doc): void {
 /**
  * Force immediate save (e.g., on last client disconnect).
  */
-export function flushSave(deckId: string, ydoc: Y.Doc): void {
+export async function flushSave(deckId: string, ydoc: Y.Doc): Promise<void> {
   // Clear any pending debounced save
   const existing = saveTimers.get(deckId);
   if (existing) {
@@ -124,5 +123,5 @@ export function flushSave(deckId: string, ydoc: Y.Doc): void {
   }
 
   // Save immediately
-  saveYDoc(deckId, ydoc);
+  await saveYDoc(deckId, ydoc);
 }

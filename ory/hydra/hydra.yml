@@ -1,0 +1,47 @@
+version: v2.3.0
+
+dsn: postgres://ory:ory@ory-postgres:5432/hydra?sslmode=disable
+
+serve:
+  public:
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:5178
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Content-Type
+      allow_credentials: true
+
+urls:
+  self:
+    issuer: http://localhost:4444
+  login: http://localhost:3008/api/auth/login
+  consent: http://localhost:3008/api/auth/consent
+  logout: http://localhost:3008/api/auth/logout
+
+strategies:
+  access_token: jwt
+
+log:
+  level: info
+  format: text
+
+secrets:
+  system:
+    - ${SECRETS_SYSTEM:-CHANGE-ME-IN-PRODUCTION-HYDRA-SYSTEM-SECRET!}
+
+ttl:
+  access_token: 15m
+  refresh_token: 720h
+  id_token: 15m
+  auth_code: 10m
+
+oauth2:
+  expose_internal_errors: true

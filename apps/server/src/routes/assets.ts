@@ -1,39 +1,24 @@
 /**
  * Asset upload and serving routes.
+ * Assets are stored in S3-compatible storage (SeaweedFS in dev).
  */
 
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import crypto from 'crypto';
-import { db, type AssetRow } from '../db/schema.js';
-import { paths, ensureDeckAssetDir } from '../config.js';
+import { pool, type AssetRow } from '../db/schema.js';
+import { uploadObject, getObject, deleteObject, deleteByPrefix } from '../storage.js';
 
 const router = Router();
 
-// Multer configuration for file uploads
-const storage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    const deckId = req.params.deckId;
-    const assetDir = ensureDeckAssetDir(deckId);
-    cb(null, assetDir);
-  },
-  filename: (_req, file, cb) => {
-    // Generate unique filename: assetId.ext
-    const assetId = `asset-${crypto.randomUUID().slice(0, 8)}`;
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${assetId}${ext}`);
-  },
-});
-
+// Multer with memory storage (buffer, no temp files)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB max
   },
   fileFilter: (_req, file, cb) => {
-    // Allow images, audio, video
     const allowedTypes = [
       'image/jpeg',
       'image/png',
@@ -58,16 +43,16 @@ const upload = multer({
  * GET /api/decks/:deckId/assets
  * List all assets for a deck
  */
-router.get('/decks/:deckId/assets', (req: Request, res: Response) => {
+router.get('/decks/:deckId/assets', async (req: Request, res: Response) => {
   const { deckId } = req.params;
 
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM assets WHERE deck_id = ? ORDER BY created_at DESC
-    `);
-    const rows = stmt.all(deckId) as AssetRow[];
+    const { rows } = await pool.query(
+      'SELECT * FROM assets WHERE deck_id = $1 ORDER BY created_at DESC',
+      [deckId]
+    );
 
-    const assets = rows.map((row) => ({
+    const assets = (rows as AssetRow[]).map((row) => ({
       id: row.id,
       deckId: row.deck_id,
       filename: row.filename,
@@ -75,10 +60,10 @@ router.get('/decks/:deckId/assets', (req: Request, res: Response) => {
       size: row.size,
       width: row.width,
       height: row.height,
-      hasThumbnail: row.has_thumbnail === 1,
+      hasThumbnail: row.has_thumbnail,
       createdAt: row.created_at,
       url: `/api/decks/${deckId}/assets/${row.id}`,
-      thumbnailUrl: row.has_thumbnail === 1
+      thumbnailUrl: row.has_thumbnail
         ? `/api/decks/${deckId}/assets/${row.id}/thumbnail`
         : undefined,
     }));
@@ -107,32 +92,22 @@ router.post(
     }
 
     try {
-      // Extract asset ID from filename (before extension)
-      const assetId = path.basename(file.filename, path.extname(file.filename));
+      const assetId = `asset-${crypto.randomUUID().slice(0, 8)}`;
+      const ext = path.extname(file.originalname).toLowerCase();
+      const storageKey = `${deckId}/${assetId}${ext}`;
+
+      // Upload to S3
+      await uploadObject(storageKey, file.buffer, file.mimetype);
 
       // Get image dimensions if applicable
       let width: number | null = null;
       let height: number | null = null;
 
-      if (file.mimetype.startsWith('image/') && file.mimetype !== 'image/svg+xml') {
-        // TODO: Use sharp to get dimensions and generate thumbnail
-        // For now, we'll skip this
-      }
-
       // Insert into database
-      const stmt = db.prepare(`
-        INSERT INTO assets (id, deck_id, filename, mime_type, size, width, height, has_thumbnail)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      stmt.run(
-        assetId,
-        deckId,
-        file.originalname,
-        file.mimetype,
-        file.size,
-        width,
-        height,
-        0 // has_thumbnail
+      await pool.query(
+        `INSERT INTO assets (id, deck_id, filename, mime_type, size, width, height, has_thumbnail, storage_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)`,
+        [assetId, deckId, file.originalname, file.mimetype, file.size, width, height, storageKey]
       );
 
       const asset = {
@@ -151,10 +126,6 @@ router.post(
       res.status(201).json(asset);
     } catch (error) {
       console.error('[Assets] Error uploading asset:', error);
-      // Clean up file on error
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
       res.status(500).json({ error: 'Failed to upload asset' });
     }
   }
@@ -164,33 +135,25 @@ router.post(
  * GET /api/decks/:deckId/assets/:assetId
  * Serve an asset file
  */
-router.get('/decks/:deckId/assets/:assetId', (req: Request, res: Response) => {
+router.get('/decks/:deckId/assets/:assetId', async (req: Request, res: Response) => {
   const { deckId, assetId } = req.params;
 
   try {
-    // Get asset metadata
-    const stmt = db.prepare('SELECT * FROM assets WHERE id = ? AND deck_id = ?');
-    const row = stmt.get(assetId, deckId) as AssetRow | undefined;
+    const { rows } = await pool.query(
+      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
+      [assetId, deckId]
+    );
+    const row = rows[0] as AssetRow | undefined;
 
     if (!row) {
       res.status(404).json({ error: 'Asset not found' });
       return;
     }
 
-    // Find the file (we need to check with extension)
-    const assetDir = paths.deckAssets(deckId);
-    const files = fs.readdirSync(assetDir);
-    const assetFile = files.find((f) => f.startsWith(assetId));
-
-    if (!assetFile) {
-      res.status(404).json({ error: 'Asset file not found' });
-      return;
-    }
-
-    const filePath = path.join(assetDir, assetFile);
-    res.setHeader('Content-Type', row.mime_type);
-    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
-    res.sendFile(filePath);
+    const { body, contentType } = await getObject(row.storage_key);
+    res.setHeader('Content-Type', contentType || row.mime_type);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    body.pipe(res);
   } catch (error) {
     console.error('[Assets] Error serving asset:', error);
     res.status(500).json({ error: 'Failed to serve asset' });
@@ -201,31 +164,26 @@ router.get('/decks/:deckId/assets/:assetId', (req: Request, res: Response) => {
  * DELETE /api/decks/:deckId/assets/:assetId
  * Delete an asset
  */
-router.delete('/decks/:deckId/assets/:assetId', (req: Request, res: Response) => {
+router.delete('/decks/:deckId/assets/:assetId', async (req: Request, res: Response) => {
   const { deckId, assetId } = req.params;
 
   try {
-    // Get asset metadata first
-    const selectStmt = db.prepare('SELECT * FROM assets WHERE id = ? AND deck_id = ?');
-    const row = selectStmt.get(assetId, deckId) as AssetRow | undefined;
+    const { rows } = await pool.query(
+      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
+      [assetId, deckId]
+    );
+    const row = rows[0] as AssetRow | undefined;
 
     if (!row) {
       res.status(404).json({ error: 'Asset not found' });
       return;
     }
 
-    // Delete from database
-    const deleteStmt = db.prepare('DELETE FROM assets WHERE id = ? AND deck_id = ?');
-    deleteStmt.run(assetId, deckId);
+    // Delete from S3
+    await deleteObject(row.storage_key);
 
-    // Delete file(s) from disk
-    const assetDir = paths.deckAssets(deckId);
-    const files = fs.readdirSync(assetDir);
-    for (const file of files) {
-      if (file.startsWith(assetId)) {
-        fs.unlinkSync(path.join(assetDir, file));
-      }
-    }
+    // Delete from database
+    await pool.query('DELETE FROM assets WHERE id = $1 AND deck_id = $2', [assetId, deckId]);
 
     console.log(`[Assets] Deleted ${assetId} from deck ${deckId}`);
     res.status(204).send();
@@ -251,41 +209,31 @@ router.post(
       return;
     }
 
-    // Validate it's an image
     if (!file.mimetype.startsWith('image/')) {
-      fs.unlinkSync(file.path);
       res.status(400).json({ error: 'Cover must be an image' });
       return;
     }
 
     try {
-      // Delete old cover file if exists
-      const assetDir = paths.deckAssets(deckId);
-      const existingFiles = fs.readdirSync(assetDir);
-      for (const f of existingFiles) {
-        if (f.startsWith('cover.')) {
-          fs.unlinkSync(path.join(assetDir, f));
-        }
-      }
+      // Delete old cover if exists
+      await deleteByPrefix(`${deckId}/cover`);
 
-      // Rename uploaded file to cover.ext
+      // Upload new cover
       const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-      const coverFilename = `cover${ext}`;
-      const coverPath = path.join(assetDir, coverFilename);
-      fs.renameSync(file.path, coverPath);
+      const storageKey = `${deckId}/cover${ext}`;
+      await uploadObject(storageKey, file.buffer, file.mimetype);
 
-      // Update database with cover URL
+      // Update database with cover URL and storage key
       const coverUrl = `/api/decks/${deckId}/cover`;
-      const stmt = db.prepare("UPDATE decks SET cover_url = ?, updated_at = datetime('now') WHERE id = ?");
-      stmt.run(coverUrl, deckId);
+      await pool.query(
+        'UPDATE decks SET cover_url = $1, cover_storage_key = $2, updated_at = NOW() WHERE id = $3',
+        [coverUrl, storageKey, deckId]
+      );
 
       console.log(`[Assets] Updated cover for deck ${deckId}`);
       res.json({ coverUrl });
     } catch (error) {
       console.error('[Assets] Error uploading cover:', error);
-      if (file.path && fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
       res.status(500).json({ error: 'Failed to upload cover' });
     }
   }
@@ -295,38 +243,25 @@ router.post(
  * GET /api/decks/:deckId/cover
  * Serve the deck's cover image
  */
-router.get('/decks/:deckId/cover', (req: Request, res: Response) => {
+router.get('/decks/:deckId/cover', async (req: Request, res: Response) => {
   const { deckId } = req.params;
 
   try {
-    const assetDir = paths.deckAssets(deckId);
-    
-    if (!fs.existsSync(assetDir)) {
+    const { rows } = await pool.query(
+      'SELECT cover_storage_key FROM decks WHERE id = $1',
+      [deckId]
+    );
+    const row = rows[0] as { cover_storage_key: string | null } | undefined;
+
+    if (!row?.cover_storage_key) {
       res.status(404).json({ error: 'Cover not found' });
       return;
     }
 
-    const files = fs.readdirSync(assetDir);
-    const coverFile = files.find(f => f.startsWith('cover.'));
-
-    if (!coverFile) {
-      res.status(404).json({ error: 'Cover not found' });
-      return;
-    }
-
-    const coverPath = path.join(assetDir, coverFile);
-    const ext = path.extname(coverFile).toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.webp': 'image/webp',
-      '.gif': 'image/gif',
-    };
-
-    res.setHeader('Content-Type', mimeTypes[ext] || 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache (covers change)
-    res.sendFile(coverPath);
+    const { body, contentType } = await getObject(row.cover_storage_key);
+    res.setHeader('Content-Type', contentType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    body.pipe(res);
   } catch (error) {
     console.error('[Assets] Error serving cover:', error);
     res.status(500).json({ error: 'Failed to serve cover' });

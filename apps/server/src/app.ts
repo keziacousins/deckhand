@@ -8,6 +8,8 @@ import { decksRouter } from './routes/decks.js';
 import assetsRouter from './routes/assets.js';
 import chatRouter from './routes/chat.js';
 import modelsRouter from './routes/models.js';
+import { authRouter } from './routes/auth.js';
+import { jwtMiddleware } from './middleware/auth.js';
 import { getAllSessions } from './sessions.js';
 
 export function createApp(): Express {
@@ -20,7 +22,7 @@ export function createApp(): Express {
   app.use((_req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (_req.method === 'OPTIONS') {
       return res.sendStatus(200);
     }
@@ -31,6 +33,13 @@ export function createApp(): Express {
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
+
+  // Auth routes (before JWT middleware — these ARE the auth flow)
+  app.use('/api/auth', authRouter);
+
+  // JWT middleware for all subsequent /api routes
+  // credentialsRequired: false — anonymous requests pass through
+  app.use('/api', jwtMiddleware);
 
   // Sessions endpoint
   app.get('/api/sessions', (_req, res) => {

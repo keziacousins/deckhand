@@ -1,0 +1,141 @@
+# Deckhand infrastructure services.
+# The editor and server run natively (npm run dev) — this only manages
+# Postgres, Kratos, Hydra, and SeaweedFS.
+#
+# No volume mounts for config — everything is baked into images via Dockerfiles,
+# so this works with remote Docker hosts.
+
+services:
+  # --- Databases ---
+
+  ory-postgres:
+    build: ./ory/postgres
+    environment:
+      POSTGRES_USER: ${ORY_DB_USER:-ory}
+      POSTGRES_PASSWORD: ${ORY_DB_PASSWORD:-ory}
+      POSTGRES_DB: ory
+    ports:
+      - "${ORY_DB_PORT:-5434}:5432"
+    volumes:
+      - ory-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORY_DB_USER:-ory}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  deckhand-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DECKHAND_DB_USER:-deckhand}
+      POSTGRES_PASSWORD: ${DECKHAND_DB_PASSWORD:-deckhand}
+      POSTGRES_DB: ${DECKHAND_DB_NAME:-deckhand}
+    ports:
+      - "${DECKHAND_DB_PORT:-5433}:5432"
+    volumes:
+      - deckhand-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DECKHAND_DB_USER:-deckhand}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- Ory Kratos (Identity) ---
+
+  kratos-migrate:
+    build: ./ory/kratos
+    command: migrate sql -e --yes
+    environment:
+      DSN: postgres://${ORY_DB_USER:-ory}:${ORY_DB_PASSWORD:-ory}@ory-postgres:5432/kratos?sslmode=disable
+    depends_on:
+      ory-postgres:
+        condition: service_healthy
+    restart: "no"
+
+  kratos:
+    build: ./ory/kratos
+    command: serve -c /etc/kratos/kratos.yml --dev --watch-courier
+    ports:
+      - "${KRATOS_PUBLIC_PORT:-4433}:4433"
+      - "${KRATOS_ADMIN_PORT:-4434}:4434"
+    environment:
+      DSN: postgres://${ORY_DB_USER:-ory}:${ORY_DB_PASSWORD:-ory}@ory-postgres:5432/kratos?sslmode=disable
+      SECRETS_COOKIE: ${KRATOS_COOKIE_SECRET:-CHANGE-ME-IN-PRODUCTION-KRATOS-COOKIE-SECRET}
+      SECRETS_CIPHER: ${KRATOS_CIPHER_SECRET:-change-me-in-prod-32-char-key!!!}
+      SERVE_PUBLIC_BASE_URL: ${KRATOS_PUBLIC_URL:-http://localhost:4433}/
+      SERVE_ADMIN_BASE_URL: ${KRATOS_ADMIN_URL:-http://localhost:4434}/
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # --- Ory Hydra (OAuth2 / JWT) ---
+
+  hydra-migrate:
+    build: ./ory/hydra
+    command: migrate sql -e --yes
+    environment:
+      DSN: postgres://${ORY_DB_USER:-ory}:${ORY_DB_PASSWORD:-ory}@ory-postgres:5432/hydra?sslmode=disable
+    depends_on:
+      ory-postgres:
+        condition: service_healthy
+    restart: "no"
+
+  hydra:
+    build: ./ory/hydra
+    command: serve all -c /etc/hydra/hydra.yml --dev
+    ports:
+      - "${HYDRA_PUBLIC_PORT:-4444}:4444"
+      - "${HYDRA_ADMIN_PORT:-4445}:4445"
+    environment:
+      DSN: postgres://${ORY_DB_USER:-ory}:${ORY_DB_PASSWORD:-ory}@ory-postgres:5432/hydra?sslmode=disable
+      SECRETS_SYSTEM: ${HYDRA_SYSTEM_SECRET:-CHANGE-ME-IN-PRODUCTION-HYDRA-SYSTEM-SECRET!}
+      URLS_SELF_ISSUER: ${HYDRA_ISSUER:-http://localhost:4444}
+      URLS_LOGIN: ${LOGIN_URL:-http://localhost:3008/api/auth/login}
+      URLS_CONSENT: ${CONSENT_URL:-http://localhost:3008/api/auth/consent}
+      URLS_LOGOUT: ${LOGOUT_URL:-http://localhost:3008/api/auth/logout}
+      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:-http://localhost:5178}
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # --- SeaweedFS (Object Storage) ---
+
+  seaweedfs:
+    build: ./ory/seaweedfs
+    command: server -s3 -filer -dir=/data -s3.config=/etc/seaweedfs/s3.json
+    ports:
+      - "${SEAWEEDFS_S3_PORT:-8333}:8333"
+      - "${SEAWEEDFS_FILER_PORT:-8888}:8888"
+      - "${SEAWEEDFS_MASTER_PORT:-9333}:9333"
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9333/cluster/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # --- One-shot init: register OAuth2 client ---
+
+  hydra-client-init:
+    build: ./ory/scripts
+    environment:
+      HYDRA_ADMIN_URL: http://hydra:4445
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:5178}
+      OAUTH2_CLIENT_ID: ${OAUTH2_CLIENT_ID:-deckhand-editor}
+    depends_on:
+      hydra:
+        condition: service_started
+    restart: "no"
+
+volumes:
+  ory-postgres-data:
+  deckhand-postgres-data:
+  seaweedfs-data:

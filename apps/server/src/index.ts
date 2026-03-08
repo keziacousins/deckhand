@@ -12,9 +12,11 @@ import {
   getClientCount,
 } from './sessions.js';
 import { loadYDoc, debouncedSaveYDoc, flushSave } from './persistence.js';
+import { ensureBucket } from './storage.js';
 
-// Initialize database
-initSchema();
+// Initialize database and storage
+await initSchema();
+await ensureBucket();
 
 const app = createApp();
 const server = createServer(app);
@@ -41,7 +43,7 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 // WebSocket connection handling
-wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
+wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string) => {
   console.log(`[WS] Client connecting to deck: ${deckId}`);
 
   // Get or create session
@@ -49,7 +51,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
 
   // Load YDoc if this is first client
   if (session.clients.size === 0) {
-    const loadedDoc = loadYDoc(deckId);
+    const loadedDoc = await loadYDoc(deckId);
     if (loadedDoc) {
       // Apply loaded state to session doc
       const state = Y.encodeStateAsUpdate(loadedDoc);
@@ -68,7 +70,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
   ws.on('message', (data: Buffer) => {
     try {
       const update = new Uint8Array(data);
-      
+
       // Apply update to YDoc
       Y.applyUpdate(session.ydoc, update);
 
@@ -88,7 +90,7 @@ wss.on('connection', (ws: WebSocket, _request: unknown, deckId: string) => {
 
     // If last client, flush save immediately
     if (getClientCount(deckId) === 0) {
-      flushSave(deckId, session.ydoc);
+      void flushSave(deckId, session.ydoc);
     }
   });
 

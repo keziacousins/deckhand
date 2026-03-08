@@ -1,6 +1,6 @@
 /**
  * Chat API route for LLM-powered deck editing.
- * 
+ *
  * Uses Claude with tool use to understand natural language commands
  * and apply changes to the deck via YDoc.
  */
@@ -11,9 +11,8 @@ import { config, isLLMEnabled } from '../config.js';
 import { getOrCreateSession, broadcastYDocState } from '../sessions.js';
 import { loadYDoc, debouncedSaveYDoc } from '../persistence.js';
 import { yDocToDeck } from '@deckhand/sync';
-import { db, type ChatMessageRow, type ChatSessionRow } from '../db/schema.js';
+import { pool, type ChatMessageRow, type ChatSessionRow } from '../db/schema.js';
 import * as Y from 'yjs';
-import type { Deck } from '@deckhand/schema';
 import { tools, executeToolCall } from '../llm/tools.js';
 import { buildSystemPrompt, buildContinuationPrompt } from '../llm/prompts.js';
 
@@ -32,61 +31,56 @@ function generateId(prefix: string): string {
 /**
  * Create a new chat session
  */
-function createSession(deckId: string, title?: string): string {
+async function createSession(deckId: string, title?: string): Promise<string> {
   const id = generateId('chat');
-  const stmt = db.prepare(`
-    INSERT INTO chat_sessions (id, deck_id, title)
-    VALUES (?, ?, ?)
-  `);
-  stmt.run(id, deckId, title || null);
+  await pool.query(
+    'INSERT INTO chat_sessions (id, deck_id, title) VALUES ($1, $2, $3)',
+    [id, deckId, title || null]
+  );
   return id;
 }
 
 /**
  * Update session timestamp and optionally title
  */
-function updateSession(sessionId: string, title?: string): void {
+async function updateSession(sessionId: string, title?: string): Promise<void> {
   if (title) {
-    const stmt = db.prepare(`
-      UPDATE chat_sessions 
-      SET updated_at = datetime('now'), title = ?
-      WHERE id = ?
-    `);
-    stmt.run(title, sessionId);
+    await pool.query(
+      'UPDATE chat_sessions SET updated_at = NOW(), title = $1 WHERE id = $2',
+      [title, sessionId]
+    );
   } else {
-    const stmt = db.prepare(`
-      UPDATE chat_sessions 
-      SET updated_at = datetime('now')
-      WHERE id = ?
-    `);
-    stmt.run(sessionId);
+    await pool.query(
+      'UPDATE chat_sessions SET updated_at = NOW() WHERE id = $1',
+      [sessionId]
+    );
   }
 }
 
 /**
  * Save a chat message to the database
  */
-function saveMessage(
+async function saveMessage(
   sessionId: string,
   deckId: string,
   role: 'user' | 'assistant',
   content: string,
   model?: string,
   toolResults?: Array<{ tool: string; success: boolean }>
-): string {
+): Promise<string> {
   const id = generateId('msg');
-  const stmt = db.prepare(`
-    INSERT INTO chat_messages (id, session_id, deck_id, role, content, model, tool_results)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
-  stmt.run(
-    id,
-    sessionId,
-    deckId,
-    role,
-    content,
-    model || null,
-    toolResults ? JSON.stringify(toolResults) : null
+  await pool.query(
+    `INSERT INTO chat_messages (id, session_id, deck_id, role, content, model, tool_results)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      id,
+      sessionId,
+      deckId,
+      role,
+      content,
+      model || null,
+      toolResults ? JSON.stringify(toolResults) : null,
+    ]
   );
   return id;
 }
@@ -95,7 +89,6 @@ function saveMessage(
  * Generate a session title from the first user message
  */
 function generateSessionTitle(message: string): string {
-  // Take first 50 chars, truncate at word boundary
   const maxLen = 50;
   if (message.length <= maxLen) return message;
   const truncated = message.slice(0, maxLen);
@@ -105,7 +98,7 @@ function generateSessionTitle(message: string): string {
 
 interface ChatRequest {
   message: string;
-  sessionId?: string;  // If not provided, creates new session
+  sessionId?: string;
   model?: string;
   context?: {
     selectedSlideId?: string;
@@ -119,21 +112,17 @@ interface ChatRequest {
 
 /**
  * GET /api/decks/:deckId/chat/sessions
- * 
- * List all chat sessions for a deck.
  */
-router.get('/:deckId/chat/sessions', (req, res) => {
+router.get('/:deckId/chat/sessions', async (req, res) => {
   const { deckId } = req.params;
 
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM chat_sessions 
-      WHERE deck_id = ? 
-      ORDER BY updated_at DESC
-    `);
-    const rows = stmt.all(deckId) as ChatSessionRow[];
+    const { rows } = await pool.query(
+      'SELECT * FROM chat_sessions WHERE deck_id = $1 ORDER BY updated_at DESC',
+      [deckId]
+    );
 
-    const sessions = rows.map(row => ({
+    const sessions = (rows as ChatSessionRow[]).map(row => ({
       id: row.id,
       title: row.title,
       createdAt: row.created_at,
@@ -149,16 +138,14 @@ router.get('/:deckId/chat/sessions', (req, res) => {
 
 /**
  * POST /api/decks/:deckId/chat/sessions
- * 
- * Create a new chat session.
  */
-router.post('/:deckId/chat/sessions', (req, res) => {
+router.post('/:deckId/chat/sessions', async (req, res) => {
   const { deckId } = req.params;
   const { title } = req.body as { title?: string };
 
   try {
-    const sessionId = createSession(deckId, title);
-    res.json({ 
+    const sessionId = await createSession(deckId, title);
+    res.json({
       id: sessionId,
       title: title || null,
     });
@@ -170,16 +157,12 @@ router.post('/:deckId/chat/sessions', (req, res) => {
 
 /**
  * DELETE /api/decks/:deckId/chat/sessions/:sessionId
- * 
- * Delete a chat session and all its messages.
  */
-router.delete('/:deckId/chat/sessions/:sessionId', (req, res) => {
+router.delete('/:deckId/chat/sessions/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
 
   try {
-    // Messages are deleted via CASCADE
-    const stmt = db.prepare('DELETE FROM chat_sessions WHERE id = ?');
-    stmt.run(sessionId);
+    await pool.query('DELETE FROM chat_sessions WHERE id = $1', [sessionId]);
     res.json({ success: true });
   } catch (error) {
     console.error('[Chat] Error deleting session:', error);
@@ -189,17 +172,14 @@ router.delete('/:deckId/chat/sessions/:sessionId', (req, res) => {
 
 /**
  * PATCH /api/decks/:deckId/chat/sessions/:sessionId
- * 
- * Update a chat session (e.g., rename).
  */
-router.patch('/:deckId/chat/sessions/:sessionId', (req, res) => {
+router.patch('/:deckId/chat/sessions/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   const { title } = req.body as { title?: string };
 
   try {
     if (title !== undefined) {
-      const stmt = db.prepare('UPDATE chat_sessions SET title = ? WHERE id = ?');
-      stmt.run(title, sessionId);
+      await pool.query('UPDATE chat_sessions SET title = $1 WHERE id = $2', [title, sessionId]);
     }
     res.json({ success: true });
   } catch (error) {
@@ -214,22 +194,18 @@ router.patch('/:deckId/chat/sessions/:sessionId', (req, res) => {
 
 /**
  * GET /api/decks/:deckId/chat/sessions/:sessionId/messages
- * 
- * Get messages for a specific session.
  */
-router.get('/:deckId/chat/sessions/:sessionId/messages', (req, res) => {
+router.get('/:deckId/chat/sessions/:sessionId/messages', async (req, res) => {
   const { sessionId } = req.params;
 
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM chat_messages 
-      WHERE session_id = ? 
-      ORDER BY created_at ASC
-    `);
-    const rows = stmt.all(sessionId) as ChatMessageRow[];
+    const { rows } = await pool.query(
+      'SELECT * FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC',
+      [sessionId]
+    );
 
-    const messages = rows
-      .filter(row => row.content && row.content.trim() !== '') // Skip empty messages
+    const messages = (rows as ChatMessageRow[])
+      .filter(row => row.content && row.content.trim() !== '')
       .map(row => ({
         id: row.id,
         role: row.role,
@@ -248,34 +224,27 @@ router.get('/:deckId/chat/sessions/:sessionId/messages', (req, res) => {
 
 /**
  * GET /api/decks/:deckId/chat/history (DEPRECATED - for backward compatibility)
- * 
- * Get chat history for a deck (returns most recent session).
  */
-router.get('/:deckId/chat/history', (req, res) => {
+router.get('/:deckId/chat/history', async (req, res) => {
   const { deckId } = req.params;
 
   try {
-    // Get most recent session
-    const sessionStmt = db.prepare(`
-      SELECT id FROM chat_sessions 
-      WHERE deck_id = ? 
-      ORDER BY updated_at DESC 
-      LIMIT 1
-    `);
-    const session = sessionStmt.get(deckId) as { id: string } | undefined;
+    const { rows: sessionRows } = await pool.query(
+      'SELECT id FROM chat_sessions WHERE deck_id = $1 ORDER BY updated_at DESC LIMIT 1',
+      [deckId]
+    );
+    const session = sessionRows[0] as { id: string } | undefined;
 
     if (!session) {
       return res.json({ messages: [], sessionId: null });
     }
 
-    const stmt = db.prepare(`
-      SELECT * FROM chat_messages 
-      WHERE session_id = ? 
-      ORDER BY created_at ASC
-    `);
-    const rows = stmt.all(session.id) as ChatMessageRow[];
+    const { rows } = await pool.query(
+      'SELECT * FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC',
+      [session.id]
+    );
 
-    const messages = rows.map(row => ({
+    const messages = (rows as ChatMessageRow[]).map(row => ({
       id: row.id,
       role: row.role,
       content: row.content,
@@ -293,16 +262,12 @@ router.get('/:deckId/chat/history', (req, res) => {
 
 /**
  * DELETE /api/decks/:deckId/chat/history (DEPRECATED - for backward compatibility)
- * 
- * Clear all chat sessions for a deck.
  */
-router.delete('/:deckId/chat/history', (req, res) => {
+router.delete('/:deckId/chat/history', async (req, res) => {
   const { deckId } = req.params;
 
   try {
-    // Delete all sessions (messages deleted via CASCADE)
-    const stmt = db.prepare('DELETE FROM chat_sessions WHERE deck_id = ?');
-    stmt.run(deckId);
+    await pool.query('DELETE FROM chat_sessions WHERE deck_id = $1', [deckId]);
     res.json({ success: true });
   } catch (error) {
     console.error('[Chat] Error clearing history:', error);
@@ -316,13 +281,11 @@ router.delete('/:deckId/chat/history', (req, res) => {
 
 /**
  * POST /api/decks/:deckId/chat
- * 
- * Send a message to the LLM assistant for deck editing.
  */
 router.post('/:deckId/chat', async (req, res) => {
   if (!isLLMEnabled()) {
-    return res.status(503).json({ 
-      error: 'LLM features not available. Set ANTHROPIC_API_KEY in server environment.' 
+    return res.status(503).json({
+      error: 'LLM features not available. Set ANTHROPIC_API_KEY in server environment.'
     });
   }
 
@@ -333,36 +296,34 @@ router.post('/:deckId/chat', async (req, res) => {
     return res.status(400).json({ error: 'Message is required' });
   }
 
-  // Use specified model or default
   const modelId = model || DEFAULT_MODEL;
 
   // Get or create session
   let sessionId = providedSessionId;
   let isNewSession = false;
-  
+
   if (!sessionId) {
-    // Create new session with title from first message
     const title = generateSessionTitle(message);
-    sessionId = createSession(deckId, title);
+    sessionId = await createSession(deckId, title);
     isNewSession = true;
   }
 
   // Save user message
-  const userMessageId = saveMessage(sessionId, deckId, 'user', message);
+  await saveMessage(sessionId, deckId, 'user', message);
 
   // Update session timestamp
-  updateSession(sessionId);
+  await updateSession(sessionId);
 
   try {
     // Get current deck state
     console.log(`[Chat] Processing request for deckId: ${deckId}`);
     const session = getOrCreateSession(deckId);
     console.log(`[Chat] Session clients: ${session.clients.size}`);
-    
+
     // Load from DB if no active clients
     if (session.clients.size === 0) {
       console.log(`[Chat] No clients, loading from DB...`);
-      const loadedDoc = loadYDoc(deckId);
+      const loadedDoc = await loadYDoc(deckId);
       if (loadedDoc) {
         const state = Y.encodeStateAsUpdate(loadedDoc);
         Y.applyUpdate(session.ydoc, state);
@@ -375,7 +336,7 @@ router.post('/:deckId/chat', async (req, res) => {
     const deck = yDocToDeck(session.ydoc);
     console.log(`[Chat] Deck meta:`, deck?.meta?.title);
     console.log(`[Chat] Deck slides:`, deck?.slides ? Object.keys(deck.slides).length : 0);
-    
+
     if (!deck || !deck.meta) {
       console.log(`[Chat] Deck not found or no meta - returning 404`);
       return res.status(404).json({ error: 'Deck not found' });
@@ -387,38 +348,33 @@ router.post('/:deckId/chat', async (req, res) => {
     });
 
     // Load chat history for this session
-    const historyStmt = db.prepare(`
-      SELECT role, content FROM chat_messages 
-      WHERE session_id = ? 
-      ORDER BY created_at ASC
-    `);
-    const historyRows = historyStmt.all(sessionId) as { role: string; content: string }[];
-    
+    const { rows: historyRows } = await pool.query(
+      'SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC',
+      [sessionId]
+    );
+
     // Build messages array from history (excluding the message we just saved)
-    // Note: We only store plain text, not tool_use blocks. The deck state is the source of truth.
     const messages: Anthropic.MessageParam[] = [];
-    
-    // Add previous messages from history (skip the last one which is the current user message)
+
     for (let i = 0; i < historyRows.length - 1; i++) {
-      const row = historyRows[i];
+      const row = historyRows[i] as { role: string; content: string };
       if (row.role === 'user' || row.role === 'assistant') {
-        // Skip empty messages
         if (!row.content || row.content.trim() === '') continue;
-        
+
         messages.push({
           role: row.role as 'user' | 'assistant',
           content: row.content,
         });
       }
     }
-    
+
     // Add current user message with tool reminder
     const toolReminder = '\n\n[Remember: You MUST call tools to make any changes. Describe your plan briefly, then call the necessary tools.]';
     messages.push({ role: 'user', content: message + toolReminder });
 
     // Use full prompt for first message in session, lighter prompt for continuation
     const hasHistory = historyRows.length > 1;
-    const systemPrompt = hasHistory 
+    const systemPrompt = hasHistory
       ? buildContinuationPrompt(deck, context)
       : buildSystemPrompt(deck, context);
 
@@ -440,15 +396,13 @@ router.post('/:deckId/chat', async (req, res) => {
     // Process tool calls in a loop
     while (response.stop_reason === 'tool_use') {
       const assistantContent = response.content;
-      
-      // Collect any text responses
+
       for (const block of assistantContent) {
         if (block.type === 'text') {
           assistantMessages.push(block.text);
         }
       }
 
-      // Process tool calls
       const toolUseBlocks = assistantContent.filter(
         (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
       );
@@ -457,10 +411,9 @@ router.post('/:deckId/chat', async (req, res) => {
 
       for (const toolUse of toolUseBlocks) {
         console.log(`[Chat] Tool call: ${toolUse.name}`, toolUse.input);
-        
-        // Re-fetch deck state for each tool call (it may have changed)
+
         const currentDeck = yDocToDeck(session.ydoc);
-        
+
         const result = executeToolCall(
           toolUse.name,
           toolUse.input as Record<string, unknown>,
@@ -507,9 +460,7 @@ router.post('/:deckId/chat', async (req, res) => {
 
     const responseText = assistantMessages.join('\n');
 
-    // Save final assistant message as plain text (for simpler history)
-    // Tool results are stored separately for UI display
-    const assistantMessageId = saveMessage(
+    const assistantMessageId = await saveMessage(
       sessionId,
       deckId,
       'assistant',
@@ -518,8 +469,7 @@ router.post('/:deckId/chat', async (req, res) => {
       toolResults.length > 0 ? toolResults : undefined
     );
 
-    // Update session timestamp
-    updateSession(sessionId);
+    await updateSession(sessionId);
 
     res.json({
       id: assistantMessageId,
@@ -532,15 +482,13 @@ router.post('/:deckId/chat', async (req, res) => {
 
   } catch (error) {
     console.error('[Chat] Error:', error);
-    
-    // Extract meaningful error message from various error formats
+
     let errorMessage = 'Failed to process chat message';
-    
+
     if (error instanceof Error) {
       errorMessage = error.message;
     } else if (error && typeof error === 'object') {
       const err = error as Record<string, unknown>;
-      // Anthropic SDK error structure
       if (err.message) {
         errorMessage = String(err.message);
       } else if (err.error && typeof err.error === 'object') {
@@ -550,7 +498,7 @@ router.post('/:deckId/chat', async (req, res) => {
         }
       }
     }
-    
+
     res.status(500).json({ error: errorMessage });
   }
 });

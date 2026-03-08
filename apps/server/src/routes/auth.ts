@@ -1,0 +1,332 @@
+import crypto from 'node:crypto';
+import { Router } from 'express';
+import { Configuration, OAuth2Api, FrontendApi } from '@ory/client';
+import { oryConfig } from '../config.js';
+import { upsertUser } from '../db/users.js';
+import { getUser } from '../db/users.js';
+
+const hydraAdmin = new OAuth2Api(
+  new Configuration({
+    basePath: oryConfig.hydraAdminUrl,
+  })
+);
+
+const kratosFrontend = new FrontendApi(
+  new Configuration({
+    basePath: oryConfig.kratosPublicUrl,
+  })
+);
+
+/**
+ * Short-lived map of recently authenticated identities, keyed by random nonce.
+ * Used to bridge Kratos native login → Hydra OAuth2 login acceptance.
+ */
+const recentLogins = new Map<
+  string,
+  { identityId: string; email: string; name: string; expiresAt: number }
+>();
+
+function cleanupRecentLogins() {
+  const now = Date.now();
+  for (const [key, val] of recentLogins) {
+    if (val.expiresAt < now) recentLogins.delete(key);
+  }
+}
+
+/**
+ * Parse Kratos error responses into field-level and general errors.
+ */
+function parseKratosErrors(data: any): {
+  errors: Record<string, string>;
+  error?: string;
+} {
+  const errors: Record<string, string> = {};
+  if (data?.ui?.nodes) {
+    for (const node of data.ui.nodes) {
+      if (node.messages?.length) {
+        const name = node.attributes?.name;
+        if (name) {
+          errors[name] = node.messages.map((m: any) => m.text).join('. ');
+        }
+      }
+    }
+  }
+  const generalErrors = data?.ui?.messages
+    ?.filter((m: any) => m.type === 'error')
+    .map((m: any) => m.text)
+    .join('. ');
+  return { errors, error: generalErrors || undefined };
+}
+
+export const authRouter = Router();
+
+// ─── Kratos Flow Proxies ───────────────────────────────────────────────
+
+/**
+ * POST /register — Proxy registration through Kratos native flow.
+ * Body: { email, password, name? }
+ */
+authRouter.post('/register', async (req, res) => {
+  const { email, password, name } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const { data: flow } = await kratosFrontend.createNativeRegistrationFlow();
+
+    const { data: result } = await kratosFrontend.updateRegistrationFlow({
+      flow: flow.id,
+      updateRegistrationFlowBody: {
+        method: 'password',
+        password,
+        traits: { email, name: name || '' },
+      },
+    });
+
+    console.log(
+      `[Auth] User registered via proxy: ${email} (${result.identity.id})`
+    );
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[Auth] Registration proxy error:', err?.response?.data || err);
+    const data = err?.response?.data;
+    if (data?.ui) {
+      const parsed = parseKratosErrors(data);
+      return res.status(400).json(parsed);
+    }
+    return res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+/**
+ * POST /login — Proxy login through Kratos native flow.
+ * On success, stores a nonce in recentLogins for the Hydra bridge.
+ * Body: { email, password }
+ * Returns: { success: true, loginNonce: string }
+ */
+authRouter.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const { data: flow } = await kratosFrontend.createNativeLoginFlow();
+
+    const { data: result } = await kratosFrontend.updateLoginFlow({
+      flow: flow.id,
+      updateLoginFlowBody: {
+        method: 'password',
+        identifier: email,
+        password,
+      },
+    });
+
+    // Store successful login for the Hydra bridge
+    const nonce = crypto.randomBytes(32).toString('hex');
+    const identity = result.session?.identity;
+    if (!identity) {
+      return res.status(500).json({ error: 'Login succeeded but no identity returned' });
+    }
+    recentLogins.set(nonce, {
+      identityId: identity.id,
+      email: (identity.traits as any).email,
+      name: (identity.traits as any).name || '',
+      expiresAt: Date.now() + 60_000,
+    });
+
+    cleanupRecentLogins();
+
+    console.log(`[Auth] User logged in via proxy: ${email}`);
+    return res.json({ success: true, loginNonce: nonce });
+  } catch (err: any) {
+    console.error('[Auth] Login proxy error:', err?.response?.data || err);
+    const data = err?.response?.data;
+    if (data?.ui) {
+      const parsed = parseKratosErrors(data);
+      return res.status(401).json(parsed);
+    }
+    return res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+/**
+ * POST /recovery — Proxy password recovery through Kratos native flow.
+ * Always returns success to prevent email enumeration.
+ * Body: { email }
+ */
+authRouter.post('/recovery', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    const { data: flow } = await kratosFrontend.createNativeRecoveryFlow();
+
+    await kratosFrontend.updateRecoveryFlow({
+      flow: flow.id,
+      updateRecoveryFlowBody: {
+        method: 'code',
+        email,
+      },
+    });
+  } catch {
+    // Swallow errors to prevent email enumeration
+  }
+
+  return res.json({ success: true });
+});
+
+// ─── Hydra OAuth2 Handlers ─────────────────────────────────────────────
+
+/**
+ * GET /login — Hydra redirects here with ?login_challenge=...
+ *
+ * Checks for a login_hint nonce from our POST /login proxy.
+ * If found, accepts immediately. Otherwise falls back to Kratos redirect.
+ */
+authRouter.get('/login', async (req, res) => {
+  try {
+    const challenge = req.query.login_challenge as string;
+    if (!challenge) {
+      return res.status(400).json({ error: 'Missing login_challenge' });
+    }
+
+    const { data: loginRequest } = await hydraAdmin.getOAuth2LoginRequest({
+      loginChallenge: challenge,
+    });
+
+    if (loginRequest.skip) {
+      const { data: completion } = await hydraAdmin.acceptOAuth2LoginRequest({
+        loginChallenge: challenge,
+        acceptOAuth2LoginRequest: {
+          subject: loginRequest.subject,
+        },
+      });
+      return res.redirect(completion.redirect_to);
+    }
+
+    // Check for a recent login via our proxy (nonce passed as login_hint)
+    const loginHint = loginRequest.oidc_context?.login_hint;
+    if (loginHint) {
+      const recentLogin = recentLogins.get(loginHint);
+      if (recentLogin && recentLogin.expiresAt > Date.now()) {
+        recentLogins.delete(loginHint);
+        const { data: completion } = await hydraAdmin.acceptOAuth2LoginRequest({
+          loginChallenge: challenge,
+          acceptOAuth2LoginRequest: {
+            subject: recentLogin.identityId,
+          },
+        });
+        return res.redirect(completion.redirect_to);
+      }
+    }
+
+    // Fallback: redirect to Kratos login UI
+    const kratosLoginUrl = new URL(
+      '/self-service/login/browser',
+      oryConfig.kratosPublicUrl
+    );
+    kratosLoginUrl.searchParams.set(
+      'return_to',
+      `${oryConfig.hydraPublicUrl}/oauth2/auth?login_challenge=${challenge}`
+    );
+    return res.redirect(kratosLoginUrl.toString());
+  } catch (error) {
+    console.error('[Auth] Login error:', error);
+    return res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+/**
+ * GET /consent — Hydra redirects here with ?consent_challenge=...
+ *
+ * Auto-accepts for first-party app. Injects custom claims into the JWT
+ * via session.access_token.
+ */
+authRouter.get('/consent', async (req, res) => {
+  try {
+    const challenge = req.query.consent_challenge as string;
+    if (!challenge) {
+      return res.status(400).json({ error: 'Missing consent_challenge' });
+    }
+
+    const { data: consentRequest } = await hydraAdmin.getOAuth2ConsentRequest({
+      consentChallenge: challenge,
+    });
+
+    // Look up local user for custom JWT claims
+    const user = consentRequest.subject
+      ? await getUser(consentRequest.subject)
+      : null;
+
+    const { data: completion } = await hydraAdmin.acceptOAuth2ConsentRequest({
+      consentChallenge: challenge,
+      acceptOAuth2ConsentRequest: {
+        grant_scope: consentRequest.requested_scope,
+        grant_access_token_audience:
+          consentRequest.requested_access_token_audience,
+        session: {
+          access_token: {
+            user_id: consentRequest.subject,
+            email: user?.email ?? null,
+            name: user?.name ?? null,
+          },
+        },
+      },
+    });
+
+    return res.redirect(completion.redirect_to);
+  } catch (error) {
+    console.error('[Auth] Consent error:', error);
+    return res.status(500).json({ error: 'Consent failed' });
+  }
+});
+
+/**
+ * GET /logout — Hydra redirects here with ?logout_challenge=...
+ */
+authRouter.get('/logout', async (req, res) => {
+  try {
+    const challenge = req.query.logout_challenge as string;
+    if (!challenge) {
+      return res.status(400).json({ error: 'Missing logout_challenge' });
+    }
+
+    const { data: completion } = await hydraAdmin.acceptOAuth2LogoutRequest({
+      logoutChallenge: challenge,
+    });
+
+    return res.redirect(completion.redirect_to);
+  } catch (error) {
+    console.error('[Auth] Logout error:', error);
+    return res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+/**
+ * POST /hooks/registration — Kratos webhook after user registration.
+ * Body shape from webhook.registration.jsonnet: { identity_id, email, name }
+ */
+authRouter.post('/hooks/registration', async (req, res) => {
+  try {
+    const { identity_id, email, name } = req.body;
+
+    if (!identity_id || !email) {
+      return res.status(400).json({ error: 'Missing identity_id or email' });
+    }
+
+    await upsertUser(identity_id, email, name ?? null);
+
+    console.log(`[Auth] User registered: ${email} (${identity_id})`);
+    return res.status(200).json({ status: 'ok' });
+  } catch (error) {
+    console.error('[Auth] Registration webhook error:', error);
+    return res.status(500).json({ error: 'Registration hook failed' });
+  }
+});

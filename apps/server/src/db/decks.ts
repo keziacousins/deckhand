@@ -2,7 +2,7 @@
  * Deck database operations.
  */
 
-import { db, type DeckMetadata, type DeckRow, type YDocStateRow } from './schema.js';
+import { pool, type DeckMetadata, type DeckRow } from './schema.js';
 import { createHash } from 'crypto';
 import type { Deck } from '@deckhand/schema';
 
@@ -16,24 +16,14 @@ export function hashContent(content: string): string {
 /**
  * List all decks (metadata only)
  */
-export function listDecks(): DeckMetadata[] {
-  const stmt = db.prepare(`
-    SELECT id, title, description, slide_count, cover_url, created_at, updated_at
-    FROM decks
-    ORDER BY updated_at DESC
-  `);
+export async function listDecks(): Promise<DeckMetadata[]> {
+  const { rows } = await pool.query(
+    `SELECT id, title, description, slide_count, cover_url, created_at, updated_at
+     FROM decks
+     ORDER BY updated_at DESC`
+  );
 
-  const rows = stmt.all() as Array<{
-    id: string;
-    title: string;
-    description: string | null;
-    slide_count: number;
-    cover_url: string | null;
-    created_at: string;
-    updated_at: string;
-  }>;
-
-  return rows.map((row) => ({
+  return rows.map((row: DeckRow) => ({
     id: row.id,
     title: row.title,
     description: row.description,
@@ -47,117 +37,114 @@ export function listDecks(): DeckMetadata[] {
 /**
  * Get a single deck by ID
  */
-export function getDeck(id: string): DeckRow | null {
-  const stmt = db.prepare('SELECT * FROM decks WHERE id = ?');
-  return (stmt.get(id) as DeckRow) || null;
+export async function getDeck(id: string): Promise<DeckRow | null> {
+  const { rows } = await pool.query('SELECT * FROM decks WHERE id = $1', [id]);
+  return rows[0] ?? null;
 }
 
 /**
  * Create a new deck
  */
-export function createDeck(deck: Deck): DeckRow {
+export async function createDeck(deck: Deck): Promise<DeckRow> {
   const content = JSON.stringify(deck);
   const contentHash = hashContent(content);
   const slideCount = Object.keys(deck.slides).length;
 
-  const stmt = db.prepare(`
-    INSERT INTO decks (id, title, description, content, content_hash, slide_count)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
-  stmt.run(
-    deck.meta.id,
-    deck.meta.title,
-    deck.meta.description || null,
-    content,
-    contentHash,
-    slideCount
+  await pool.query(
+    `INSERT INTO decks (id, title, description, content, content_hash, slide_count)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      deck.meta.id,
+      deck.meta.title,
+      deck.meta.description || null,
+      content,
+      contentHash,
+      slideCount,
+    ]
   );
 
-  return getDeck(deck.meta.id)!;
+  return (await getDeck(deck.meta.id))!;
 }
 
 /**
  * Update a deck's content
  */
-export function updateDeckContent(id: string, deck: Deck): DeckRow | null {
+export async function updateDeckContent(id: string, deck: Deck): Promise<DeckRow | null> {
   const content = JSON.stringify(deck);
   const contentHash = hashContent(content);
   const slideCount = Object.keys(deck.slides).length;
 
-  const stmt = db.prepare(`
-    UPDATE decks
-    SET title = ?, description = ?, content = ?, content_hash = ?,
-        slide_count = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `);
-
-  const result = stmt.run(
-    deck.meta.title,
-    deck.meta.description || null,
-    content,
-    contentHash,
-    slideCount,
-    id
+  const result = await pool.query(
+    `UPDATE decks
+     SET title = $1, description = $2, content = $3, content_hash = $4,
+         slide_count = $5, updated_at = NOW()
+     WHERE id = $6`,
+    [
+      deck.meta.title,
+      deck.meta.description || null,
+      content,
+      contentHash,
+      slideCount,
+      id,
+    ]
   );
 
-  if (result.changes === 0) return null;
+  if (result.rowCount === 0) return null;
   return getDeck(id);
 }
 
 /**
  * Update deck metadata only (doesn't update content_hash to trigger re-bootstrap)
  */
-export function updateDeckMetadata(
+export async function updateDeckMetadata(
   id: string,
   updates: { title?: string; description?: string }
-): DeckRow | null {
+): Promise<DeckRow | null> {
   const fields: string[] = [];
   const values: unknown[] = [];
+  let paramIndex = 1;
 
   if (updates.title !== undefined) {
-    fields.push('title = ?');
+    fields.push(`title = $${paramIndex++}`);
     values.push(updates.title);
   }
   if (updates.description !== undefined) {
-    fields.push('description = ?');
+    fields.push(`description = $${paramIndex++}`);
     values.push(updates.description);
   }
 
   if (fields.length === 0) return getDeck(id);
 
-  fields.push("updated_at = datetime('now')");
+  fields.push('updated_at = NOW()');
   values.push(id);
 
-  const stmt = db.prepare(`
-    UPDATE decks SET ${fields.join(', ')} WHERE id = ?
-  `);
+  const result = await pool.query(
+    `UPDATE decks SET ${fields.join(', ')} WHERE id = $${paramIndex}`,
+    values
+  );
 
-  const result = stmt.run(...values);
-  if (result.changes === 0) return null;
+  if (result.rowCount === 0) return null;
   return getDeck(id);
 }
 
 /**
  * Delete a deck
  */
-export function deleteDeck(id: string): boolean {
-  const stmt = db.prepare('DELETE FROM decks WHERE id = ?');
-  const result = stmt.run(id);
-  return result.changes > 0;
+export async function deleteDeck(id: string): Promise<boolean> {
+  const result = await pool.query('DELETE FROM decks WHERE id = $1', [id]);
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**
  * Duplicate a deck with a new ID
  */
-export function duplicateDeck(id: string, newId: string): DeckRow | null {
-  const original = getDeck(id);
+export async function duplicateDeck(id: string, newId: string): Promise<DeckRow | null> {
+  const original = await getDeck(id);
   if (!original) return null;
 
   const deck = JSON.parse(original.content) as Deck;
   const now = new Date().toISOString();
 
-  // Update IDs and title
   deck.meta.id = newId;
   deck.meta.title = `${deck.meta.title} (copy)`;
   deck.meta.created = now;
@@ -169,44 +156,45 @@ export function duplicateDeck(id: string, newId: string): DeckRow | null {
 /**
  * Get YDoc state for a deck
  */
-export function getYDocState(deckId: string): Buffer | null {
-  const stmt = db.prepare('SELECT data FROM ydoc_states WHERE deck_id = ?');
-  const row = stmt.get(deckId) as YDocStateRow | undefined;
-  return row?.data || null;
+export async function getYDocState(deckId: string): Promise<Buffer | null> {
+  const { rows } = await pool.query(
+    'SELECT data FROM ydoc_states WHERE deck_id = $1',
+    [deckId]
+  );
+  return rows[0]?.data ?? null;
 }
 
 /**
  * Save YDoc state for a deck
  */
-export function saveYDocState(deckId: string, data: Buffer): void {
-  const stmt = db.prepare(`
-    INSERT INTO ydoc_states (deck_id, data, updated_at)
-    VALUES (?, ?, datetime('now'))
-    ON CONFLICT(deck_id) DO UPDATE SET
-      data = excluded.data,
-      updated_at = datetime('now')
-  `);
-  stmt.run(deckId, data);
+export async function saveYDocState(deckId: string, data: Buffer): Promise<void> {
+  await pool.query(
+    `INSERT INTO ydoc_states (deck_id, data, updated_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (deck_id) DO UPDATE SET
+       data = EXCLUDED.data,
+       updated_at = NOW()`,
+    [deckId, data]
+  );
 }
 
 /**
  * Delete YDoc state for a deck
  */
-export function deleteYDocState(deckId: string): void {
-  const stmt = db.prepare('DELETE FROM ydoc_states WHERE deck_id = ?');
-  stmt.run(deckId);
+export async function deleteYDocState(deckId: string): Promise<void> {
+  await pool.query('DELETE FROM ydoc_states WHERE deck_id = $1', [deckId]);
 }
 
 /**
  * Get deck with YDoc state for bootstrap
  */
-export function getDeckWithYDocState(id: string): {
+export async function getDeckWithYDocState(id: string): Promise<{
   deck: DeckRow;
   ydocState: Buffer | null;
-} | null {
-  const deck = getDeck(id);
+} | null> {
+  const deck = await getDeck(id);
   if (!deck) return null;
 
-  const ydocState = getYDocState(id);
+  const ydocState = await getYDocState(id);
   return { deck, ydocState };
 }

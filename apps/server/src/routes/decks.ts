@@ -12,7 +12,7 @@ import {
   deleteDeck,
   duplicateDeck,
 } from '../db/decks.js';
-import { createEmptyDeck, generateDeckId, validateDeck, type Deck } from '@deckhand/schema';
+import { createEmptyDeck, generateDeckId, validateDeck } from '@deckhand/schema';
 import { getActiveSession } from '../sessions.js';
 
 export const decksRouter = Router();
@@ -20,9 +20,9 @@ export const decksRouter = Router();
 /**
  * GET /api/decks - List all decks
  */
-decksRouter.get('/', (_req, res) => {
+decksRouter.get('/', async (_req, res) => {
   try {
-    const decks = listDecks();
+    const decks = await listDecks();
     res.json(decks);
   } catch (error) {
     console.error('[API] Error listing decks:', error);
@@ -33,9 +33,9 @@ decksRouter.get('/', (_req, res) => {
 /**
  * GET /api/decks/:id - Get a single deck
  */
-decksRouter.get('/:id', (req, res) => {
+decksRouter.get('/:id', async (req, res) => {
   try {
-    const deck = getDeck(req.params.id);
+    const deck = await getDeck(req.params.id);
     if (!deck) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -57,17 +57,16 @@ decksRouter.get('/:id', (req, res) => {
 /**
  * POST /api/decks - Create a new deck
  */
-decksRouter.post('/', (req, res) => {
+decksRouter.post('/', async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    // Create empty deck with provided title
     const deck = createEmptyDeck(title || 'Untitled Deck');
     if (description) {
       deck.meta.description = description;
     }
 
-    const row = createDeck(deck);
+    const row = await createDeck(deck);
     res.status(201).json({
       id: row.id,
       title: row.title,
@@ -85,11 +84,10 @@ decksRouter.post('/', (req, res) => {
 /**
  * PUT /api/decks/:id - Update deck content
  */
-decksRouter.put('/:id', (req, res) => {
+decksRouter.put('/:id', async (req, res) => {
   try {
     const { content } = req.body;
 
-    // Validate the content
     const validation = validateDeck(content);
     if (!validation.success) {
       return res.status(400).json({
@@ -98,7 +96,7 @@ decksRouter.put('/:id', (req, res) => {
       });
     }
 
-    const row = updateDeckContent(req.params.id, validation.data);
+    const row = await updateDeckContent(req.params.id, validation.data);
     if (!row) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -120,11 +118,11 @@ decksRouter.put('/:id', (req, res) => {
 /**
  * PATCH /api/decks/:id - Update deck metadata only
  */
-decksRouter.patch('/:id', (req, res) => {
+decksRouter.patch('/:id', async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    const row = updateDeckMetadata(req.params.id, { title, description });
+    const row = await updateDeckMetadata(req.params.id, { title, description });
     if (!row) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -146,9 +144,8 @@ decksRouter.patch('/:id', (req, res) => {
 /**
  * DELETE /api/decks/:id - Delete a deck
  */
-decksRouter.delete('/:id', (req, res) => {
+decksRouter.delete('/:id', async (req, res) => {
   try {
-    // Check if deck has active session
     const session = getActiveSession(req.params.id);
     if (session) {
       return res.status(409).json({
@@ -157,7 +154,7 @@ decksRouter.delete('/:id', (req, res) => {
       });
     }
 
-    const deleted = deleteDeck(req.params.id);
+    const deleted = await deleteDeck(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -172,10 +169,10 @@ decksRouter.delete('/:id', (req, res) => {
 /**
  * POST /api/decks/:id/duplicate - Duplicate a deck
  */
-decksRouter.post('/:id/duplicate', (req, res) => {
+decksRouter.post('/:id/duplicate', async (req, res) => {
   try {
     const newId = generateDeckId();
-    const row = duplicateDeck(req.params.id, newId);
+    const row = await duplicateDeck(req.params.id, newId);
 
     if (!row) {
       return res.status(404).json({ error: 'Deck not found' });

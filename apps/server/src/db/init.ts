@@ -3,7 +3,8 @@
  * Run with: npm run db:init
  */
 
-import { initSchema } from './schema.js';
+import { initSchema, pool } from './schema.js';
 
-initSchema();
+await initSchema();
 console.log('[DB] Database initialized successfully');
+await pool.end();

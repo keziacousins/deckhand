@@ -148,10 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Refresh 60 seconds before expiry
     const refreshIn = Math.max(expiresIn - 60_000, 1000);
+    console.log(`[Auth] Token expires in ${Math.round(expiresIn / 1000)}s, scheduling refresh in ${Math.round(refreshIn / 1000)}s`);
 
     refreshTimerRef.current = setTimeout(async () => {
       try {
         const result = await refreshAccessToken(refreshToken);
+        setAuthToken(result.access_token);
         setToken(result.access_token);
         setUser(extractUser(result.access_token));
 

@@ -146,8 +146,7 @@ export interface DeckShare {
 
 export async function listShares(deckId: string): Promise<DeckShare[]> {
   const response = await apiFetch(`${API_BASE}/decks/${deckId}/shares`);
-  const data = await handleResponse<{ shares: DeckShare[] }>(response);
-  return data.shares;
+  return handleResponse<DeckShare[]>(response);
 }
 
 export async function addShare(

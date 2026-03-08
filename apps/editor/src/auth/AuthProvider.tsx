@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import { setAuthToken } from '../api/decks';
 
 // Auth config from env vars (with defaults for local dev)
-const HYDRA_PUBLIC_URL = import.meta.env.VITE_HYDRA_PUBLIC_URL || 'http://minimax.local:4444';
 const PUBLIC_URL = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5178';
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID || 'deckhand-editor';
 
@@ -92,24 +91,20 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     .replace(/=+$/, '');
 }
 
-// --- Token exchange ---
+// --- Token exchange (proxied through Express backend) ---
 
 async function exchangeCodeForTokens(
   code: string,
   codeVerifier: string
 ): Promise<{ access_token: string; refresh_token?: string }> {
-  const params = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: `${PUBLIC_URL}/callback`,
-    client_id: CLIENT_ID,
-    code_verifier: codeVerifier,
-  });
-
-  const response = await fetch(`${HYDRA_PUBLIC_URL}/oauth2/token`, {
+  const response = await fetch('/api/auth/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: `${PUBLIC_URL}/callback`,
+    }),
   });
 
   if (!response.ok) {
@@ -123,16 +118,10 @@ async function exchangeCodeForTokens(
 async function refreshAccessToken(
   refreshToken: string
 ): Promise<{ access_token: string; refresh_token?: string }> {
-  const params = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    client_id: CLIENT_ID,
-  });
-
-  const response = await fetch(`${HYDRA_PUBLIC_URL}/oauth2/token`, {
+  const response = await fetch('/api/auth/refresh', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
   });
 
   if (!response.ok) {
@@ -276,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       params.set('login_hint', loginHint);
     }
 
-    window.location.href = `${HYDRA_PUBLIC_URL}/oauth2/auth?${params.toString()}`;
+    window.location.href = `/api/auth/authorize?${params.toString()}`;
   }, []);
 
   const logout = useCallback(() => {
@@ -287,8 +276,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem('deckhand_refresh_token');
 
-    // Redirect to Hydra logout
-    window.location.href = `${HYDRA_PUBLIC_URL}/oauth2/sessions/logout`;
+    // Redirect to logout via backend proxy
+    window.location.href = '/api/auth/end-session';
   }, []);
 
   // Sync token to API module

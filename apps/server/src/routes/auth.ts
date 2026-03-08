@@ -182,6 +182,104 @@ authRouter.post('/recovery', async (req, res) => {
   return res.json({ success: true });
 });
 
+// ─── Hydra URL Proxies ────────────────────────────────────────────────
+
+/**
+ * GET /authorize — Redirect to Hydra's authorize endpoint.
+ * The frontend doesn't need to know Hydra's URL.
+ * Query params are forwarded as-is to Hydra.
+ */
+authRouter.get('/authorize', (req, res) => {
+  const params = new URLSearchParams(req.query as Record<string, string>);
+  return res.redirect(`${oryConfig.hydraPublicUrl}/oauth2/auth?${params.toString()}`);
+});
+
+/**
+ * GET /logout — Redirect to Hydra's logout endpoint.
+ */
+authRouter.get('/end-session', (_req, res) => {
+  return res.redirect(`${oryConfig.hydraPublicUrl}/oauth2/sessions/logout`);
+});
+
+// ─── Hydra Token Proxies ──────────────────────────────────────────────
+
+/**
+ * POST /token — Proxy OAuth2 token exchange through Hydra.
+ * The browser can't call Hydra directly due to CORS.
+ * Body: { code, code_verifier, redirect_uri }
+ */
+authRouter.post('/token', async (req, res) => {
+  const { code, code_verifier, redirect_uri } = req.body;
+
+  if (!code || !code_verifier || !redirect_uri) {
+    return res.status(400).json({ error: 'Missing code, code_verifier, or redirect_uri' });
+  }
+
+  try {
+    const params = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri,
+      client_id: 'deckhand-editor',
+      code_verifier,
+    });
+
+    const response = await fetch(`${oryConfig.hydraPublicUrl}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[Auth] Token exchange error:', data);
+      return res.status(response.status).json(data);
+    }
+
+    return res.json(data);
+  } catch (error) {
+    console.error('[Auth] Token exchange error:', error);
+    return res.status(500).json({ error: 'Token exchange failed' });
+  }
+});
+
+/**
+ * POST /refresh — Proxy OAuth2 token refresh through Hydra.
+ * Body: { refresh_token }
+ */
+authRouter.post('/refresh', async (req, res) => {
+  const { refresh_token } = req.body;
+
+  if (!refresh_token) {
+    return res.status(400).json({ error: 'Missing refresh_token' });
+  }
+
+  try {
+    const params = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token,
+      client_id: 'deckhand-editor',
+    });
+
+    const response = await fetch(`${oryConfig.hydraPublicUrl}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[Auth] Token refresh error:', data);
+      return res.status(response.status).json(data);
+    }
+
+    return res.json(data);
+  } catch (error) {
+    console.error('[Auth] Token refresh error:', error);
+    return res.status(500).json({ error: 'Token refresh failed' });
+  }
+});
+
 // ─── Hydra OAuth2 Handlers ─────────────────────────────────────────────
 
 /**

@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { LoginPage } from './auth/LoginPage';
 import { SignupPage } from './auth/SignupPage';
 import { ForgotPasswordPage } from './auth/ForgotPasswordPage';
+import { AppBar } from './components/AppBar';
 import './styles/global.css';
 
 type Route =
@@ -112,24 +113,29 @@ function AppRoutes({
     return null;
   }
 
-  // Authenticated app routes
-  switch (route.type) {
-    case 'present':
-      return (
-        <Presentation
-          deckId={route.deckId}
-          startSlideId={route.startSlideId}
-          onExit={() => navigateTo({ type: 'editor', deckId: route.deckId })}
-        />
-      );
-    case 'editor':
-      return (
+  // Presentation mode — fullscreen, no app bar
+  if (route.type === 'present') {
+    return (
+      <Presentation
+        deckId={route.deckId}
+        startSlideId={route.startSlideId}
+        onExit={() => navigateTo({ type: 'editor', deckId: route.deckId })}
+      />
+    );
+  }
+
+  // Authenticated app routes with app bar
+  return (
+    <>
+      <AppBar />
+      {route.type === 'editor' ? (
         <DeckEditor
           deckId={route.deckId}
           onBack={() => navigateTo({ type: 'list' })}
         />
-      );
-    case 'list':
-      return <DeckList onOpenDeck={(id) => navigateTo({ type: 'editor', deckId: id })} />;
-  }
+      ) : (
+        <DeckList onOpenDeck={(id) => navigateTo({ type: 'editor', deckId: id })} />
+      )}
+    </>
+  );
 }

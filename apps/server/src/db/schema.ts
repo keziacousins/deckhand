@@ -68,6 +68,7 @@ export async function initSchema(): Promise<void> {
       id TEXT PRIMARY KEY,
       deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
       title TEXT,
+      api_messages TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -102,6 +103,10 @@ export async function initSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_assets_deck_id ON assets(deck_id);
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_deck_id ON chat_sessions(deck_id, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id, created_at);
+
+    -- Migrations
+    ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS api_messages TEXT;
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS segments TEXT;
   `);
 
   console.log('[DB] Schema initialized');

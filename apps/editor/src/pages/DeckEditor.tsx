@@ -8,6 +8,7 @@ import { SelectionProvider, useSelection } from '../selection';
 import { useYDoc } from '../sync';
 import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
 import { useCoverCapture } from '../hooks/useCoverCapture';
+import { useCaptureHandler } from '../hooks/useCaptureHandler';
 import { getDeck, type DeckRole } from '../api/decks';
 import type { Deck } from '@deckhand/schema';
 import '../styles/layout.css';
@@ -21,7 +22,7 @@ interface DeckEditorProps {
 let presentationWindow: Window | null = null;
 
 function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
-  const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo } = useYDoc(deckId);
+  const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage } = useYDoc(deckId);
   const [inspectorVisible, setInspectorVisible] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
@@ -45,6 +46,9 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
 
   // Cover image capture
   const { captureCover, isCapturing } = useCoverCapture({ deck, deckId });
+
+  // Handle server-initiated slide capture commands (for LLM vision)
+  useCaptureHandler({ deckId, onMessage, sendMessage });
   const [isSaving, setIsSaving] = useState(false);
 
   // Mark initial load complete (no auto-selection)
@@ -275,6 +279,8 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         readOnly={readOnly}
         showGrid={showGrid}
         onToggleShowGrid={() => setShowGrid((v) => !v)}
+        onMessage={onMessage}
+        sendMessage={sendMessage}
       />
       
       {showStartModal && deck && (

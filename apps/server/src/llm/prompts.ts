@@ -127,13 +127,13 @@ Each slide can have style overrides (via update_slide tool):
 - **backgroundTransparent**: true to make slide background transparent (useful for backdrop slides)
 - **backdropSlideId**: ID of another slide to render behind this one (for reusable footers/logos). Use "__none__" to explicitly disable default backdrop.
 
-## Slide Positioning
+## Slide Dimensions & Positioning
 
-When adding new slides, position them on the canvas so they don't overlap:
-- Slides are typically arranged in a horizontal row (increasing x, same y)
-- Standard horizontal spacing: 350px between slide x positions
-- Standard vertical spacing: 550px between rows (for branching flows)
-- Check existing slide positions before adding new ones to avoid overlaps
+Slides are ${SLIDE_WIDTH}px wide. Height depends on aspect ratio (shown in deck state).
+When adding slides, auto-positioning handles placement. If you use move_slide:
+- Horizontal spacing: ${SLIDE_WIDTH + 80}px between slide x positions (slide width + 80px gap)
+- Vertical spacing: use slide height + 80px for branching rows
+- Check existing slide positions to avoid overlaps
 
 ## Available Tools
 

@@ -4,12 +4,31 @@ import { apiFetch } from '../../api/decks';
 import type { InspectorContext } from '../types';
 import './ChatSection.css';
 
+type MessageSegment =
+  | { type: 'text'; content: string }
+  | { type: 'tool'; tool: string; success?: boolean; result?: unknown };
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  segments?: MessageSegment[];
   toolResults?: Array<{ tool: string; success: boolean; result?: unknown }>;
 }
+
+/** Build interleaved segments from flat content + toolResults (for history messages) */
+function buildSegments(content: string, toolResults?: Array<{ tool: string; success: boolean; result?: unknown }>): MessageSegment[] {
+  const segs: MessageSegment[] = [];
+  if (content) segs.push({ type: 'text', content });
+  if (toolResults) {
+    for (const tr of toolResults) {
+      segs.push({ type: 'tool', tool: tr.tool, success: tr.success, result: tr.result });
+    }
+  }
+  return segs;
+}
+
+type StreamingSegment = MessageSegment;
 
 interface ChatSession {
   id: string;
@@ -23,12 +42,16 @@ interface Model {
   name: string;
 }
 
+type MessageHandler = (msg: { type: string; [key: string]: unknown }) => void;
+
 interface ChatSectionProps {
   context: InspectorContext;
   deckId: string;
+  onMessage: (type: string, handler: MessageHandler) => () => void;
+  sendMessage: (msg: { type: string; [key: string]: unknown }) => void;
 }
 
-export function ChatSection({ context, deckId }: ChatSectionProps) {
+export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -36,6 +59,8 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [streamingSegments, setStreamingSegments] = useState<StreamingSegment[]>([]);
+  const streamingSegmentsRef = useRef<StreamingSegment[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [modelsLoading, setModelsLoading] = useState(true);
@@ -43,8 +68,12 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
   const [showSessionList, setShowSessionList] = useState(false);
   const [expandedToolResult, setExpandedToolResult] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const shouldFollowRef = useRef(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isInitialScrollRef = useRef(true);
 
   // Load sessions on mount
   useEffect(() => {
@@ -80,7 +109,11 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
         const response = await apiFetch(`/api/decks/${deckId}/chat/sessions/${currentSessionId}/messages`);
         if (response.ok) {
           const data = await response.json();
-          setMessages(data.messages || []);
+          const msgs = (data.messages || []).map((m: Message) => ({
+            ...m,
+            segments: m.segments || (m.role === 'assistant' ? buildSegments(m.content, m.toolResults) : undefined),
+          }));
+          setMessages(msgs);
         }
       } catch (err) {
         console.error('Failed to load messages:', err);
@@ -116,10 +149,92 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
     loadModels();
   }, []);
 
-  // Scroll to bottom when messages change
+  // Subscribe to streaming chat messages via WebSocket
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const updateSegments = (updater: (prev: StreamingSegment[]) => StreamingSegment[]) => {
+      setStreamingSegments(prev => {
+        const next = updater(prev);
+        streamingSegmentsRef.current = next;
+        return next;
+      });
+    };
+
+    const unsubs = [
+      onMessage('chat:start', () => {
+        updateSegments(() => []);
+      }),
+      onMessage('chat:chunk', (msg) => {
+        const delta = msg.delta as string;
+        updateSegments(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.type === 'text') {
+            return [...prev.slice(0, -1), { type: 'text', content: last.content + delta }];
+          }
+          return [...prev, { type: 'text', content: delta }];
+        });
+      }),
+      onMessage('chat:tool-call', (msg) => {
+        updateSegments(prev => [...prev, { type: 'tool', tool: msg.tool as string }]);
+      }),
+      onMessage('chat:tool-result', (msg) => {
+        updateSegments(prev =>
+          prev.map(seg =>
+            seg.type === 'tool' && seg.tool === (msg.tool as string) && seg.success === undefined
+              ? { ...seg, success: msg.success as boolean }
+              : seg
+          )
+        );
+      }),
+      onMessage('chat:complete', () => {
+        // Don't clear — sendMessage handler will snapshot segments into the message
+      }),
+      onMessage('chat:error', (msg) => {
+        updateSegments(() => []);
+        setError(msg.error as string);
+      }),
+    ];
+    return () => unsubs.forEach(u => u());
+  }, [onMessage]);
+
+  // Track scroll position to decide auto-scroll.
+  // shouldFollowRef is the source of truth for follow mode — only user actions change it.
+  // isAtBottom state is derived from it for rendering the scroll-to-bottom button.
+  const handleScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const threshold = 40;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    // Only allow the user to break out of follow mode by scrolling up.
+    // Never re-enable follow mode from scroll events (only from explicit user actions).
+    if (!atBottom && shouldFollowRef.current) {
+      shouldFollowRef.current = false;
+    }
+    setIsAtBottom(atBottom);
+  }, []);
+
+  // Scroll helpers
+  const doScroll = useCallback((behavior: ScrollBehavior) => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  // Scroll to bottom: instant on session switch, smooth for new content
+  useEffect(() => {
+    if (isInitialScrollRef.current) {
+      doScroll('instant');
+      isInitialScrollRef.current = false;
+    }
+  }, [messages, doScroll]);
+
+  useEffect(() => {
+    if (shouldFollowRef.current) {
+      doScroll('smooth');
+    }
+  }, [messages, streamingSegments, doScroll]);
+
+  // Mark next scroll as instant when session changes
+  useEffect(() => {
+    isInitialScrollRef.current = true;
+  }, [currentSessionId]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -136,6 +251,12 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
       textareaRef.current.focus();
     }
   });
+
+  const scrollToBottom = useCallback(() => {
+    shouldFollowRef.current = true;
+    setIsAtBottom(true);
+    doScroll('smooth');
+  }, [doScroll]);
 
   const startNewChat = useCallback(() => {
     setCurrentSessionId(null);
@@ -179,6 +300,9 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
     setInput('');
     setIsLoading(true);
     setError(null);
+    // Re-enable auto-scroll when user sends a message
+    shouldFollowRef.current = true;
+    setIsAtBottom(true);
     
     // Restore focus to input after sending
     setTimeout(() => textareaRef.current?.focus(), 0);
@@ -217,14 +341,24 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
         setSessions(prev => [newSession, ...prev]);
       }
 
+      // Prefer: streaming segments (live interleaved) > server segments > fallback
+      const segments = streamingSegmentsRef.current.length > 0
+        ? streamingSegmentsRef.current
+        : data.segments?.length > 0
+          ? data.segments
+          : buildSegments(data.message, data.toolResults);
+
       const assistantMessage: Message = {
         id: data.id || `msg-${Date.now()}`,
         role: 'assistant',
         content: data.message,
+        segments,
         toolResults: data.toolResults,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+      setStreamingSegments([]);
+      streamingSegmentsRef.current = [];
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -335,7 +469,7 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
         )}
       </div>
 
-      <div className="chat-messages">
+      <div className="chat-messages" ref={messagesContainerRef} onScroll={handleScroll}>
         {historyLoading && (
           <div className="chat-empty">
             <p>Loading...</p>
@@ -353,63 +487,80 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
 
         {messages.map((message) => (
           <div key={message.id} className={`chat-message chat-message-${message.role}`}>
-            {message.content && (
+            {message.role === 'user' ? (
               <div className="chat-message-content">
-                {message.role === 'assistant' ? (
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                <p>{message.content}</p>
+              </div>
+            ) : (
+              /* Assistant messages render interleaved segments */
+              (message.segments || buildSegments(message.content, message.toolResults)).map((seg, i) =>
+                seg.type === 'text' ? (
+                  <div key={i} className="chat-message-content">
+                    <ReactMarkdown>{seg.content}</ReactMarkdown>
+                  </div>
                 ) : (
-                  <p>{message.content}</p>
-                )}
-              </div>
-            )}
-            {message.toolResults && message.toolResults.length > 0 && (
-              <div className="chat-tool-calls">
-                {message.toolResults.map((result, i) => {
-                  const isExpanded = expandedToolResult === `${message.id}-${i}`;
-                  return (
-                    <div key={i} className="chat-tool-call">
-                      <button
-                        className={`chat-tool-call-header ${result.success ? 'success' : 'error'}`}
-                        onClick={() => setExpandedToolResult(isExpanded ? null : `${message.id}-${i}`)}
-                      >
-                        <span className="chat-tool-call-name">{result.tool}</span>
-                        <svg 
-                          className={`chat-tool-call-chevron ${isExpanded ? 'expanded' : ''}`}
-                          width="12" 
-                          height="12" 
-                          viewBox="0 0 16 16" 
-                          fill="none"
-                        >
-                          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                      {isExpanded && result.result && (
-                        <div className="chat-tool-call-details">
-                          <div className="chat-tool-call-section">
-                            <span className="chat-tool-call-label">
-                              Result: {result.success ? '✓' : '✗'}
-                            </span>
-                            <pre className="chat-tool-call-json">
-                              {JSON.stringify(result.result, null, 2)}
-                            </pre>
-                          </div>
-                        </div>
+                  <div key={i} className="chat-tool-call">
+                    <button
+                      className={`chat-tool-call-header ${seg.success ? 'success' : 'error'}`}
+                      onClick={() => setExpandedToolResult(
+                        expandedToolResult === `${message.id}-${i}` ? null : `${message.id}-${i}`
                       )}
-                    </div>
-                  );
-                })}
-              </div>
+                    >
+                      <span className="chat-tool-call-name">{seg.tool}</span>
+                      <svg
+                        className={`chat-tool-call-chevron ${expandedToolResult === `${message.id}-${i}` ? 'expanded' : ''}`}
+                        width="12"
+                        height="12"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {expandedToolResult === `${message.id}-${i}` && seg.result != null && (
+                      <div className="chat-tool-call-details">
+                        <div className="chat-tool-call-section">
+                          <span className="chat-tool-call-label">
+                            Result: {seg.success ? '✓' : '✗'}
+                          </span>
+                          <pre className="chat-tool-call-json">
+                            {JSON.stringify(seg.result, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              )
             )}
           </div>
         ))}
 
         {isLoading && (
           <div className="chat-message chat-message-assistant">
-            <div className="chat-loading">
-              <span className="chat-loading-dot" />
-              <span className="chat-loading-dot" />
-              <span className="chat-loading-dot" />
-            </div>
+            {streamingSegments.length === 0 && (
+              <div className="chat-loading">
+                <span className="chat-loading-dot" />
+                <span className="chat-loading-dot" />
+                <span className="chat-loading-dot" />
+              </div>
+            )}
+            {streamingSegments.map((seg, i) =>
+              seg.type === 'text' ? (
+                <div key={i} className="chat-message-content">
+                  <ReactMarkdown>{seg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <div key={i} className="chat-tool-call">
+                  <div className={`chat-tool-call-header ${seg.success === undefined ? 'pending' : seg.success ? 'success' : 'error'}`}>
+                    <span className="chat-tool-call-name">{seg.tool}</span>
+                    {seg.success === undefined && (
+                      <span className="chat-tool-call-spinner" />
+                    )}
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -420,6 +571,14 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
         )}
 
         <div ref={messagesEndRef} />
+
+        {!isAtBottom && (
+          <button className="chat-scroll-to-bottom" onClick={scrollToBottom} title="Scroll to bottom">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="chat-input-container">

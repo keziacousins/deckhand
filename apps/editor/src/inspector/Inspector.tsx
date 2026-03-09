@@ -32,9 +32,11 @@ interface InspectorProps {
   readOnly?: boolean;
   showGrid?: boolean;
   onToggleShowGrid?: () => void;
+  onMessage: (type: string, handler: (msg: { type: string; [key: string]: unknown }) => void) => () => void;
+  sendMessage: (msg: { type: string; [key: string]: unknown }) => void;
 }
 
-export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOnly, showGrid, onToggleShowGrid }: InspectorProps) {
+export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOnly, showGrid, onToggleShowGrid, onMessage, sendMessage }: InspectorProps) {
   const { selection, selectSlide, selectComponent, clearSelection } = useSelection();
   const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
   const [showComponentBrowser, setShowComponentBrowser] = useState(false);
@@ -703,7 +705,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOn
           )}
 
           {activeTab === 'chat' && (
-            <ChatSection context={context} deckId={deckId} />
+            <ChatSection context={context} deckId={deckId} onMessage={onMessage} sendMessage={sendMessage} />
           )}
         </div>
 

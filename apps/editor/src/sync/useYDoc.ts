@@ -15,6 +15,13 @@ import { getAuthToken } from '../api/decks';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
+export interface ControlMessage {
+  type: string;
+  [key: string]: unknown;
+}
+
+type MessageHandler = (msg: ControlMessage) => void;
+
 interface UseYDocResult {
   /** Current deck state (null while loading) */
   deck: Deck | null;
@@ -34,6 +41,10 @@ interface UseYDocResult {
   canUndo: boolean;
   /** Whether redo is available */
   canRedo: boolean;
+  /** Subscribe to JSON control messages by type. Returns unsubscribe function. */
+  onMessage: (type: string, handler: MessageHandler) => () => void;
+  /** Send a JSON control message to the server */
+  sendMessage: (msg: ControlMessage) => void;
 }
 
 // Use same-origin WebSocket - Vite proxies /ws in dev, same-origin in prod
@@ -61,6 +72,7 @@ export function useYDoc(deckId: string): UseYDocResult {
   const hasEverSyncedRef = useRef(false);
   const initialSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deletedRef = useRef(false);
+  const messageHandlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
 
   // Keep deckRef in sync with state for use in callbacks
   useEffect(() => {
@@ -156,7 +168,7 @@ export function useYDoc(deckId: string): UseYDocResult {
         // Control messages are JSON strings (not binary YDoc updates)
         if (typeof event.data === 'string') {
           try {
-            const msg = JSON.parse(event.data);
+            const msg = JSON.parse(event.data) as ControlMessage;
             if (msg.type === 'deck-deleted') {
               console.log('[YDoc] Deck has been deleted');
               deletedRef.current = true;
@@ -165,6 +177,9 @@ export function useYDoc(deckId: string): UseYDocResult {
               ws.close();
               return;
             }
+            // Dispatch to subscribers
+            const handlers = messageHandlersRef.current.get(msg.type);
+            handlers?.forEach(h => h(msg));
           } catch {
             // Not JSON — ignore
           }
@@ -353,8 +368,25 @@ export function useYDoc(deckId: string): UseYDocResult {
     }
   }, []);
 
+  const onMessage = useCallback((type: string, handler: MessageHandler) => {
+    if (!messageHandlersRef.current.has(type)) {
+      messageHandlersRef.current.set(type, new Set());
+    }
+    messageHandlersRef.current.get(type)!.add(handler);
+
+    return () => {
+      messageHandlersRef.current.get(type)?.delete(handler);
+    };
+  }, []);
+
+  const sendMessage = useCallback((msg: ControlMessage) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(msg));
+    }
+  }, []);
+
   const canUndo = undoCount > 0;
   const canRedo = redoCount > 0;
 
-  return { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo };
+  return { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage };
 }

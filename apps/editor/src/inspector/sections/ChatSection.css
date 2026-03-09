@@ -225,6 +225,33 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  position: relative;
+}
+
+/* Scroll to bottom button */
+.chat-scroll-to-bottom {
+  position: sticky;
+  bottom: 0;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.chat-scroll-to-bottom:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .chat-empty {
@@ -362,6 +389,23 @@
 
 .chat-tool-call-header.error {
   border-left: 3px solid var(--color-error, #ef4444);
+}
+
+.chat-tool-call-header.pending {
+  border-left: 3px solid var(--text-muted, #888);
+}
+
+.chat-tool-call-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--text-muted, #888);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: chat-spin 0.6s linear infinite;
+}
+
+@keyframes chat-spin {
+  to { transform: rotate(360deg); }
 }
 
 .chat-tool-call-name {

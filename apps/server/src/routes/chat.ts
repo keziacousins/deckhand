@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { config, isLLMEnabled } from '../config.js';
-import { getOrCreateSession, broadcastYDocState } from '../sessions.js';
+import { getOrCreateSession, broadcastYDocState, broadcastJSON, requestCapture } from '../sessions.js';
 import { loadYDoc, debouncedSaveYDoc } from '../persistence.js';
 import { yDocToDeck } from '@deckhand/sync';
 import { pool, type ChatMessageRow, type ChatSessionRow } from '../db/schema.js';
@@ -61,18 +61,27 @@ async function updateSession(sessionId: string, title?: string): Promise<void> {
 /**
  * Save a chat message to the database
  */
+interface MessageSegment {
+  type: 'text' | 'tool';
+  content?: string;
+  tool?: string;
+  success?: boolean;
+  result?: unknown;
+}
+
 async function saveMessage(
   sessionId: string,
   deckId: string,
   role: 'user' | 'assistant',
   content: string,
   model?: string,
-  toolResults?: Array<{ tool: string; success: boolean }>
+  toolResults?: Array<{ tool: string; success: boolean }>,
+  segments?: MessageSegment[]
 ): Promise<string> {
   const id = generateId('msg');
   await pool.query(
-    `INSERT INTO chat_messages (id, session_id, deck_id, role, content, model, tool_results)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT INTO chat_messages (id, session_id, deck_id, role, content, model, tool_results, segments)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       id,
       sessionId,
@@ -81,6 +90,7 @@ async function saveMessage(
       content,
       model || null,
       toolResults ? JSON.stringify(toolResults) : null,
+      segments ? JSON.stringify(segments) : null,
     ]
   );
   return id;
@@ -205,7 +215,7 @@ router.get('/:deckId/chat/sessions/:sessionId/messages', requireDeckRole('owner'
       [sessionId]
     );
 
-    const messages = (rows as ChatMessageRow[])
+    const messages = (rows as (ChatMessageRow & { segments?: string })[])
       .filter(row => row.content && row.content.trim() !== '')
       .map(row => ({
         id: row.id,
@@ -213,6 +223,7 @@ router.get('/:deckId/chat/sessions/:sessionId/messages', requireDeckRole('owner'
         content: row.content,
         model: row.model,
         toolResults: row.tool_results ? JSON.parse(row.tool_results) : undefined,
+        segments: row.segments ? JSON.parse(row.segments) : undefined,
         createdAt: row.created_at,
       }));
 
@@ -348,25 +359,39 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       apiKey: config.anthropicApiKey,
     });
 
-    // Load chat history for this session
-    const { rows: historyRows } = await pool.query(
-      'SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC',
+    // Load conversation history — use saved API messages if available (preserves tool_use/tool_result blocks)
+    const { rows: sessionRows } = await pool.query(
+      'SELECT api_messages FROM chat_sessions WHERE id = $1',
       [sessionId]
     );
+    const savedApiMessages = (sessionRows[0] as { api_messages: string | null })?.api_messages;
 
-    // Build messages array from history (excluding the message we just saved)
     const messages: Anthropic.MessageParam[] = [];
+    let hasHistory = false;
 
-    for (let i = 0; i < historyRows.length - 1; i++) {
-      const row = historyRows[i] as { role: string; content: string };
-      if (row.role === 'user' || row.role === 'assistant') {
-        if (!row.content || row.content.trim() === '') continue;
+    if (savedApiMessages) {
+      // Restore full API history including tool_use/tool_result blocks
+      const parsed = JSON.parse(savedApiMessages) as Anthropic.MessageParam[];
+      messages.push(...parsed);
+      hasHistory = parsed.length > 0;
+    } else {
+      // Fallback for sessions created before api_messages was added
+      const { rows: historyRows } = await pool.query(
+        'SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC',
+        [sessionId]
+      );
 
-        messages.push({
-          role: row.role as 'user' | 'assistant',
-          content: row.content,
-        });
+      for (let i = 0; i < historyRows.length - 1; i++) {
+        const row = historyRows[i] as { role: string; content: string };
+        if (row.role === 'user' || row.role === 'assistant') {
+          if (!row.content || row.content.trim() === '') continue;
+          messages.push({
+            role: row.role as 'user' | 'assistant',
+            content: row.content,
+          });
+        }
       }
+      hasHistory = messages.length > 0;
     }
 
     // Add current user message with tool reminder
@@ -374,33 +399,68 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
     messages.push({ role: 'user', content: message + toolReminder });
 
     // Use full prompt for first message in session, lighter prompt for continuation
-    const hasHistory = historyRows.length > 1;
     const systemPrompt = hasHistory
       ? buildContinuationPrompt(deck, context)
       : buildSystemPrompt(deck, context);
 
-    // Agent loop - keep calling until no more tool use
-    let response = await anthropic.messages.create({
-      model: modelId,
-      max_tokens: 4096,
-      system: systemPrompt,
-      tools,
-      messages,
-    });
+    const messageId = generateId('msg');
 
-    console.log(`[Chat] Response stop_reason: ${response.stop_reason}`);
-    console.log(`[Chat] Response content types:`, response.content.map(b => b.type));
+    // Broadcast chat start to all connected clients
+    broadcastJSON(deckId, {
+      type: 'chat:start',
+      sessionId,
+      messageId,
+    });
 
     const assistantMessages: string[] = [];
     const toolResults: Array<{ tool: string; success: boolean; result?: unknown }> = [];
+    const segments: MessageSegment[] = [];
+
+    // Helper: run one streaming API call, broadcasting text chunks
+    async function streamOnce(): Promise<Anthropic.Message> {
+      const stream = anthropic.messages.stream({
+        model: modelId,
+        max_tokens: 4096,
+        system: systemPrompt,
+        tools,
+        messages,
+        cache_control: { type: 'ephemeral' },
+      } as Anthropic.MessageCreateParams);
+
+      stream.on('text', (delta) => {
+        broadcastJSON(deckId, {
+          type: 'chat:chunk',
+          sessionId,
+          messageId,
+          delta,
+        });
+      });
+
+      const finalMessage = await stream.finalMessage();
+
+      // Log cache performance
+      const usage = finalMessage.usage as unknown as Record<string, number>;
+      if (usage.cache_read_input_tokens || usage.cache_creation_input_tokens) {
+        console.log(`[Chat] Cache: read=${usage.cache_read_input_tokens || 0}, created=${usage.cache_creation_input_tokens || 0}, uncached=${usage.input_tokens}`);
+      }
+
+      return finalMessage;
+    }
+
+    // Agent loop - keep calling until no more tool use
+    let response = await streamOnce();
+
+    console.log(`[Chat] Response stop_reason: ${response.stop_reason}`);
 
     // Process tool calls in a loop
     while (response.stop_reason === 'tool_use') {
       const assistantContent = response.content;
 
+      // Build interleaved segments from content blocks (preserves text/tool order)
       for (const block of assistantContent) {
         if (block.type === 'text') {
           assistantMessages.push(block.text);
+          segments.push({ type: 'text', content: block.text });
         }
       }
 
@@ -413,26 +473,86 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       for (const toolUse of toolUseBlocks) {
         console.log(`[Chat] Tool call: ${toolUse.name}`, toolUse.input);
 
-        const currentDeck = yDocToDeck(session.ydoc);
-
-        const result = executeToolCall(
-          toolUse.name,
-          toolUse.input as Record<string, unknown>,
-          session.ydoc,
-          currentDeck
-        );
-
-        toolResults.push({
+        // Broadcast tool call to clients
+        broadcastJSON(deckId, {
+          type: 'chat:tool-call',
+          sessionId,
+          messageId,
           tool: toolUse.name,
-          success: result.success,
-          result: result.data,
+          input: toolUse.input,
         });
 
-        toolResultContents.push({
-          type: 'tool_result',
-          tool_use_id: toolUse.id,
-          content: JSON.stringify(result),
-        });
+        // capture_slide is async — requests screenshot from a connected client
+        if (toolUse.name === 'capture_slide') {
+          const { slideId } = toolUse.input as { slideId: string };
+          try {
+            const dataUrl = await requestCapture(deckId, slideId);
+            // Strip the data:image/jpeg;base64, prefix to get raw base64
+            const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+
+            toolResults.push({ tool: 'capture_slide', success: true });
+            segments.push({ type: 'tool', tool: 'capture_slide', success: true });
+            broadcastJSON(deckId, {
+              type: 'chat:tool-result', sessionId, messageId, tool: 'capture_slide', success: true,
+            });
+            toolResultContents.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: [
+                { type: 'text', text: `Screenshot of slide ${slideId}:` },
+                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Data } },
+              ],
+            });
+          } catch (captureError) {
+            const errorMsg = captureError instanceof Error ? captureError.message : 'Capture failed';
+            toolResults.push({ tool: 'capture_slide', success: false, result: errorMsg });
+            segments.push({ type: 'tool', tool: 'capture_slide', success: false, result: errorMsg });
+            broadcastJSON(deckId, {
+              type: 'chat:tool-result', sessionId, messageId, tool: 'capture_slide', success: false,
+            });
+            toolResultContents.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify({ success: false, error: errorMsg }),
+            });
+          }
+        } else {
+          const currentDeck = yDocToDeck(session.ydoc);
+
+          const result = executeToolCall(
+            toolUse.name,
+            toolUse.input as Record<string, unknown>,
+            session.ydoc,
+            currentDeck
+          );
+
+          toolResults.push({
+            tool: toolUse.name,
+            success: result.success,
+            result: result.data,
+          });
+          segments.push({
+            type: 'tool',
+            tool: toolUse.name,
+            success: result.success,
+            result: result.data,
+          });
+
+          toolResultContents.push({
+            type: 'tool_result',
+            tool_use_id: toolUse.id,
+            content: JSON.stringify(result),
+          });
+
+          // Broadcast tool result to clients
+          broadcastJSON(deckId, {
+            type: 'chat:tool-result',
+            sessionId,
+            messageId,
+            tool: toolUse.name,
+            success: result.success,
+          });
+        }
       }
 
       // Save changes and broadcast to connected clients
@@ -443,23 +563,26 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       messages.push({ role: 'assistant', content: assistantContent });
       messages.push({ role: 'user', content: toolResultContents });
 
-      response = await anthropic.messages.create({
-        model: modelId,
-        max_tokens: 4096,
-        system: systemPrompt,
-        tools,
-        messages,
-      });
+      response = await streamOnce();
     }
 
-    // Collect final text response
+    // Collect final text response and add to messages
     for (const block of response.content) {
       if (block.type === 'text') {
         assistantMessages.push(block.text);
+        segments.push({ type: 'text', content: block.text });
       }
     }
+    messages.push({ role: 'assistant', content: response.content });
 
     const responseText = assistantMessages.join('\n');
+
+    // Broadcast completion
+    broadcastJSON(deckId, {
+      type: 'chat:complete',
+      sessionId,
+      messageId,
+    });
 
     const assistantMessageId = await saveMessage(
       sessionId,
@@ -467,10 +590,22 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       'assistant',
       responseText,
       modelId,
-      toolResults.length > 0 ? toolResults : undefined
+      toolResults.length > 0 ? toolResults : undefined,
+      segments.length > 0 ? segments : undefined
     );
 
-    await updateSession(sessionId);
+    // Save full API messages (with base64 images stripped) for proper history reconstruction
+    const apiMessagesJson = JSON.stringify(messages, (_key, value) => {
+      // Strip base64 image data to avoid bloating the DB
+      if (value && typeof value === 'object' && value.type === 'image' && value.source?.type === 'base64') {
+        return { type: 'text', text: '[screenshot captured]' };
+      }
+      return value;
+    });
+    await pool.query(
+      'UPDATE chat_sessions SET api_messages = $1, updated_at = NOW() WHERE id = $2',
+      [apiMessagesJson, sessionId]
+    );
 
     res.json({
       id: assistantMessageId,
@@ -479,6 +614,7 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       message: responseText,
       model: modelId,
       toolResults,
+      segments,
     });
 
   } catch (error) {
@@ -499,6 +635,14 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
         }
       }
     }
+
+    // Broadcast error to all connected clients
+    broadcastJSON(deckId, {
+      type: 'chat:error',
+      sessionId: providedSessionId || '',
+      messageId: '',
+      error: errorMessage,
+    });
 
     res.status(500).json({ error: errorMessage });
   }

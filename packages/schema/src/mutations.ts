@@ -6,6 +6,9 @@
  */
 
 import type { Deck, Slide, Component, SlideStyle, Edge, StartPoint, TransitionType, EdgeTrigger, AspectRatio, StandardTokens } from './index';
+import { SLIDE_WIDTH } from './deck.js';
+
+const SLIDE_GAP = 80;
 
 /**
  * Generate a unique ID with prefix
@@ -24,10 +27,10 @@ function calculateNewSlidePosition(deck: Deck): { x: number; y: number } {
   if (slides.length === 0) {
     return { x: 0, y: 0 };
   }
-  
-  // Find rightmost slide and place new one to the right
+
+  // Find rightmost slide and place new one to the right with proper gap
   const maxX = Math.max(...slides.map(s => s.position.x));
-  return { x: maxX + 300, y: 0 };
+  return { x: maxX + SLIDE_WIDTH + SLIDE_GAP, y: 0 };
 }
 
 // ============================================================================

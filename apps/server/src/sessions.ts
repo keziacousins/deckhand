@@ -104,6 +104,38 @@ export function broadcastYDocState(deckId: string): void {
 }
 
 /**
+ * Broadcast a JSON control message to all clients in a session.
+ */
+export function broadcastJSON(deckId: string, message: object, excludeWs?: WebSocket): void {
+  const session = sessions.get(deckId);
+  if (!session) return;
+
+  const data = JSON.stringify(message);
+  for (const client of session.clients) {
+    if (client !== excludeWs && client.readyState === 1) {
+      try {
+        client.send(data);
+      } catch (err) {
+        console.error('[Session] Failed to send JSON to client:', err);
+      }
+    }
+  }
+}
+
+/**
+ * Send a JSON control message to a specific client.
+ */
+export function sendJSON(ws: WebSocket, message: object): void {
+  if (ws.readyState === 1) {
+    try {
+      ws.send(JSON.stringify(message));
+    } catch (err) {
+      console.error('[Session] Failed to send JSON to client:', err);
+    }
+  }
+}
+
+/**
  * Force-close all clients and remove a session.
  * Used when deleting a deck — owner has authority to end all connections.
  */
@@ -115,14 +147,14 @@ export function closeSession(deckId: string): void {
   }
 
   console.log(`[Session] Closing session for ${deckId} — ${session.clients.size} client(s)`);
+  // Send a control message before closing — Vite's WS proxy swallows close codes,
+  // so the client needs to detect deletion from a message instead.
+  broadcastJSON(deckId, { type: 'deck-deleted' });
   for (const client of session.clients) {
     try {
-      // Send a control message before closing — Vite's WS proxy swallows close codes,
-      // so the client needs to detect deletion from a message instead.
-      client.send(JSON.stringify({ type: 'deck-deleted' }));
       client.close(4002, 'Deck deleted');
     } catch {
-      // Ignore send/close errors
+      // Ignore close errors
     }
   }
   session.clients.clear();
@@ -136,6 +168,79 @@ export function closeSession(deckId: string): void {
 export function getClientCount(deckId: string): number {
   const session = sessions.get(deckId);
   return session?.clients.size ?? 0;
+}
+
+// ============================================================================
+// Control message handling
+// ============================================================================
+
+interface ControlMessage {
+  type: string;
+  [key: string]: unknown;
+}
+
+// Pending capture requests awaiting client response
+const pendingCaptures = new Map<string, {
+  resolve: (url: string) => void;
+  reject: (err: Error) => void;
+  timeout: NodeJS.Timeout;
+}>();
+
+/**
+ * Handle an incoming JSON control message from a client.
+ */
+export function handleControlMessage(_deckId: string, _ws: WebSocket, msg: ControlMessage): void {
+  switch (msg.type) {
+    case 'response:capture-slide': {
+      const requestId = msg.requestId as string;
+      const dataUrl = msg.dataUrl as string | undefined;
+      const error = msg.error as string | undefined;
+      const pending = pendingCaptures.get(requestId);
+      if (!pending) return;
+
+      clearTimeout(pending.timeout);
+      pendingCaptures.delete(requestId);
+
+      if (error) {
+        pending.reject(new Error(error));
+      } else {
+        pending.resolve(dataUrl!);
+      }
+      break;
+    }
+    default:
+      console.warn(`[Session] Unknown control message type: ${msg.type}`);
+  }
+}
+
+/**
+ * Request a slide capture from a connected client.
+ * Returns a promise that resolves with the base64 data URL (data:image/jpeg;base64,...).
+ */
+export async function requestCapture(deckId: string, slideId: string): Promise<string> {
+  const session = sessions.get(deckId);
+  if (!session || session.clients.size === 0) {
+    throw new Error('No clients connected to capture slide');
+  }
+
+  const requestId = crypto.randomUUID();
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingCaptures.delete(requestId);
+      reject(new Error('Capture timeout'));
+    }, 10000);
+
+    pendingCaptures.set(requestId, { resolve, reject, timeout });
+
+    // Send to first connected client
+    const client = session.clients.values().next().value!;
+    sendJSON(client, {
+      type: 'command:capture-slide',
+      requestId,
+      slideId,
+    });
+  });
 }
 
 /**

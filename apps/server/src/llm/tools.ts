@@ -410,6 +410,21 @@ export const tools: Anthropic.Tool[] = [
       required: ['tokens'],
     },
   },
+  // Capture tool (async — handled in chat route, not executeToolCall)
+  {
+    name: 'capture_slide',
+    description: 'Capture a screenshot of a slide as it currently appears. Returns a base64 image. Use this to visually inspect slide layout, check alignment, verify colors, or review the overall look. Requires at least one client connected.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        slideId: {
+          type: 'string',
+          description: 'The ID of the slide to capture',
+        },
+      },
+      required: ['slideId'],
+    },
+  },
   // State inspection tools
   {
     name: 'list_assets',

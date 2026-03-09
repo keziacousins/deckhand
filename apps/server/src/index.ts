@@ -10,6 +10,7 @@ import {
   removeClient,
   broadcastUpdate,
   getClientCount,
+  handleControlMessage,
 } from './sessions.js';
 import { loadYDoc, debouncedSaveYDoc, flushSave } from './persistence.js';
 import { ensureBucket } from './storage.js';
@@ -95,9 +96,20 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
   const initialState = Y.encodeStateAsUpdate(session.ydoc);
   ws.send(initialState);
 
-  // Handle incoming updates from client
-  ws.on('message', (data: Buffer) => {
-    // Viewers cannot send updates
+  // Handle incoming messages from client
+  ws.on('message', (data: Buffer, isBinary: boolean) => {
+    // JSON control messages (text frames)
+    if (!isBinary) {
+      try {
+        const msg = JSON.parse(data.toString());
+        handleControlMessage(deckId, ws, msg);
+      } catch (error) {
+        console.error(`[WS] Invalid JSON message for ${deckId}:`, error);
+      }
+      return;
+    }
+
+    // Binary YDoc updates — viewers cannot send these
     if (readOnly) return;
 
     try {

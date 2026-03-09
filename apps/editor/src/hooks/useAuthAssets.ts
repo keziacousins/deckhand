@@ -14,7 +14,8 @@ import { apiFetch } from '../api/decks';
 type AssetsMap = Record<string, Asset>;
 
 export function useAuthAssets(assets: AssetsMap): AssetsMap {
-  const [resolved, setResolved] = useState<AssetsMap>(assets);
+  // Start empty — don't expose raw /api/ URLs that web components can't auth
+  const [resolved, setResolved] = useState<AssetsMap>({});
   // Track blob URLs we've created so we can revoke them on cleanup
   const blobUrlsRef = useRef<Map<string, string>>(new Map());
   // Track which source URLs we've already fetched (avoid re-fetching)

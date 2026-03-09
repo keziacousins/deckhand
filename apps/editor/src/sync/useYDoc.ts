@@ -77,6 +77,7 @@ export function useYDoc(deckId: string): UseYDocResult {
   }, []);
 
   useEffect(() => {
+    let aborted = false; // Prevents stale closures from reconnecting after cleanup
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
@@ -123,9 +124,9 @@ export function useYDoc(deckId: string): UseYDocResult {
 
     // WebSocket connection function (for initial connect and reconnect)
     const connect = () => {
-      // Don't reconnect if we're already connected or connecting
-      if (wsRef.current?.readyState === WebSocket.OPEN ||
-          wsRef.current?.readyState === WebSocket.CONNECTING) {
+      if (aborted) return;
+      // Don't reconnect if we're already connected, connecting, or closing
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
         return;
       }
 
@@ -198,11 +199,14 @@ export function useYDoc(deckId: string): UseYDocResult {
           return; // Don't reconnect for deleted deck
         }
         
+        // Don't reconnect if effect was cleaned up
+        if (aborted) return;
+
         // Schedule reconnect with backoff
         reconnectAttemptRef.current++;
         const delay = getReconnectDelay();
         console.log(`[YDoc] Disconnected, reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current})`);
-        
+
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
         }, delay);
@@ -241,6 +245,7 @@ export function useYDoc(deckId: string): UseYDocResult {
 
     // Cleanup
     return () => {
+      aborted = true;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       
       if (reconnectTimeoutRef.current) {

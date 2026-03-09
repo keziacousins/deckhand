@@ -195,7 +195,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   // On mount: try to restore session from refresh token
+  const sessionRestoredRef = useRef(false);
   useEffect(() => {
+    if (sessionRestoredRef.current) return;
+    sessionRestoredRef.current = true;
+
     const storedRefresh = localStorage.getItem('deckhand_refresh_token');
     if (!storedRefresh) {
       setIsLoading(false);

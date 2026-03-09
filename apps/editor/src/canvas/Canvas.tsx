@@ -27,6 +27,7 @@ import { useSelection } from '../selection';
 import type { Deck, Slide, StartPoint } from '@deckhand/schema';
 import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS, resolveEdgeSource } from '@deckhand/schema';
 import { findClosestTargetHandle } from './handleUtils';
+import { useAuthAssets } from '../hooks/useAuthAssets';
 
 const nodeTypes = {
   slide: SlideNode,
@@ -53,6 +54,7 @@ interface CanvasProps {
   inspectorVisible: boolean;
   onToggleInspector: () => void;
   onShare?: () => void;
+  readOnly?: boolean;
   showGrid?: boolean;
   connectionStatus: ConnectionStatusType;
   connectionError?: string | null;
@@ -68,6 +70,7 @@ export function Canvas({
   inspectorVisible,
   onToggleInspector,
   onShare,
+  readOnly,
   showGrid,
   connectionStatus,
   connectionError,
@@ -96,10 +99,13 @@ export function Canvas({
     targetNode: CanvasNodeType | null;
   } | null>(null);
 
+  // Resolve asset URLs to authenticated blob URLs for web components
+  const rawAssets = useMemo(() => deck.assets ?? {}, [deck.assets]);
+  const assets = useAuthAssets(rawAssets);
+
   // Derive slide nodes from deck state
   const slideNodes = useMemo(() => {
     const deckGridColumns = deck.gridColumns ?? DEFAULT_GRID_COLUMNS;
-    const assets = deck.assets ?? {};
     
     // Pre-compute linked component IDs per slide
     const linkedComponentsBySlide = new Map<string, string[]>();
@@ -130,7 +136,7 @@ export function Canvas({
       },
       selected: slide.id === selectedSlideId,
     }));
-  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, deck.assets, deck.defaultBackdropSlideId, deck.flow.edges, showGrid, selectedSlideId, selectedComponentId]);
+  }, [deck.slides, deck.theme, deck.aspectRatio, deck.gridColumns, assets, deck.defaultBackdropSlideId, deck.flow.edges, showGrid, selectedSlideId, selectedComponentId]);
 
   // Derive start point nodes from deck state
   const startPointNodes = useMemo(() => {
@@ -281,6 +287,7 @@ export function Canvas({
   // Persist positions to deck when drag ends (handles single and multi-select)
   const onNodeDragStop = useCallback(
     (_event: React.MouseEvent, _node: CanvasNodeType, draggedNodes: CanvasNodeType[]) => {
+      if (readOnly) return;
       onUpdateDeck((d) => {
         let hasChanges = false;
         const updatedSlides = { ...d.slides };
@@ -326,15 +333,16 @@ export function Canvas({
         };
       });
     },
-    [onUpdateDeck]
+    [onUpdateDeck, readOnly]
   );
 
   // Connection handling
   const onConnect = useCallback(
     (connection: Connection) => {
+      if (readOnly) return;
       // Skip if this is a reconnection (handled by onReconnect)
       if (isReconnectingRef.current) return;
-      
+
       if (!connection.source || !connection.target) return;
       if (connection.source === connection.target) return; // No self-loops
 
@@ -386,6 +394,7 @@ export function Canvas({
 
   const onReconnect: OnReconnect = useCallback(
     (oldEdge, newConnection) => {
+      if (readOnly) return;
       if (!newConnection.source || !newConnection.target) return;
       if (newConnection.source === newConnection.target) return; // No self-loops
 
@@ -809,6 +818,8 @@ export function Canvas({
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (readOnly) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if typing in an input
       const target = e.target as HTMLElement;
@@ -846,7 +857,7 @@ export function Canvas({
     // Use capture phase to intercept before React Flow
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [addSlide, duplicateSlide, deleteComponent, selectedSlideId, selectedComponentId]);
+  }, [readOnly, addSlide, duplicateSlide, deleteComponent, selectedSlideId, selectedComponentId]);
 
   return (
     <>
@@ -856,20 +867,22 @@ export function Canvas({
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodesDelete={onNodesDelete}
-        onEdgesDelete={onEdgesDelete}
-        onNodeDragStop={onNodeDragStop}
+        onNodesDelete={readOnly ? undefined : onNodesDelete}
+        onEdgesDelete={readOnly ? undefined : onEdgesDelete}
+        onNodeDragStop={readOnly ? undefined : onNodeDragStop}
         onSelectionChange={onSelectionChange}
-        onConnect={onConnect}
-        onReconnectStart={onReconnectStart}
-        onReconnect={onReconnect}
-        onReconnectEnd={onReconnectEnd}
-        edgesReconnectable
-        onConnectStart={onConnectStart}
-        onConnectEnd={onConnectEnd}
+        onConnect={readOnly ? undefined : onConnect}
+        onReconnectStart={readOnly ? undefined : onReconnectStart}
+        onReconnect={readOnly ? undefined : onReconnect}
+        onReconnectEnd={readOnly ? undefined : onReconnectEnd}
+        edgesReconnectable={!readOnly}
+        onConnectStart={readOnly ? undefined : onConnectStart}
+        onConnectEnd={readOnly ? undefined : onConnectEnd}
         onMoveEnd={onMoveEnd}
-        onPaneContextMenu={onPaneContextMenu}
-        onNodeContextMenu={onNodeContextMenu}
+        onPaneContextMenu={readOnly ? undefined : onPaneContextMenu}
+        onNodeContextMenu={readOnly ? undefined : onNodeContextMenu}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
         connectionMode="loose"
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -910,6 +923,7 @@ export function Canvas({
           inspectorVisible={inspectorVisible}
           onToggleInspector={onToggleInspector}
           onShare={onShare}
+          readOnly={readOnly}
           connectionStatus={connectionStatus}
           connectionError={connectionError}
         />

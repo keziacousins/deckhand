@@ -79,6 +79,12 @@
   flex-direction: column;
 }
 
+/* Read-only mode — disable interaction on non-chat tabs */
+.inspector-content-readonly > :not(.chat-section) {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .inspector-empty {
   display: flex;
   align-items: center;

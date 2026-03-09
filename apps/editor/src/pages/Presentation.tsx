@@ -3,6 +3,7 @@ import { useYDoc } from '../sync';
 import type { Deck, Slide, TransitionType, Edge } from '@deckhand/schema';
 import { DEFAULT_GRID_COLUMNS, SLIDE_WIDTH, getSlideHeight, themeToCssProperties, DEFAULT_TRANSITION_DURATION, resolveEdgeSource } from '@deckhand/schema';
 import { renderComponent, getTopLevelComponents } from '../utils/renderComponent';
+import { useAuthAssets } from '../hooks/useAuthAssets';
 import './Presentation.css';
 
 const RADIUS_MAP: Record<string, string> = {
@@ -270,7 +271,11 @@ interface TransitionState {
 }
 
 export function Presentation({ deckId, startSlideId, onExit }: PresentationProps) {
-  const { deck, status, error } = useYDoc(deckId);
+  const { deck: rawDeck, status, error } = useYDoc(deckId);
+  const rawAssets = useMemo(() => rawDeck?.assets ?? {}, [rawDeck?.assets]);
+  const resolvedAssets = useAuthAssets(rawAssets);
+  // Replace assets with blob URLs so web components can load them
+  const deck = useMemo(() => rawDeck ? { ...rawDeck, assets: resolvedAssets } : null, [rawDeck, resolvedAssets]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);

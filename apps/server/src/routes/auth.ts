@@ -2,8 +2,9 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import { Configuration, OAuth2Api, FrontendApi } from '@ory/client';
 import { oryConfig } from '../config.js';
-import { upsertUser } from '../db/users.js';
+import { upsertUser, updateUserName } from '../db/users.js';
 import { getUser } from '../db/users.js';
+import { jwtMiddleware, getAuthUser } from '../middleware/auth.js';
 
 const hydraAdmin = new OAuth2Api(
   new Configuration({
@@ -431,6 +432,95 @@ authRouter.get('/logout', async (req, res) => {
   } catch (error) {
     console.error('[Auth] Logout error:', error);
     return res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// ─── Settings (require JWT) ──────────────────────────────────────────
+
+/**
+ * POST /settings/profile — Update display name.
+ * Updates both local DB and Kratos identity traits.
+ * Body: { name }
+ */
+authRouter.post('/settings/profile', jwtMiddleware, async (req, res) => {
+  const claims = getAuthUser(req);
+  if (!claims) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { name } = req.body;
+  if (typeof name !== 'string') {
+    return res.status(400).json({ error: 'Name is required' });
+  }
+
+  try {
+    // Update local DB
+    await updateUserName(claims.sub, name.trim());
+
+    // Update Kratos identity traits
+    const identityRes = await fetch(
+      `${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`
+    );
+    if (identityRes.ok) {
+      const identity = await identityRes.json();
+      await fetch(`${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schema_id: identity.schema_id,
+          traits: { ...identity.traits, name: name.trim() },
+          state: identity.state,
+        }),
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[Auth] Profile update error:', error);
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+/**
+ * POST /settings/password — Change password via Kratos admin API.
+ * Body: { password }
+ */
+authRouter.post('/settings/password', jwtMiddleware, async (req, res) => {
+  const claims = getAuthUser(req);
+  if (!claims) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { password } = req.body;
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  try {
+    // Use Kratos admin API to update password
+    const identityRes = await fetch(
+      `${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`
+    );
+    if (!identityRes.ok) {
+      return res.status(500).json({ error: 'Failed to fetch identity' });
+    }
+    const identity = await identityRes.json();
+
+    await fetch(`${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schema_id: identity.schema_id,
+        traits: identity.traits,
+        state: identity.state,
+        credentials: {
+          password: {
+            config: { password },
+          },
+        },
+      }),
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[Auth] Password change error:', error);
+    return res.status(500).json({ error: 'Failed to change password' });
   }
 });
 

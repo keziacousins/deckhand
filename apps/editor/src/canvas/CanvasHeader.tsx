@@ -14,6 +14,7 @@ interface CanvasHeaderProps {
   inspectorVisible: boolean;
   onToggleInspector: () => void;
   onShare?: () => void;
+  readOnly?: boolean;
   connectionStatus: ConnectionStatusType;
   connectionError?: string | null;
 }
@@ -28,6 +29,7 @@ export function CanvasHeader({
   inspectorVisible,
   onToggleInspector,
   onShare,
+  readOnly,
   connectionStatus,
   connectionError,
 }: CanvasHeaderProps) {
@@ -47,6 +49,7 @@ export function CanvasHeader({
   }, [isEditing]);
 
   const handleNameClick = () => {
+    if (readOnly) return;
     setIsEditing(true);
   };
 
@@ -99,7 +102,7 @@ export function CanvasHeader({
               <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5" />
             </svg>
           </div>
-          {isEditing ? (
+          {isEditing && !readOnly ? (
             <input
               ref={inputRef}
               type="text"
@@ -113,7 +116,8 @@ export function CanvasHeader({
             <button
               className="name-button"
               onClick={handleNameClick}
-              title="Click to edit name"
+              title={readOnly ? deckName : 'Click to edit name'}
+              style={readOnly ? { cursor: 'default' } : undefined}
             >
               {deckName}
             </button>
@@ -122,21 +126,27 @@ export function CanvasHeader({
 
         <div className="header-separator" />
 
-        {/* Add slide button */}
-        <button
-          className="header-button"
-          onClick={onAddSlide}
-          title="Add Slide (⌘N)"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M8 3v10M3 8h10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+        {readOnly ? (
+          <span className="view-only-badge">View only</span>
+        ) : (
+          <>
+            {/* Add slide button */}
+            <button
+              className="header-button"
+              onClick={onAddSlide}
+              title="Add Slide (⌘N)"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 3v10M3 8h10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </>
+        )}
 
         <div className="header-separator" />
 

@@ -29,11 +29,12 @@ interface InspectorProps {
   deck: Deck;
   deckId: string;
   onUpdateDeck: (updater: (deck: Deck) => Deck) => void;
+  readOnly?: boolean;
   showGrid?: boolean;
   onToggleShowGrid?: () => void;
 }
 
-export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGrid, onToggleShowGrid }: InspectorProps) {
+export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOnly, showGrid, onToggleShowGrid }: InspectorProps) {
   const { selection, selectSlide, selectComponent, clearSelection } = useSelection();
   const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
   const [showComponentBrowser, setShowComponentBrowser] = useState(false);
@@ -546,15 +547,16 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
       selection,
       selectedSlide,
       selectedComponent,
-      onUpdate: handleUpdate,
-      onAddComponent: handleAddComponent,
-      onDeleteComponent: handleDeleteComponent,
-      onReorderComponent: handleReorderComponent,
-      onReorderComponents: handleReorderComponents,
-      onMoveComponentToContainer: handleMoveComponentToContainer,
-      onComponentLinkChange: handleComponentLinkChange,
+      readOnly,
+      onUpdate: readOnly ? (() => {}) as InspectorContext['onUpdate'] : handleUpdate,
+      onAddComponent: readOnly ? undefined : handleAddComponent,
+      onDeleteComponent: readOnly ? undefined : handleDeleteComponent,
+      onReorderComponent: readOnly ? undefined : handleReorderComponent,
+      onReorderComponents: readOnly ? undefined : handleReorderComponents,
+      onMoveComponentToContainer: readOnly ? undefined : handleMoveComponentToContainer,
+      onComponentLinkChange: readOnly ? undefined : handleComponentLinkChange,
     };
-  }, [deck, selection, handleUpdate, handleAddComponent, handleDeleteComponent, handleReorderComponent, handleReorderComponents, handleMoveComponentToContainer, handleComponentLinkChange]);
+  }, [deck, selection, readOnly, handleUpdate, handleAddComponent, handleDeleteComponent, handleReorderComponent, handleReorderComponents, handleMoveComponentToContainer, handleComponentLinkChange]);
 
   const hasSlideSelected = context.selectedSlide !== null;
   const selectedEdge = isEdgeSelected(selection) ? deck.flow.edges[selection.edgeId] : null;
@@ -604,7 +606,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
           </button>
         </div>
 
-        <div className="inspector-content">
+        <div className={`inspector-content${readOnly ? ' inspector-content-readonly' : ''}`}>
           {activeTab === 'selection' && (
             <>
               {selectedEdge ? (
@@ -612,14 +614,14 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
                   edge={selectedEdge}
                   deckDefaultTransition={deck.flow.defaultTransition}
                   deckDefaultDuration={deck.flow.defaultTransitionDuration}
-                  onUpdateEdge={handleUpdateEdge}
-                  onDeleteEdge={handleDeleteEdge}
+                  onUpdateEdge={readOnly ? undefined : handleUpdateEdge}
+                  onDeleteEdge={readOnly ? undefined : handleDeleteEdge}
                 />
               ) : selectedStartPoint ? (
                 <StartPointPropertiesSection
                   startPoint={selectedStartPoint}
-                  onUpdateStartPoint={handleUpdateStartPoint}
-                  onDeleteStartPoint={handleDeleteStartPoint}
+                  onUpdateStartPoint={readOnly ? undefined : handleUpdateStartPoint}
+                  onDeleteStartPoint={readOnly ? undefined : handleDeleteStartPoint}
                 />
               ) : !hasSlideSelected ? (
                 <div className="inspector-empty">Select an object to edit</div>
@@ -629,7 +631,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
                   <BackgroundSection context={context} stickyIndex={1} />
                   <ColorsSection context={context} stickyIndex={2} />
                   <ComponentList context={context} stickyIndex={3} />
-                  <button
+                  {!readOnly && <button
                     className="inspector-add-component"
                     data-drop-active={addButtonDropActive || undefined}
                     onClick={() => setShowComponentBrowser(true)}
@@ -670,7 +672,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, showGr
                       />
                     </svg>
                     <span>Add Component</span>
-                  </button>
+                  </button>}
                 </>
               )}
             </>

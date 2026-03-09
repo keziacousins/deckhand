@@ -431,14 +431,14 @@ export function ChatSection({ context, deckId }: ChatSectionProps) {
           onKeyDown={handleKeyDown}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="Describe changes..."
+          placeholder={context.readOnly ? 'View only' : 'Describe changes...'}
           rows={1}
-          disabled={isLoading}
+          disabled={isLoading || context.readOnly}
         />
         <button
           className="chat-send"
           onClick={sendMessage}
-          disabled={!input.trim() || isLoading}
+          disabled={!input.trim() || isLoading || context.readOnly}
           title="Send (Enter)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

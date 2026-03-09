@@ -15,8 +15,8 @@ interface EdgePropertiesSectionProps {
   edge: Edge;
   deckDefaultTransition?: TransitionType;
   deckDefaultDuration?: number;
-  onUpdateEdge: (edgeId: string, updates: Partial<Pick<Edge, 'transition' | 'transitionDuration'>>) => void;
-  onDeleteEdge: (edgeId: string) => void;
+  onUpdateEdge?: (edgeId: string, updates: Partial<Pick<Edge, 'transition' | 'transitionDuration'>>) => void;
+  onDeleteEdge?: (edgeId: string) => void;
 }
 
 export function EdgePropertiesSection({
@@ -42,6 +42,7 @@ export function EdgePropertiesSection({
             ...TRANSITION_OPTIONS,
           ]}
           onChange={(value) => {
+            if (!onUpdateEdge) return;
             if (value === '') {
               // Clear override, use deck default
               onUpdateEdge(edge.id, { transition: undefined, transitionDuration: undefined });
@@ -54,21 +55,23 @@ export function EdgePropertiesSection({
           <NumberField
             label="Duration"
             value={effectiveDuration}
-            onChange={(value) => onUpdateEdge(edge.id, { transitionDuration: value })}
+            onChange={(value) => onUpdateEdge?.(edge.id, { transitionDuration: value })}
             min={0}
             max={5}
             step={0.1}
             suffix="s"
           />
         )}
-        <div className="inspector-field">
-          <button
-            className="inspector-delete-button"
-            onClick={() => onDeleteEdge(edge.id)}
-          >
-            Delete Edge
-          </button>
-        </div>
+        {onDeleteEdge && (
+          <div className="inspector-field">
+            <button
+              className="inspector-delete-button"
+              onClick={() => onDeleteEdge(edge.id)}
+            >
+              Delete Edge
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

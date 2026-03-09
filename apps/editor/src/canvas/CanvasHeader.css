@@ -131,6 +131,20 @@
   color: var(--canvas-overlay-text-hover);
 }
 
+/* View only badge */
+.view-only-badge {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* Name input - editing mode */
 .name-input {
   padding: var(--space-1);

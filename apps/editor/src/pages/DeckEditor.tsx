@@ -34,7 +34,10 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   useEffect(() => {
     if (roleFetchedFor.current === deckId) return;
     roleFetchedFor.current = deckId;
-    getDeck(deckId).then((d) => setDeckRole(d.role)).catch(() => {});
+    getDeck(deckId).then((d) => {
+      setDeckRole(d.role);
+      if (d.role === 'viewer') setInspectorVisible(false);
+    }).catch(() => {});
   }, [deckId]);
 
   // Register undo/redo keyboard shortcuts
@@ -58,8 +61,9 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   }, [deckId]);
 
   // Capture cover image after initial render (with delay for canvas to render)
+  // Skip for viewers — they can't upload covers
   useEffect(() => {
-    if (deck && hasEverSynced && !hasCapturedInitialCover.current) {
+    if (deck && hasEverSynced && !hasCapturedInitialCover.current && deckRole && deckRole !== 'viewer') {
       hasCapturedInitialCover.current = true;
       // Delay to ensure the slide is rendered
       const timer = setTimeout(() => {
@@ -67,7 +71,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [deck, hasEverSynced, captureCover]);
+  }, [deck, hasEverSynced, deckRole, captureCover]);
 
   const handleUpdateDeck = useCallback((updater: (deck: Deck) => Deck) => {
     updateDeck((current) => {
@@ -92,12 +96,14 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
     }));
   }, [handleUpdateDeck]);
 
-  // Capture cover before navigating away
+  // Capture cover before navigating away (skip for viewers)
   const handleBack = useCallback(async () => {
-    setIsSaving(true);
-    await captureCover();
+    if (deckRole && deckRole !== 'viewer') {
+      setIsSaving(true);
+      await captureCover();
+    }
     onBack();
-  }, [captureCover, onBack]);
+  }, [captureCover, deckRole, onBack]);
 
   const toggleInspector = useCallback(() => {
     setInspectorVisible((v) => !v);
@@ -237,6 +243,8 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
     );
   }
 
+  const readOnly = deckRole === 'viewer';
+
   return (
     <div className="editor-container">
       <div className="editor-canvas">
@@ -251,6 +259,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
             inspectorVisible={inspectorVisible}
             onToggleInspector={toggleInspector}
             onShare={deckRole === 'owner' ? () => setShowShareDialog(true) : undefined}
+            readOnly={readOnly}
             showGrid={showGrid}
             connectionStatus={status}
             connectionError={error}
@@ -263,6 +272,7 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         deck={deck}
         deckId={deckId}
         onUpdateDeck={handleUpdateDeck}
+        readOnly={readOnly}
         showGrid={showGrid}
         onToggleShowGrid={() => setShowGrid((v) => !v)}
       />
@@ -284,6 +294,35 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         <div className="saving-overlay">
           <div className="saving-spinner" />
           <span>Saving...</span>
+        </div>
+      )}
+
+      {status === 'error' && error === 'This deck has been deleted' && (
+        <div className="saving-overlay">
+          <div style={{
+            background: 'var(--bg-panel, #1e1e2e)',
+            borderRadius: '12px',
+            padding: '32px 40px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          }}>
+            <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary, #fff)' }}>
+              This deck has been deleted
+            </p>
+            <button onClick={onBack} style={{
+              padding: '8px 24px',
+              background: 'var(--interactive-primary, #6366f1)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}>Back to Decks</button>
+          </div>
         </div>
       )}
     </div>

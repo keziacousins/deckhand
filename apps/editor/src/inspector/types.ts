@@ -8,6 +8,7 @@ export interface InspectorContext {
   selection: Selection;
   selectedSlide: Slide | null;
   selectedComponent: Component | null;
+  readOnly?: boolean;
   onUpdate: (update: InspectorUpdate) => void;
   onAddComponent?: (componentType: string, parentId?: string) => void;
   onDeleteComponent?: (slideId: string, componentId: string) => void;

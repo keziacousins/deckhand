@@ -60,6 +60,7 @@ export function useYDoc(deckId: string): UseYDocResult {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasEverSyncedRef = useRef(false);
   const initialSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deletedRef = useRef(false);
 
   // Keep deckRef in sync with state for use in callbacks
   useEffect(() => {
@@ -151,6 +152,23 @@ export function useYDoc(deckId: string): UseYDocResult {
       };
 
       ws.onmessage = (event) => {
+        // Control messages are JSON strings (not binary YDoc updates)
+        if (typeof event.data === 'string') {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'deck-deleted') {
+              console.log('[YDoc] Deck has been deleted');
+              deletedRef.current = true;
+              setStatus('error');
+              setError('This deck has been deleted');
+              ws.close();
+              return;
+            }
+          } catch {
+            // Not JSON — ignore
+          }
+          return;
+        }
         try {
           const update = new Uint8Array(event.data);
           Y.applyUpdate(ydoc, update);
@@ -160,15 +178,24 @@ export function useYDoc(deckId: string): UseYDocResult {
       };
 
       ws.onclose = (event) => {
-        setStatus('disconnected');
+        console.log(`[YDoc] WS closed: code=${event.code} reason=${event.reason} clean=${event.wasClean}`);
         wsRef.current = null;
-        
+
+        // If deck was deleted (via control message), don't reconnect
+        if (deletedRef.current) return;
+
+        setStatus('disconnected');
+
         // Check for specific close codes
         if (event.code === 4000) {
           setError('Server unavailable - retrying...');
         } else if (event.code === 4001) {
           setError('Deck not found');
           return; // Don't reconnect for not found
+        } else if (event.code === 4002) {
+          setStatus('error');
+          setError('This deck has been deleted');
+          return; // Don't reconnect for deleted deck
         }
         
         // Schedule reconnect with backoff

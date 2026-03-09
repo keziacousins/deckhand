@@ -17,6 +17,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (loginHint?: string) => void;
   logout: () => void;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextValue>({
   isLoading: true,
   login: () => {},
   logout: () => {},
+  refreshSession: async () => {},
 });
 
 export function useAuth() {
@@ -272,6 +274,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = `/api/auth/authorize?${params.toString()}`;
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    const storedRefresh = localStorage.getItem('deckhand_refresh_token');
+    if (!storedRefresh) return;
+    try {
+      const result = await refreshAccessToken(storedRefresh);
+      handleTokens(result.access_token, result.refresh_token || storedRefresh);
+    } catch {
+      // Refresh failed — ignore, user state stays as-is
+    }
+  }, [handleTokens]);
+
   const logout = useCallback(() => {
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
@@ -295,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

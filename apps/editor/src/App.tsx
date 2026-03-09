@@ -124,18 +124,21 @@ function AppRoutes({
     );
   }
 
-  // Authenticated app routes with app bar
+  // Editor — fullscreen, no app bar (has its own CanvasHeader)
+  if (route.type === 'editor') {
+    return (
+      <DeckEditor
+        deckId={route.deckId}
+        onBack={() => navigateTo({ type: 'list' })}
+      />
+    );
+  }
+
+  // Other authenticated routes with app bar
   return (
     <>
       <AppBar />
-      {route.type === 'editor' ? (
-        <DeckEditor
-          deckId={route.deckId}
-          onBack={() => navigateTo({ type: 'list' })}
-        />
-      ) : (
-        <DeckList onOpenDeck={(id) => navigateTo({ type: 'editor', deckId: id })} />
-      )}
+      <DeckList onOpenDeck={(id) => navigateTo({ type: 'editor', deckId: id })} />
     </>
   );
 }

@@ -104,6 +104,33 @@ export function broadcastYDocState(deckId: string): void {
 }
 
 /**
+ * Force-close all clients and remove a session.
+ * Used when deleting a deck — owner has authority to end all connections.
+ */
+export function closeSession(deckId: string): void {
+  const session = sessions.get(deckId);
+  if (!session) {
+    console.log(`[Session] No session found for ${deckId} — nothing to close`);
+    return;
+  }
+
+  console.log(`[Session] Closing session for ${deckId} — ${session.clients.size} client(s)`);
+  for (const client of session.clients) {
+    try {
+      // Send a control message before closing — Vite's WS proxy swallows close codes,
+      // so the client needs to detect deletion from a message instead.
+      client.send(JSON.stringify({ type: 'deck-deleted' }));
+      client.close(4002, 'Deck deleted');
+    } catch {
+      // Ignore send/close errors
+    }
+  }
+  session.clients.clear();
+  sessions.delete(deckId);
+  console.log(`[Session] Force-closed session for ${deckId}`);
+}
+
+/**
  * Get client count for a session
  */
 export function getClientCount(deckId: string): number {

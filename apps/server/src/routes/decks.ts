@@ -13,7 +13,7 @@ import {
   duplicateDeck,
 } from '../db/decks.js';
 import { createEmptyDeck, generateDeckId, validateDeck } from '@deckhand/schema';
-import { getActiveSession } from '../sessions.js';
+import { closeSession } from '../sessions.js';
 import { getAuthUser } from '../middleware/auth.js';
 import { requireDeckRole } from '../middleware/permissions.js';
 
@@ -156,13 +156,8 @@ decksRouter.patch('/:id', requireDeckRole('owner', 'editor'), async (req, res) =
  */
 decksRouter.delete('/:id', requireDeckRole('owner'), async (req, res) => {
   try {
-    const session = getActiveSession(req.params.id);
-    if (session) {
-      return res.status(409).json({
-        error: 'Cannot delete deck with active editing session',
-        activeClients: session.clients.size,
-      });
-    }
+    // Force-close any active sessions — owner is deleting the deck
+    closeSession(req.params.id);
 
     const deleted = await deleteDeck(req.params.id);
     if (!deleted) {

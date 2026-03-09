@@ -7,6 +7,7 @@ import {
   type DeckMetadata,
 } from '../api/decks';
 import { AuthImage } from '../components/AuthImage';
+import { ShareDialog } from '../components/ShareDialog';
 import './DeckList.css';
 
 interface DeckListProps {
@@ -17,6 +18,7 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
   const [decks, setDecks] = useState<DeckMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sharingDeckId, setSharingDeckId] = useState<string | null>(null);
 
   const fetchDecks = async () => {
     try {
@@ -141,6 +143,20 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
                 <p className="deck-card-date">Updated {formatDate(deck.updatedAt)}</p>
               </div>
               <div className="deck-card-actions">
+                {deck.role === 'owner' && (
+                  <button
+                    className="deck-card-action"
+                    onClick={(e) => { e.stopPropagation(); setSharingDeckId(deck.id); }}
+                    title="Share"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.5" />
+                      <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5" />
+                      <circle cx="4" cy="8" r="2" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M6 7l4-2M6 9l4 2" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   className="deck-card-action"
                   onClick={(e) => handleDuplicateDeck(deck.id, e)}
@@ -183,6 +199,9 @@ export function DeckList({ onOpenDeck }: DeckListProps) {
             </div>
           ))}
         </div>
+      )}
+      {sharingDeckId && (
+        <ShareDialog deckId={sharingDeckId} onClose={() => setSharingDeckId(null)} />
       )}
     </div>
   );

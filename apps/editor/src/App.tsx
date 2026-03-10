@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DeckList } from './pages/DeckList';
 import { DeckEditor } from './pages/DeckEditor';
 import { Presentation } from './pages/Presentation';
+import { PublicPresentation } from './pages/PublicPresentation';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { LoginPage } from './auth/LoginPage';
 import { SignupPage } from './auth/SignupPage';
@@ -13,6 +14,7 @@ type Route =
   | { type: 'list' }
   | { type: 'editor'; deckId: string }
   | { type: 'present'; deckId: string; startSlideId?: string }
+  | { type: 'public-present'; deckId: string }
   | { type: 'login' }
   | { type: 'signup' }
   | { type: 'forgot-password' }
@@ -21,12 +23,18 @@ type Route =
 function parseRoute(): Route {
   const hash = window.location.hash;
 
-  // Auth routes are path-based (not hash) so external services can redirect to them
+  // Path-based routes (not hash) for auth and public pages
   const pathname = window.location.pathname;
   if (pathname === '/callback') return { type: 'callback' };
   if (pathname === '/login') return { type: 'login' };
   if (pathname === '/signup') return { type: 'signup' };
   if (pathname === '/forgot-password') return { type: 'forgot-password' };
+
+  // Public presentation: /present/:deckId
+  const publicPresentMatch = pathname.match(/^\/present\/([^/]+)$/);
+  if (publicPresentMatch) {
+    return { type: 'public-present', deckId: publicPresentMatch[1] };
+  }
 
   // Match /deck/:id/present or /deck/:id/present/:slideId
   const presentMatch = hash.match(/^#\/deck\/([^/]+)\/present(?:\/(.+))?$/);
@@ -82,7 +90,7 @@ function AppRoutes({
 }) {
   const { user, isLoading } = useAuth();
 
-  // Auth pages are always accessible
+  // Public/auth pages — no authentication required
   switch (route.type) {
     case 'login':
       return <LoginPage />;
@@ -96,6 +104,8 @@ function AppRoutes({
           <p>Completing login...</p>
         </div>
       );
+    case 'public-present':
+      return <PublicPresentation deckId={route.deckId} />;
   }
 
   // Wait for auth state to resolve before deciding

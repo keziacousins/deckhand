@@ -42,6 +42,7 @@ export interface DeckMetadata {
 
 export interface DeckFull extends DeckMetadata {
   content: import('@deckhand/schema').Deck;
+  publicAccess?: string;
 }
 
 class ApiError extends Error {
@@ -127,6 +128,24 @@ export async function deleteDeck(id: string): Promise<void> {
 export async function duplicateDeck(id: string): Promise<DeckMetadata> {
   const response = await apiFetch(`${API_BASE}/decks/${id}/duplicate`, {
     method: 'POST',
+  });
+  return handleResponse(response);
+}
+
+// ============================================================================
+// Public Access API
+// ============================================================================
+
+export type PublicAccess = 'none' | 'present';
+
+export async function setPublicAccess(
+  deckId: string,
+  publicAccess: PublicAccess
+): Promise<{ publicAccess: PublicAccess }> {
+  const response = await apiFetch(`${API_BASE}/decks/${deckId}/public`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ publicAccess }),
   });
   return handleResponse(response);
 }

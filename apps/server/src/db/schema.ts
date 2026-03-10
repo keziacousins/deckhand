@@ -159,6 +159,7 @@ export interface DeckRow {
   slide_count: number;
   cover_url: string | null;
   cover_storage_key: string | null;
+  public_access: string;
   created_at: string;
   updated_at: string;
 }

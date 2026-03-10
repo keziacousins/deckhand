@@ -51,6 +51,7 @@ decksRouter.get('/:id', requireDeckRole('owner', 'editor', 'viewer'), async (req
       content: JSON.parse(deck.content),
       slideCount: deck.slide_count,
       role: req.deckRole,
+      publicAccess: deck.public_access,
       createdAt: deck.created_at,
       updatedAt: deck.updated_at,
     });
@@ -168,6 +169,34 @@ decksRouter.delete('/:id', requireDeckRole('owner'), async (req, res) => {
   } catch (error) {
     console.error('[API] Error deleting deck:', error);
     res.status(500).json({ error: 'Failed to delete deck' });
+  }
+});
+
+/**
+ * PATCH /api/decks/:id/public - Toggle public access (owner only)
+ */
+decksRouter.patch('/:id/public', requireDeckRole('owner'), async (req, res) => {
+  try {
+    const { publicAccess } = req.body;
+    if (!publicAccess || !['none', 'present'].includes(publicAccess)) {
+      return res.status(400).json({ error: 'publicAccess must be "none" or "present"' });
+    }
+
+    const result = await import('../db/schema.js').then(({ pool }) =>
+      pool.query(
+        'UPDATE decks SET public_access = $1, updated_at = NOW() WHERE id = $2 RETURNING public_access',
+        [publicAccess, req.params.id]
+      )
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Deck not found' });
+    }
+
+    res.json({ publicAccess: result.rows[0].public_access });
+  } catch (error) {
+    console.error('[API] Error updating public access:', error);
+    res.status(500).json({ error: 'Failed to update public access' });
   }
 });
 

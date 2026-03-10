@@ -24,14 +24,15 @@ npm run dev:all
 # Build all packages and apps
 npm run build
 
-# Run unit tests across all workspaces
+# Run unit tests across all workspaces (NOT `npx vitest run` — that picks up reference-code)
 npm run test
 
-# Run unit tests in a specific package
-npm run test --workspace=packages/schema
-npm run test --workspace=packages/sync
-npm run test --workspace=packages/components
-npm run test --workspace=apps/server
+# Run unit tests in a specific workspace
+npm run test -w packages/schema
+npm run test -w packages/sync
+npm run test -w packages/components
+npm run test -w apps/server
+# Note: apps/editor has no unit tests (only E2E via Playwright)
 
 # Run E2E tests (Playwright) - requires dev servers running
 npx playwright test

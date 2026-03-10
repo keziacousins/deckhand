@@ -10,6 +10,7 @@ import chatRouter from './routes/chat.js';
 import modelsRouter from './routes/models.js';
 import { authRouter } from './routes/auth.js';
 import { sharesRouter } from './routes/shares.js';
+import { publicRouter } from './routes/public.js';
 import { jwtMiddleware } from './middleware/auth.js';
 import { getAllSessions } from './sessions.js';
 
@@ -41,6 +42,9 @@ export function createApp(options: AppOptions = {}): Express {
 
   // Auth routes (before JWT middleware — these ARE the auth flow)
   app.use('/api/auth', authRouter);
+
+  // Public routes (before JWT middleware — no auth required)
+  app.use('/api/public', publicRouter);
 
   // JWT middleware for all subsequent /api routes — requires valid token
   if (!options.skipAuth) {

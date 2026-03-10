@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
+  getDeck,
   listShares,
   addShare,
   updateShare,
   removeShare,
+  setPublicAccess,
   type DeckShare,
+  type PublicAccess,
 } from '../api/decks';
 import './ShareDialog.css';
 
@@ -19,6 +22,8 @@ export function ShareDialog({ deckId, onClose }: ShareDialogProps) {
   const [role, setRole] = useState<'editor' | 'viewer'>('editor');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [publicAccess, setPublicAccessState] = useState<PublicAccess>('none');
+  const [copied, setCopied] = useState(false);
 
   const fetchShares = useCallback(async () => {
     try {
@@ -29,9 +34,34 @@ export function ShareDialog({ deckId, onClose }: ShareDialogProps) {
     }
   }, [deckId]);
 
+  // Fetch current public access state
+  useEffect(() => {
+    getDeck(deckId)
+      .then((deck) => setPublicAccessState((deck.publicAccess as PublicAccess) || 'none'))
+      .catch(() => { /* defaults to 'none' */ });
+  }, [deckId]);
+
   useEffect(() => {
     fetchShares();
   }, [fetchShares]);
+
+  const handleTogglePublic = async () => {
+    const newAccess: PublicAccess = publicAccess === 'none' ? 'present' : 'none';
+    try {
+      const result = await setPublicAccess(deckId, newAccess);
+      setPublicAccessState(result.publicAccess);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update public access');
+    }
+  };
+
+  const publicUrl = `${window.location.origin}/present/${deckId}`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +112,36 @@ export function ShareDialog({ deckId, onClose }: ShareDialogProps) {
           </button>
         </div>
         <div className="share-dialog-body">
+          {/* Public link section */}
+          <div className="share-public-section">
+            <div className="share-public-toggle">
+              <label className="share-public-label">
+                <span>Anyone with the link can view</span>
+                <button
+                  className={`share-toggle-btn ${publicAccess !== 'none' ? 'share-toggle-on' : ''}`}
+                  onClick={handleTogglePublic}
+                  type="button"
+                >
+                  <span className="share-toggle-knob" />
+                </button>
+              </label>
+            </div>
+            {publicAccess !== 'none' && (
+              <div className="share-public-link">
+                <input
+                  className="share-public-url"
+                  type="text"
+                  value={publicUrl}
+                  readOnly
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button className="share-copy-btn" onClick={handleCopyLink} type="button">
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            )}
+          </div>
+
           <form className="share-add-form" onSubmit={handleAdd}>
             <input
               className="share-email-input"

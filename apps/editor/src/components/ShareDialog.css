@@ -177,3 +177,86 @@
   background: var(--status-error-bg);
   color: var(--status-error-text);
 }
+
+/* Public link section */
+.share-public-section {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.share-public-toggle {
+  margin-bottom: var(--space-2);
+}
+
+.share-public-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.share-toggle-btn {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--bg-surface-active);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  padding: 0;
+}
+
+.share-toggle-btn.share-toggle-on {
+  background: var(--interactive-primary);
+}
+
+.share-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+}
+
+.share-toggle-on .share-toggle-knob {
+  transform: translateX(16px);
+}
+
+.share-public-link {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.share-public-url {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  outline: none;
+}
+
+.share-copy-btn {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface-active);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+
+.share-copy-btn:hover {
+  background: var(--bg-surface-hover);
+}

@@ -1,91 +1,144 @@
+/**
+ * Public (unauthenticated) presentation viewer.
+ * Fetches deck content via the public REST API and renders the presentation.
+ * Assets use public URLs that don't require auth.
+ */
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useYDoc } from '../sync';
-import type { Edge, TransitionType } from '@deckhand/schema';
+import type { Deck, Edge, TransitionType } from '@deckhand/schema';
 import { SLIDE_WIDTH, getSlideHeight, DEFAULT_TRANSITION_DURATION, resolveEdgeSource } from '@deckhand/schema';
-import { useAuthAssets } from '../hooks/useAuthAssets';
 import { computePlayOrder, getTransitionInfo, SlideRenderer, type TransitionState } from './presentationUtils';
 import './Presentation.css';
 
-interface PresentationProps {
+interface PublicPresentationProps {
   deckId: string;
-  startSlideId?: string;
-  onExit: () => void;
 }
 
-export function Presentation({ deckId, startSlideId, onExit }: PresentationProps) {
-  const { deck: rawDeck, status, error } = useYDoc(deckId);
-  const rawAssets = useMemo(() => rawDeck?.assets ?? {}, [rawDeck?.assets]);
-  const resolvedAssets = useAuthAssets(rawAssets);
-  // Replace assets with blob URLs so web components can load them
-  const deck = useMemo(() => rawDeck ? { ...rawDeck, assets: resolvedAssets } : null, [rawDeck, resolvedAssets]);
+/**
+ * Rewrite asset URLs from /api/decks/... to /api/public/decks/... so they
+ * load without authentication.
+ */
+function rewriteAssetsToPublic(deck: Deck): Deck {
+  const assets = deck.assets ?? {};
+  const rewritten: typeof assets = {};
+  for (const [id, asset] of Object.entries(assets)) {
+    if ('url' in asset && asset.url) {
+      rewritten[id] = {
+        ...asset,
+        url: asset.url.replace(/^\/api\/decks\//, '/api/public/decks/'),
+      };
+    } else {
+      rewritten[id] = asset;
+    }
+  }
+  return { ...deck, assets: rewritten };
+}
+
+export function PublicPresentation({ deckId }: PublicPresentationProps) {
+  const [deck, setDeck] = useState<Deck | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const [transition, setTransition] = useState<TransitionState | null>(null);
-  // Play order start slide — changes when a component link jumps outside
-  // the current linear order.
   const [playOrderStart, setPlayOrderStart] = useState<string | undefined>(undefined);
-  // Navigation history stack — tracks positions before component link jumps
-  // so "back" returns to the jump origin rather than the linear predecessor.
   const [navHistory, setNavHistory] = useState<Array<{ start: string | undefined; index: number }>>([]);
 
-  // Calculate scale to fit slide in viewport while maintaining aspect ratio
+  // Fetch deck via public API
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchDeck() {
+      try {
+        const res = await fetch(`/api/public/decks/${deckId}`);
+        if (!res.ok) {
+          if (res.status === 404) {
+            setError('Presentation not found or not publicly shared');
+          } else {
+            setError('Failed to load presentation');
+          }
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) {
+          setDeck(rewriteAssetsToPublic(data.content));
+        }
+      } catch {
+        if (!cancelled) setError('Failed to load presentation');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchDeck();
+    return () => { cancelled = true; };
+  }, [deckId]);
+
+  // Scale to fit viewport
   useEffect(() => {
     if (!deck) return;
-
     const slideHeight = getSlideHeight(deck.aspectRatio);
-
     const updateScale = () => {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Calculate scale to fit slide in viewport (letterbox/pillarbox)
-      const scaleX = viewportWidth / SLIDE_WIDTH;
-      const scaleY = viewportHeight / slideHeight;
-      const newScale = Math.min(scaleX, scaleY);
-
-      setScale(newScale);
+      const scaleX = window.innerWidth / SLIDE_WIDTH;
+      const scaleY = window.innerHeight / slideHeight;
+      setScale(Math.min(scaleX, scaleY));
     };
-
     updateScale();
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
   }, [deck]);
 
-  // Compute play order — recomputes when a component link jumps to a new start
+  // Find start slide by following edges from the default start point
+  const startSlideId = useMemo(() => {
+    if (!deck) return undefined;
+
+    // Helper: find the slide a start point connects to via an edge
+    const findTarget = (spId: string): string | undefined => {
+      const edge = Object.values(deck.flow.edges).find(e => e.from === spId);
+      return edge?.to && deck.slides[edge.to] ? edge.to : undefined;
+    };
+
+    // Try default start point
+    if (deck.defaultStartPointId) {
+      const target = findTarget(deck.defaultStartPointId);
+      if (target) return target;
+    }
+
+    // Fallback: first start point with an edge to a slide
+    for (const sp of Object.values(deck.flow.startPoints ?? {})) {
+      const target = findTarget(sp.id);
+      if (target) return target;
+    }
+
+    // Last resort: first slide
+    return Object.keys(deck.slides)[0];
+  }, [deck]);
+
+  // Compute play order
   const playOrder = useMemo(() => {
     if (!deck) return [];
-    
-    let start = playOrderStart ?? startSlideId;
-    if (!start || !deck.slides[start]) {
-      const slideIds = Object.keys(deck.slides);
-      start = slideIds[0];
-    }
-    
-    if (!start) return [];
+    const start = playOrderStart ?? startSlideId;
+    if (!start || !deck.slides[start]) return [];
     return computePlayOrder(deck, start);
   }, [deck, startSlideId, playOrderStart]);
 
   const currentEntry = playOrder[currentIndex];
   const currentSlideId = currentEntry?.slideId;
   const currentSlide = deck?.slides[currentSlideId];
-  
+
   const canGoNext = currentIndex < playOrder.length - 1 && !transition?.isTransitioning;
   const canGoPrev = (currentIndex > 0 || navHistory.length > 0) && !transition?.isTransitioning;
 
-  // Component links for the current slide.
-  // If a linked component is nested inside a container, bubble the link
-  // up to the top-level ancestor (same logic as the editor badge).
+  // Component links for current slide
   const componentLinks = useMemo(() => {
     if (!deck || !currentSlideId) return new Map<string, Edge>();
     const slide = deck.slides[currentSlideId];
     if (!slide) return new Map<string, Edge>();
-    
+
     const links = new Map<string, Edge>();
     for (const edge of Object.values(deck.flow.edges)) {
       const source = resolveEdgeSource(deck, edge.from);
       if (source?.type === 'component' && source.slideId === currentSlideId) {
-        // Walk up to top-level ancestor
         let comp = slide.components.find(c => c.id === source.componentId);
         while (comp?.parentId) {
           comp = slide.components.find(c => c.id === comp!.parentId);
@@ -97,18 +150,13 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     return links;
   }, [deck, currentSlideId]);
 
-  // Navigate to a slide by ID (for component links).
-  // Pushes current position onto navHistory so "back" returns here.
   const navigateToSlide = useCallback((targetSlideId: string, edgeTransition?: TransitionType, edgeDuration?: number) => {
     if (!deck || transition?.isTransitioning || !currentSlideId) return;
     if (!deck.slides[targetSlideId]) return;
 
-    // Save current position so back returns here
     setNavHistory(h => [...h, { start: playOrderStart, index: currentIndex }]);
 
     const targetIndex = playOrder.findIndex(e => e.slideId === targetSlideId);
-
-    // Determine transition to use
     const type = edgeTransition ?? deck.flow.defaultTransition ?? 'instant';
     const duration = edgeDuration ?? deck.flow.defaultTransitionDuration ?? DEFAULT_TRANSITION_DURATION;
 
@@ -124,38 +172,24 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     if (type === 'instant' || duration === 0) {
       applyNav();
     } else {
-      // Start transition animation with actual slide IDs (not indices,
-      // since the target may not be in the current play order yet)
       setTransition({
-        isTransitioning: true,
-        type,
-        duration,
-        fromSlideId: currentSlideId,
-        toSlideId: targetSlideId,
-        phase: 'enter',
+        isTransitioning: true, type, duration,
+        fromSlideId: currentSlideId, toSlideId: targetSlideId, phase: 'enter',
       });
-
       requestAnimationFrame(() => {
         setTransition(t => t ? { ...t, phase: 'active' } : null);
       });
-
-      setTimeout(() => {
-        applyNav();
-        setTransition(null);
-      }, duration * 1000);
+      setTimeout(() => { applyNav(); setTransition(null); }, duration * 1000);
     }
   }, [deck, transition, playOrder, currentIndex, currentSlideId, playOrderStart]);
 
   const handleComponentClick = useCallback((componentId: string) => {
     const edge = componentLinks.get(componentId);
-    if (edge) {
-      navigateToSlide(edge.to, edge.transition, edge.transitionDuration);
-    }
+    if (edge) navigateToSlide(edge.to, edge.transition, edge.transitionDuration);
   }, [componentLinks, navigateToSlide]);
 
   const goNext = useCallback(() => {
     if (!canGoNext || !deck || !currentSlideId) return;
-
     const nextIndex = currentIndex + 1;
     const nextEntry = playOrder[nextIndex];
     const { type, duration } = getTransitionInfo(deck, nextEntry.incomingEdgeId, 'forward');
@@ -164,29 +198,17 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
       setCurrentIndex(nextIndex);
     } else {
       setTransition({
-        isTransitioning: true,
-        type,
-        duration,
-        fromSlideId: currentSlideId,
-        toSlideId: nextEntry.slideId,
-        phase: 'enter',
+        isTransitioning: true, type, duration,
+        fromSlideId: currentSlideId, toSlideId: nextEntry.slideId, phase: 'enter',
       });
-
-      requestAnimationFrame(() => {
-        setTransition(t => t ? { ...t, phase: 'active' } : null);
-      });
-
-      setTimeout(() => {
-        setCurrentIndex(nextIndex);
-        setTransition(null);
-      }, duration * 1000);
+      requestAnimationFrame(() => setTransition(t => t ? { ...t, phase: 'active' } : null));
+      setTimeout(() => { setCurrentIndex(nextIndex); setTransition(null); }, duration * 1000);
     }
   }, [canGoNext, currentIndex, currentSlideId, deck, playOrder]);
 
   const goPrev = useCallback(() => {
     if (!canGoPrev || !deck || !currentSlideId) return;
 
-    // If at the start of current play order and there's history, pop back
     if (currentIndex === 0 && navHistory.length > 0) {
       const prev = navHistory[navHistory.length - 1];
       setNavHistory(h => h.slice(0, -1));
@@ -203,123 +225,63 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
       setCurrentIndex(prevIndex);
     } else {
       setTransition({
-        isTransitioning: true,
-        type,
-        duration,
-        fromSlideId: currentSlideId,
-        toSlideId: prevEntry.slideId,
-        phase: 'enter',
+        isTransitioning: true, type, duration,
+        fromSlideId: currentSlideId, toSlideId: prevEntry.slideId, phase: 'enter',
       });
-
-      requestAnimationFrame(() => {
-        setTransition(t => t ? { ...t, phase: 'active' } : null);
-      });
-
-      setTimeout(() => {
-        setCurrentIndex(prevIndex);
-        setTransition(null);
-      }, duration * 1000);
+      requestAnimationFrame(() => setTransition(t => t ? { ...t, phase: 'active' } : null));
+      setTimeout(() => { setCurrentIndex(prevIndex); setTransition(null); }, duration * 1000);
     }
   }, [canGoPrev, currentIndex, currentSlideId, currentEntry, deck, navHistory, playOrder]);
 
-  // Track if we were ever in fullscreen (to know if exiting fullscreen should exit presentation)
-  const wasInFullscreen = useRef(false);
-
-  // Detect initial fullscreen state after mount
-  useEffect(() => {
+  // Fullscreen toggle
+  const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
-      wasInFullscreen.current = true;
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen();
     }
   }, []);
-
-  // Exit presentation when fullscreen is exited (if we were in fullscreen)
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (document.fullscreenElement) {
-        // Entered fullscreen
-        wasInFullscreen.current = true;
-      } else if (wasInFullscreen.current) {
-        // Exited fullscreen after being in it - also exit presentation
-        if (window.opener) {
-          window.close();
-        } else {
-          onExit();
-        }
-      }
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [onExit]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
-        case 'ArrowRight':
-        case 'ArrowDown':
-        case ' ':
-        case 'Enter':
-          e.preventDefault();
-          goNext();
-          break;
-        case 'ArrowLeft':
-        case 'ArrowUp':
-          e.preventDefault();
-          goPrev();
-          break;
+        case 'ArrowRight': case 'ArrowDown': case ' ': case 'Enter':
+          e.preventDefault(); goNext(); break;
+        case 'ArrowLeft': case 'ArrowUp':
+          e.preventDefault(); goPrev(); break;
+        case 'f':
+          e.preventDefault(); toggleFullscreen(); break;
         case 'Escape':
-          // If in fullscreen, let browser handle it - fullscreenchange will exit presentation
-          // If not in fullscreen, exit presentation directly
-          if (!document.fullscreenElement) {
-            e.preventDefault();
-            if (window.opener) {
-              window.close();
-            } else {
-              onExit();
-            }
-          }
+          if (document.fullscreenElement) break; // let browser handle
           break;
         case 'Home':
-          e.preventDefault();
-          setCurrentIndex(0);
-          break;
+          e.preventDefault(); setCurrentIndex(0); break;
         case 'End':
-          e.preventDefault();
-          setCurrentIndex(Math.max(0, playOrder.length - 1));
-          break;
+          e.preventDefault(); setCurrentIndex(Math.max(0, playOrder.length - 1)); break;
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goNext, goPrev, onExit, playOrder.length]);
+  }, [goNext, goPrev, toggleFullscreen, playOrder.length]);
 
-  // Click to advance (or follow component link)
+  // Click to advance
   const handleClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-
-    // Don't advance if clicking on interactive elements
     if (target.closest('a, button, input, textarea')) return;
 
-    // Check if click is inside a component link.
-    // Use composedPath to pierce Shadow DOM boundaries.
     const path = e.nativeEvent.composedPath();
     for (const el of path) {
       if (el instanceof HTMLElement && el.classList.contains('component-link')) {
         const compId = el.getAttribute('data-component-id');
-        if (compId) {
-          handleComponentClick(compId);
-          return;
-        }
+        if (compId) { handleComponentClick(compId); return; }
       }
     }
-
     goNext();
-  }, [goNext, handleComponentClick, componentLinks]);
+  }, [goNext, handleComponentClick]);
 
-  // Show loading state
-  if (status === 'connecting' || (status === 'connected' && !deck)) {
+  // Loading state
+  if (loading) {
     return (
       <div className="presentation">
         <div className="presentation-loading">Loading presentation...</div>
@@ -327,33 +289,29 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     );
   }
 
-  // Show error state
-  if (status === 'error' || status === 'disconnected' || !deck) {
+  // Error state
+  if (error || !deck) {
     return (
       <div className="presentation">
         <div className="presentation-error">
           <p>{error || 'Failed to load presentation'}</p>
-          <button onClick={onExit}>Exit</button>
         </div>
       </div>
     );
   }
 
-  // No slides to present
+  // No slides
   if (playOrder.length === 0 || !currentSlide) {
     return (
       <div className="presentation">
         <div className="presentation-error">
-          <p>No slides to present. Add slides and connect them with edges.</p>
-          <button onClick={onExit}>Exit</button>
+          <p>No slides to present.</p>
         </div>
       </div>
     );
   }
 
   const slideHeight = getSlideHeight(deck.aspectRatio);
-
-  // Scale the entire slide viewport like React Flow does
   const viewportStyle: React.CSSProperties = {
     transform: `scale(${scale})`,
     transformOrigin: 'center center',
@@ -361,21 +319,17 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     height: slideHeight,
   };
 
-  // Get slides for transition rendering
   const fromSlide = transition ? deck.slides[transition.fromSlideId] : null;
   const toSlide = transition ? deck.slides[transition.toSlideId] : null;
-
-  // CSS custom properties for transition duration
   const transitionDuration = transition ? `${transition.duration}s` : '0s';
 
   return (
     <div className="presentation" ref={containerRef} onClick={handleClick}>
-      <div 
-        className="presentation-viewport" 
+      <div
+        className="presentation-viewport"
         style={{ ...viewportStyle, '--transition-duration': transitionDuration } as React.CSSProperties}
       >
         {transition && fromSlide && toSlide ? (
-          // During transition: show both slides with animation
           <div className={`presentation-transition transition-${transition.type} ${transition.phase}`}>
             <div className="transition-slide transition-from">
               <SlideRenderer slide={fromSlide} deck={deck} />
@@ -385,7 +339,6 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
             </div>
           </div>
         ) : (
-          // Normal: show current slide
           <SlideRenderer
             slide={currentSlide}
             deck={deck}
@@ -394,7 +347,7 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
           />
         )}
       </div>
-      
+
       {/* Progress indicator */}
       <div className="presentation-progress">
         <span className="presentation-progress-text">
@@ -402,9 +355,9 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
         </span>
       </div>
 
-      {/* Navigation controls (visible on hover) */}
+      {/* Navigation controls */}
       <div className="presentation-controls">
-        <button 
+        <button
           className="presentation-nav presentation-nav-prev"
           onClick={(e) => { e.stopPropagation(); goPrev(); }}
           disabled={!canGoPrev}
@@ -414,7 +367,7 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
             <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <button 
+        <button
           className="presentation-nav presentation-nav-next"
           onClick={(e) => { e.stopPropagation(); goNext(); }}
           disabled={!canGoNext}
@@ -426,25 +379,16 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
         </button>
       </div>
 
-      {/* Exit button */}
-      <button 
+      {/* Fullscreen button */}
+      <button
         className="presentation-exit"
-        onClick={(e) => { 
-          e.stopPropagation(); 
-          if (window.opener) {
-            window.close();
-          } else {
-            onExit();
-          }
-        }}
-        title="Exit (Esc)"
+        onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+        title="Fullscreen (F)"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
     </div>
   );
 }
-
-

@@ -348,6 +348,7 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
     const deck = yDocToDeck(session.ydoc);
     console.log(`[Chat] Deck meta:`, deck?.meta?.title);
     console.log(`[Chat] Deck slides:`, deck?.slides ? Object.keys(deck.slides).length : 0);
+    console.log(`[Chat] Context:`, JSON.stringify(context));
 
     if (!deck || !deck.meta) {
       console.log(`[Chat] Deck not found or no meta - returning 404`);

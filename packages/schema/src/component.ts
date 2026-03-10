@@ -106,6 +106,8 @@ export const DiagramComponentSchema = BaseComponentSchema.extend({
   props: GridPropsSchema.merge(VisualPropsSchema).extend({
     source: z.string(),
     theme: z.enum(['auto', 'default', 'dark', 'neutral', 'forest']).optional(),
+    maxWidth: z.number().min(0).max(2000).optional(),
+    maxHeight: z.number().min(0).max(2000).optional(),
   }),
 });
 

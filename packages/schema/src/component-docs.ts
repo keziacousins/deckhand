@@ -91,6 +91,8 @@ const componentDocMeta: Record<string, ComponentDocMeta> = {
     propDescriptions: {
       source: 'Mermaid diagram syntax (required)',
       theme: 'Mermaid theme — "auto" inherits deck colors',
+      maxWidth: 'max width in px',
+      maxHeight: 'max height in px — use to constrain tall diagrams',
       gridWidth: 'columns to span (0 = full width)',
     },
   },

@@ -501,6 +501,31 @@
   font-size: var(--font-size-sm);
 }
 
+/* Context indicator */
+.chat-context-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.chat-context-label {
+  opacity: 0.6;
+}
+
+.chat-context-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-context-indicator + .chat-input-container {
+  border-top: none;
+}
+
 /* Input area */
 .chat-input-container {
   display: flex;

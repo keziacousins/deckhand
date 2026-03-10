@@ -57,6 +57,14 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Track last known slide/component selection so context survives deselection
+  const lastSlideIdRef = useRef<string | null>(null);
+  const lastComponentIdRef = useRef<string | null>(null);
+  if (context.selection.slideId) {
+    lastSlideIdRef.current = context.selection.slideId;
+    lastComponentIdRef.current = context.selection.componentId;
+  }
   const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streamingSegments, setStreamingSegments] = useState<StreamingSegment[]>([]);
@@ -322,8 +330,8 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
           sessionId: currentSessionId || undefined,
           model: selectedModel || undefined,
           context: {
-            selectedSlideId: context.selection.slideId,
-            selectedComponentId: context.selection.componentId,
+            selectedSlideId: context.selection.slideId || lastSlideIdRef.current,
+            selectedComponentId: context.selection.componentId || lastComponentIdRef.current,
           },
         }),
       });
@@ -587,6 +595,22 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
         )}
       </div>
 
+      {(() => {
+        const slideId = context.selection.slideId || lastSlideIdRef.current;
+        const compId = context.selection.componentId || lastComponentIdRef.current;
+        const slide = slideId ? context.deck.slides[slideId] : null;
+        const comp = slide && compId ? slide.components.find(c => c.id === compId) : null;
+        if (!slide) return null;
+        return (
+          <div className="chat-context-indicator">
+            <span className="chat-context-label">Context:</span>
+            <span className="chat-context-value">
+              {slide.title || 'Untitled slide'}
+              {comp ? ` › ${comp.type.replace('deck-', '')}` : ''}
+            </span>
+          </div>
+        );
+      })()}
       <div className="chat-input-container">
         <textarea
           ref={textareaRef}

@@ -43,6 +43,24 @@ export class DeckDiagram extends DeckComponent {
         group: PropertyGroups.STYLE,
         compact: true,
       },
+      maxWidth: {
+        type: 'number',
+        label: 'Max width',
+        min: 0,
+        max: 2000,
+        step: 10,
+        group: PropertyGroups.LAYOUT,
+        compact: true,
+      },
+      maxHeight: {
+        type: 'number',
+        label: 'Max height',
+        min: 0,
+        max: 2000,
+        step: 10,
+        group: PropertyGroups.LAYOUT,
+        compact: true,
+      },
       gridWidth: {
         ...CommonProperties.gridWidth(),
         compact: true,
@@ -56,7 +74,7 @@ export class DeckDiagram extends DeckComponent {
     },
   };
 
-  static observedAttributes = ['source', 'theme', 'grid-width', 'linked'];
+  static observedAttributes = ['source', 'theme', 'max-width', 'max-height', 'grid-width', 'linked'];
 
   private _renderTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -177,6 +195,11 @@ export class DeckDiagram extends DeckComponent {
 
     const id = `deck-diagram-${++renderCounter}`;
 
+    const maxWidth = this.getAttr('max-width', '');
+    const maxHeight = this.getAttr('max-height', '');
+    const maxWidthStyle = maxWidth ? `max-width: ${maxWidth}px;` : 'max-width: 100%;';
+    const maxHeightStyle = maxHeight ? `max-height: ${maxHeight}px;` : '';
+
     mermaid.render(id, source).then(({ svg }) => {
       this.shadow.innerHTML = `
         <style>
@@ -193,7 +216,8 @@ export class DeckDiagram extends DeckComponent {
             justify-content: center;
           }
           .diagram svg {
-            max-width: 100%;
+            ${maxWidthStyle}
+            ${maxHeightStyle}
             height: auto;
           }
           ${linkedStyles}

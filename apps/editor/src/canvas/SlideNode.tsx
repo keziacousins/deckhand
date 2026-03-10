@@ -297,21 +297,29 @@ export const SlideNode = memo(function SlideNode({
         </deck-slide>
       </div>
 
-      {/* Per-component source handles for linked components */}
+      {/* Per-component source handles for linked components (right + bottom) */}
       {/* Always render handles so React Flow can resolve edges immediately; */}
       {/* useLayoutEffect updates positions once badges are measured. */}
-      {(linkedComponentIds ?? []).map(compId => {
+      {(linkedComponentIds ?? []).flatMap(compId => {
         const measured = compHandles.find(h => h.id === compId);
-        return (
+        return [
           <Handle
-            key={compId}
+            key={`${compId}-r`}
             type="source"
             position={Position.Right}
-            id={`link-${compId}`}
+            id={`link-r-${compId}`}
             className="component-handle"
             style={measured ? { top: measured.top, left: measured.right } : undefined}
-          />
-        );
+          />,
+          <Handle
+            key={`${compId}-b`}
+            type="source"
+            position={Position.Bottom}
+            id={`link-b-${compId}`}
+            className="component-handle"
+            style={measured ? { top: measured.top, left: measured.right } : undefined}
+          />,
+        ];
       })}
 
       {/* Source handles - outgoing connections */}

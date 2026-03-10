@@ -186,6 +186,12 @@
   border: 2px solid var(--node-bg);
 }
 
+/* Hide unmeasured component handles (no inline position yet) */
+.slide-node .react-flow__handle.component-handle:not([style]) {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
 /* Hide handles when zoomed out */
 .react-flow.zoom-overview .slide-node .react-flow__handle {
   opacity: 0;

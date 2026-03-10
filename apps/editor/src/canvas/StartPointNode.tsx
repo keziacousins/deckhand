@@ -19,8 +19,9 @@ export const StartPointNode = memo(function StartPointNode({
     <div className={`start-point-node ${selected ? 'selected' : ''}`}>
       <span className="start-point-name">{startPoint.name}</span>
       
-      {/* Single source handle - start points can only connect outward */}
-      <Handle type="source" position={Position.Right} id="source" />
+      {/* Source handles - start points can only connect outward */}
+      <Handle type="source" position={Position.Right} id="source-right" />
+      <Handle type="source" position={Position.Bottom} id="source-bottom" />
     </div>
   );
 });

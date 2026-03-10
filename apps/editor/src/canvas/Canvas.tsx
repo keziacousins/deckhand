@@ -24,7 +24,7 @@ import { ContextMenu } from './ContextMenu';
 import { CanvasHeader } from './CanvasHeader';
 import { useSelection } from '../selection';
 import type { Deck, Slide, StartPoint } from '@deckhand/schema';
-import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS, resolveEdgeSource } from '@deckhand/schema';
+import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS, resolveEdgeSource, SLIDE_WIDTH, getSlideHeight } from '@deckhand/schema';
 import { findClosestTargetHandle } from './handleUtils';
 import { useAuthAssets } from '../hooks/useAuthAssets';
 
@@ -154,32 +154,100 @@ export function Canvas({
   }, [slideNodes, startPointNodes]);
 
   // Derive edges from deck state
+  const slideHeight = getSlideHeight(deck.aspectRatio);
+
   const deckEdges = useMemo((): Edge[] => {
-    // Pick best target handle based on relative position of source and target
-    const pickTargetHandle = (sourceId: string, targetId: string): string => {
-      const sourceSlide = deck.slides[sourceId];
-      const targetSlide = deck.slides[targetId];
-      const startPoint = (deck.flow.startPoints ?? {})[sourceId];
-      const sourcePos = sourceSlide?.position ?? startPoint?.position;
-      const targetPos = targetSlide?.position;
-      if (!sourcePos || !targetPos) return 'target-left';
-      const dx = targetPos.x - sourcePos.x;
-      const dy = targetPos.y - sourcePos.y;
-      // If target is more below than to the side, use top handle
-      return Math.abs(dy) > Math.abs(dx) && dy > 0 ? 'target-top' : 'target-left';
+    // Compute actual handle positions on the node boundary
+    const getHandlePositions = (nodeId: string) => {
+      const slide = deck.slides[nodeId];
+      if (slide) {
+        const x = slide.position.x;
+        const y = slide.position.y;
+        return {
+          'source-right':  { x: x + SLIDE_WIDTH, y: y + slideHeight / 2 },
+          'source-bottom': { x: x + SLIDE_WIDTH / 2, y: y + slideHeight },
+          'target-left':   { x, y: y + slideHeight / 2 },
+          'target-top':    { x: x + SLIDE_WIDTH / 2, y: y },
+        };
+      }
+      const sp = (deck.flow.startPoints ?? {})[nodeId];
+      if (sp) {
+        const px = sp.position.x;
+        const py = sp.position.y;
+        return {
+          'source-right':  { x: px + 20, y: py },
+          'source-bottom': { x: px, y: py + 20 },
+          'target-left':   { x: px - 20, y: py },
+          'target-top':    { x: px, y: py - 20 },
+        };
+      }
+      return null;
+    };
+
+    type HandlePositions = NonNullable<ReturnType<typeof getHandlePositions>>;
+
+    // Pick the (source, target) handle pair that gives the shortest distance
+    const HANDLE_PAIRS: Array<{ source: keyof HandlePositions; target: keyof HandlePositions }> = [
+      { source: 'source-right', target: 'target-left' },
+      { source: 'source-right', target: 'target-top' },
+      { source: 'source-bottom', target: 'target-left' },
+      { source: 'source-bottom', target: 'target-top' },
+    ];
+
+    const pickHandles = (sourceId: string, targetId: string) => {
+      const sp = getHandlePositions(sourceId);
+      const tp = getHandlePositions(targetId);
+      if (!sp || !tp) return { source: 'source-right', target: 'target-left' };
+
+      let best = HANDLE_PAIRS[0];
+      let bestDist = Infinity;
+      for (const pair of HANDLE_PAIRS) {
+        const s = sp[pair.source];
+        const t = tp[pair.target];
+        const dist = Math.hypot(s.x - t.x, s.y - t.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = pair;
+        }
+      }
+      return best;
     };
 
     return Object.values(deck.flow.edges).map((edge) => {
       const source = resolveEdgeSource(deck, edge.from);
 
       if (source?.type === 'component') {
-        // Component link edge — source is the slide, handle is on the component
+        // Use source slide's boundary handle positions as proxy for the
+        // component badge position to pick the shortest-distance pair
+        const sp = getHandlePositions(source.slideId);
+        const tp = getHandlePositions(edge.to);
+        let linkDir = 'r';
+        let targetHandle = 'target-left';
+        if (sp && tp) {
+          const LINK_PAIRS = [
+            { dir: 'r', source: 'source-right' as const, target: 'target-left' as const },
+            { dir: 'r', source: 'source-right' as const, target: 'target-top' as const },
+            { dir: 'b', source: 'source-bottom' as const, target: 'target-left' as const },
+            { dir: 'b', source: 'source-bottom' as const, target: 'target-top' as const },
+          ];
+          let bestDist = Infinity;
+          for (const pair of LINK_PAIRS) {
+            const s = sp[pair.source];
+            const t = tp[pair.target];
+            const dist = Math.hypot(s.x - t.x, s.y - t.y);
+            if (dist < bestDist) {
+              bestDist = dist;
+              linkDir = pair.dir;
+              targetHandle = pair.target;
+            }
+          }
+        }
         return {
           id: edge.id,
           source: source.slideId,
           target: edge.to,
-          sourceHandle: `link-${source.componentId}`,
-          targetHandle: pickTargetHandle(source.slideId, edge.to),
+          sourceHandle: `link-${linkDir}-${source.componentId}`,
+          targetHandle,
           type: 'transition',
           data: {
             transition: edge.transition,
@@ -188,13 +256,14 @@ export function Canvas({
         };
       }
 
-      // Slide or start point edge (existing logic)
+      // Slide or start point edge
+      const handles = pickHandles(edge.from, edge.to);
       return {
         id: edge.id,
         source: edge.from,
         target: edge.to,
-        sourceHandle: edge.sourceHandle ?? 'source-right',
-        targetHandle: pickTargetHandle(edge.from, edge.to),
+        sourceHandle: handles.source,
+        targetHandle: handles.target,
         type: 'transition',
         data: {
           transition: edge.transition,
@@ -202,7 +271,7 @@ export function Canvas({
         },
       };
     });
-  }, [deck.flow.edges, deck.slides, deck.flow.startPoints]);
+  }, [deck.flow.edges, deck.slides, deck.flow.startPoints, slideHeight]);
 
   // Use React Flow's state management - initialize with empty, sync via effect
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNodeType>([]);
@@ -935,7 +1004,6 @@ export function Canvas({
             type: MarkerType.Arrow,
             width: 20,
             height: 20,
-            orient: 'auto',
           },
           style: { zIndex: 1 },
         }}

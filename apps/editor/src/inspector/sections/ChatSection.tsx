@@ -197,24 +197,30 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
   }, [onMessage]);
 
   // Track scroll position to decide auto-scroll.
-  // shouldFollowRef is the source of truth for follow mode — only user actions change it.
-  // isAtBottom state is derived from it for rendering the scroll-to-bottom button.
+  // shouldFollowRef is the source of truth for follow mode.
+  // isProgrammaticScrollRef prevents scroll events from breaking follow mode
+  // when we programmatically scroll (content growth also fires scroll events).
+  const isProgrammaticScrollRef = useRef(false);
+
   const handleScroll = useCallback(() => {
+    if (isProgrammaticScrollRef.current) return;
     const el = messagesContainerRef.current;
     if (!el) return;
     const threshold = 40;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-    // Only allow the user to break out of follow mode by scrolling up.
-    // Never re-enable follow mode from scroll events (only from explicit user actions).
-    if (!atBottom && shouldFollowRef.current) {
-      shouldFollowRef.current = false;
-    }
+    shouldFollowRef.current = atBottom;
     setIsAtBottom(atBottom);
   }, []);
 
   // Scroll helpers
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const doScroll = useCallback((behavior: ScrollBehavior) => {
+    isProgrammaticScrollRef.current = true;
+    clearTimeout(scrollTimerRef.current);
     messagesEndRef.current?.scrollIntoView({ behavior });
+    // Smooth scroll animates over time — keep flag set until it settles
+    const delay = behavior === 'smooth' ? 500 : 50;
+    scrollTimerRef.current = setTimeout(() => { isProgrammaticScrollRef.current = false; }, delay);
   }, []);
 
   // Scroll to bottom: instant on session switch, smooth for new content

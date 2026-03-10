@@ -265,8 +265,8 @@ interface TransitionState {
   isTransitioning: boolean;
   type: TransitionType;
   duration: number;
-  fromIndex: number;
-  toIndex: number;
+  fromSlideId: string;
+  toSlideId: string;
   phase: 'enter' | 'active' | 'done';
 }
 
@@ -358,14 +358,13 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   // Navigate to a slide by ID (for component links).
   // Pushes current position onto navHistory so "back" returns here.
   const navigateToSlide = useCallback((targetSlideId: string, edgeTransition?: TransitionType, edgeDuration?: number) => {
-    if (!deck || transition?.isTransitioning) return;
+    if (!deck || transition?.isTransitioning || !currentSlideId) return;
     if (!deck.slides[targetSlideId]) return;
 
     // Save current position so back returns here
     setNavHistory(h => [...h, { start: playOrderStart, index: currentIndex }]);
 
     const targetIndex = playOrder.findIndex(e => e.slideId === targetSlideId);
-    const toIndex = targetIndex !== -1 ? targetIndex : 0;
 
     // Determine transition to use
     const type = edgeTransition ?? deck.flow.defaultTransition ?? 'instant';
@@ -383,13 +382,14 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     if (type === 'instant' || duration === 0) {
       applyNav();
     } else {
-      // Start transition animation
+      // Start transition animation with actual slide IDs (not indices,
+      // since the target may not be in the current play order yet)
       setTransition({
         isTransitioning: true,
         type,
         duration,
-        fromIndex: currentIndex,
-        toIndex,
+        fromSlideId: currentSlideId,
+        toSlideId: targetSlideId,
         phase: 'enter',
       });
 
@@ -402,7 +402,7 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
         setTransition(null);
       }, duration * 1000);
     }
-  }, [deck, transition, playOrder, currentIndex, playOrderStart]);
+  }, [deck, transition, playOrder, currentIndex, currentSlideId, playOrderStart]);
 
   const handleComponentClick = useCallback((componentId: string) => {
     const edge = componentLinks.get(componentId);
@@ -412,41 +412,38 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   }, [componentLinks, navigateToSlide]);
 
   const goNext = useCallback(() => {
-    if (!canGoNext || !deck) return;
-    
+    if (!canGoNext || !deck || !currentSlideId) return;
+
     const nextIndex = currentIndex + 1;
     const nextEntry = playOrder[nextIndex];
     const { type, duration } = getTransitionInfo(deck, nextEntry.incomingEdgeId, 'forward');
-    
+
     if (type === 'instant' || duration === 0) {
       setCurrentIndex(nextIndex);
     } else {
-      // Start transition
       setTransition({
         isTransitioning: true,
         type,
         duration,
-        fromIndex: currentIndex,
-        toIndex: nextIndex,
+        fromSlideId: currentSlideId,
+        toSlideId: nextEntry.slideId,
         phase: 'enter',
       });
-      
-      // Trigger animation after a frame
+
       requestAnimationFrame(() => {
         setTransition(t => t ? { ...t, phase: 'active' } : null);
       });
-      
-      // Complete transition after duration
+
       setTimeout(() => {
         setCurrentIndex(nextIndex);
         setTransition(null);
       }, duration * 1000);
     }
-  }, [canGoNext, currentIndex, deck, playOrder]);
+  }, [canGoNext, currentIndex, currentSlideId, deck, playOrder]);
 
   const goPrev = useCallback(() => {
-    if (!canGoPrev || !deck) return;
-    
+    if (!canGoPrev || !deck || !currentSlideId) return;
+
     // If at the start of current play order and there's history, pop back
     if (currentIndex === 0 && navHistory.length > 0) {
       const prev = navHistory[navHistory.length - 1];
@@ -455,36 +452,33 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
       setCurrentIndex(prev.index);
       return;
     }
-    
+
     const prevIndex = currentIndex - 1;
-    // Use the edge that led to the current slide, but reverse direction
+    const prevEntry = playOrder[prevIndex];
     const { type, duration } = getTransitionInfo(deck, currentEntry.incomingEdgeId, 'backward');
-    
+
     if (type === 'instant' || duration === 0) {
       setCurrentIndex(prevIndex);
     } else {
-      // Start transition
       setTransition({
         isTransitioning: true,
         type,
         duration,
-        fromIndex: currentIndex,
-        toIndex: prevIndex,
+        fromSlideId: currentSlideId,
+        toSlideId: prevEntry.slideId,
         phase: 'enter',
       });
-      
-      // Trigger animation after a frame
+
       requestAnimationFrame(() => {
         setTransition(t => t ? { ...t, phase: 'active' } : null);
       });
-      
-      // Complete transition after duration
+
       setTimeout(() => {
         setCurrentIndex(prevIndex);
         setTransition(null);
       }, duration * 1000);
     }
-  }, [canGoPrev, currentIndex, currentEntry, deck, navHistory]);
+  }, [canGoPrev, currentIndex, currentSlideId, currentEntry, deck, navHistory, playOrder]);
 
   // Track if we were ever in fullscreen (to know if exiting fullscreen should exit presentation)
   const wasInFullscreen = useRef(false);
@@ -626,8 +620,8 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   };
 
   // Get slides for transition rendering
-  const fromSlide = transition ? deck.slides[playOrder[transition.fromIndex]?.slideId] : null;
-  const toSlide = transition ? deck.slides[playOrder[transition.toIndex]?.slideId] : null;
+  const fromSlide = transition ? deck.slides[transition.fromSlideId] : null;
+  const toSlide = transition ? deck.slides[transition.toSlideId] : null;
 
   // CSS custom properties for transition duration
   const transitionDuration = transition ? `${transition.duration}s` : '0s';

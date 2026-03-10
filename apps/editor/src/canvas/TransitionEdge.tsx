@@ -1,10 +1,21 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
   type EdgeProps,
 } from '@xyflow/react';
+
+/** Sample a point on an SVG path at a given distance from the end */
+function getPointNearEnd(pathD: string, distFromEnd: number): { x: number; y: number } | null {
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', pathD);
+  const totalLen = path.getTotalLength();
+  if (totalLen === 0) return null;
+  const at = Math.max(0, totalLen - distFromEnd);
+  const pt = path.getPointAtLength(at);
+  return { x: pt.x, y: pt.y };
+}
 
 export interface TransitionEdgeData extends Record<string, unknown> {
   transition?: string;
@@ -33,10 +44,16 @@ export const TransitionEdge = memo(function TransitionEdge({
     targetX,
     targetY,
     targetPosition,
+    curvature: 0.55,
   });
 
   const edgeData = data as TransitionEdgeData | undefined;
   const hasCustomTransition = edgeData?.transition !== undefined;
+
+  // Position badge 50px from the target end, on the actual curve
+  const badgePos = useMemo(() => getPointNearEnd(edgePath, 50), [edgePath]);
+  const bx = badgePos?.x ?? labelX;
+  const by = badgePos?.y ?? labelY;
 
   return (
     <>
@@ -47,7 +64,7 @@ export const TransitionEdge = memo(function TransitionEdge({
             className={`edge-transition-badge ${selected ? 'selected' : ''}`}
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${bx}px, ${by}px)`,
               pointerEvents: 'all',
               zIndex: 1000,
             }}

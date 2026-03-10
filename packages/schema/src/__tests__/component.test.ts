@@ -569,10 +569,11 @@ describe('componentTypes', () => {
     expect(componentTypes).toContain('deck-text');
     expect(componentTypes).toContain('deck-image');
     expect(componentTypes).toContain('deck-container');
+    expect(componentTypes).toContain('deck-diagram');
   });
 
-  it('has 3 component types', () => {
-    expect(componentTypes).toHaveLength(3);
+  it('has 4 component types', () => {
+    expect(componentTypes).toHaveLength(4);
   });
 });
 

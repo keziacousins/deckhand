@@ -21,12 +21,14 @@ export { DeckSlide } from './components/deck-slide';
 export { DeckText } from './components/deck-text';
 export { DeckImage } from './components/deck-image';
 export { DeckContainer } from './components/deck-container';
+export { DeckDiagram } from './components/deck-diagram';
 
 // Import components for registration
 import { DeckSlide } from './components/deck-slide';
 import { DeckText } from './components/deck-text';
 import { DeckImage } from './components/deck-image';
 import { DeckContainer } from './components/deck-container';
+import { DeckDiagram } from './components/deck-diagram';
 import { registry } from './registry';
 
 /**
@@ -39,7 +41,8 @@ export function registerComponents(): void {
   registry.add(DeckText);
   registry.add(DeckImage);
   registry.add(DeckContainer);
-  
+  registry.add(DeckDiagram);
+
   // Define custom elements
   registry.registerAll();
 }

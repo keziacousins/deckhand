@@ -99,18 +99,31 @@ export const ContainerComponentSchema = BaseComponentSchema.extend({
 });
 
 /**
+ * Diagram component — renders Mermaid syntax as SVG
+ */
+export const DiagramComponentSchema = BaseComponentSchema.extend({
+  type: z.literal('deck-diagram'),
+  props: GridPropsSchema.merge(VisualPropsSchema).extend({
+    source: z.string(),
+    theme: z.enum(['auto', 'default', 'dark', 'neutral', 'forest']).optional(),
+  }),
+});
+
+/**
  * Union of all component types
  */
 export const ComponentSchema = z.discriminatedUnion('type', [
   TextComponentSchema,
   ImageComponentSchema,
   ContainerComponentSchema,
+  DiagramComponentSchema,
 ]);
 
 export type VisualProps = z.infer<typeof VisualPropsSchema>;
 export type TextComponent = z.infer<typeof TextComponentSchema>;
 export type ImageComponent = z.infer<typeof ImageComponentSchema>;
 export type ContainerComponent = z.infer<typeof ContainerComponentSchema>;
+export type DiagramComponent = z.infer<typeof DiagramComponentSchema>;
 
 export type Component = z.infer<typeof ComponentSchema>;
 
@@ -121,6 +134,7 @@ export const componentTypes = [
   'deck-text',
   'deck-image',
   'deck-container',
+  'deck-diagram',
 ] as const;
 
 export type ComponentType = (typeof componentTypes)[number];

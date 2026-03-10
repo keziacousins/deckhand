@@ -13,7 +13,7 @@ const HEADER_HEIGHT = 41; /* 8px padding + 24px content + 8px padding + 1px bord
 
 /** Get summary text shown in the collapsed header for a component */
 function getSummaryMeta(component: Component): string | null {
-  const props = component.props as Record<string, unknown>;
+  const props = (component.props ?? {}) as Record<string, unknown>;
 
   switch (component.type) {
     case 'deck-text': {
@@ -98,7 +98,7 @@ function ComponentCard({
 }: ComponentCardProps) {
   const meta = registry.getMeta(component.type);
   const componentName = meta?.name ?? component.type;
-  const gridWidth = (component.props as Record<string, unknown>).gridWidth as number | undefined;
+  const gridWidth = (component.props as Record<string, unknown> | undefined)?.gridWidth as number | undefined;
 
   // Track whether a drag happened so we can suppress click
   const didDragRef = useRef(false);
@@ -264,7 +264,7 @@ function ComponentCard({
                       <div className="component-group-label">{name}</div>
                     )}
                     {properties.map(([key, descriptor]) => {
-                      const currentValue = (component.props as Record<string, unknown>)[key];
+                      const currentValue = ((component.props ?? {}) as Record<string, unknown>)[key];
                       return (
                         <PropertyEditor
                           key={key}

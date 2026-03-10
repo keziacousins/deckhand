@@ -3,7 +3,7 @@
  */
 
 import type { Deck } from '@deckhand/schema';
-import { SLIDE_WIDTH, SLIDE_HEIGHTS } from '@deckhand/schema';
+import { SLIDE_WIDTH, SLIDE_HEIGHTS, generateComponentDocs } from '@deckhand/schema';
 import { tools } from './tools.js';
 
 interface ChatContext {
@@ -95,25 +95,7 @@ function buildBasePrompt(): string {
 
 ## Component Types
 
-There are 3 component primitives:
-
-- **deck-text**: Universal text block — plain or markdown.
-  Props: content (string, required), markdown (boolean — opt-in for GH-flavored markdown rendering; default false), size ("xs"|"sm"|"md"|"lg"|"xl"|"2xl"|"display"), weight ("normal"|"medium"|"semibold"|"bold"), align ("left"|"center"|"right"), transform ("none"|"uppercase"|"lowercase"|"capitalize"), color (CSS color string), gridWidth (0-12, optional)
-  - For headings, use size="display" or "2xl" with weight="bold"
-  - For lists, use markdown=true with content like "- Item 1\n- Item 2"
-  - For simple body text, just set content (no markdown flag needed)
-
-- **deck-image**: Image from assets.
-  Props: assetId (string, required), alt, caption, fit ("contain"|"cover"|"fill"), darken (0-100), blur (0-20), maxWidth (px), maxHeight (px), align ("left"|"center"|"right"), color (hex for SVG fill), gridWidth (0-12, optional)
-  Visual props (shared with container): borderRadius ("none"|"sm"|"md"|"lg"|"full"|"pill"), borderWidth (0-10), borderColor (CSS color), shadow ("none"|"sm"|"md"|"lg"), shadowColor (CSS color)
-
-- **deck-container**: Groups components in a sub-grid or floating layer.
-  Grid mode props: gridWidth (required, 1-12 — sets both span AND internal columns), background (color), padding ("none"|"sm"|"md"|"lg"), gap ("none"|"sm"|"md"|"lg"), alignItems ("start"|"center"|"end"|"stretch"), justifyContent ("start"|"center"|"end"|"space-between")
-  Visual props (shared with image): borderRadius ("none"|"sm"|"md"|"lg"|"full"|"pill"), borderWidth (0-10), borderColor (CSS color), shadow ("none"|"sm"|"md"|"lg"), shadowColor (CSS color)
-  Floating mode props (for absolute positioning outside content flow): anchorX ("left"|"right"), anchorY ("top"|"bottom"), x (offset like "20px" or "5%"), y, width, height (CSS values), opacity (0-100). A container is floating when anchorX or anchorY is set.
-  - To add components inside a container, use the parentId parameter when calling add_component
-  - Containers CANNOT be nested inside other containers (max 2 levels: slide → container → components)
-  - Children inherit the container's internal grid
+${generateComponentDocs()}
 
 ## Slide Style Properties
 

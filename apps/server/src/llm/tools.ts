@@ -35,6 +35,8 @@ import {
   type UpdateFlowSettingsOptions,
   type UpdateDeckSettingsOptions,
   type ThemeTokenUpdates,
+  componentTypes,
+  ComponentSchema,
 } from '@deckhand/schema';
 import { diffDeck, applyPatchesToYDoc } from '@deckhand/sync';
 import * as Y from 'yjs';
@@ -97,12 +99,12 @@ export const tools: Anthropic.Tool[] = [
           properties: {
             type: {
               type: 'string',
-              enum: ['deck-text', 'deck-image', 'deck-container'],
+              enum: ['deck-text', 'deck-image', 'deck-container', 'deck-diagram'],
               description: 'The component type',
             },
             props: {
               type: 'object',
-              description: 'Component properties (varies by type). For deck-text: content (string, required), markdown (boolean, opt-in for GH-flavored markdown), size (xs/sm/md/lg/xl/2xl/display), weight (normal/medium/semibold/bold), align (left/center/right), transform (none/uppercase/lowercase/capitalize), color (CSS color string), gridWidth (0-12, optional). For deck-image: assetId, alt, caption, fit (contain/cover/fill), darken (0-100), blur (0-20), maxWidth (px), maxHeight (px), align, color (SVG fill), gridWidth. For deck-container: gridWidth (required 1-12), background, padding (none/sm/md/lg), gap, alignItems, justifyContent. Floating mode: anchorX (left/right), anchorY (top/bottom), x, y, width, height (CSS values), opacity (0-100). Visual props (image & container): borderRadius (none/sm/md/lg/full/pill), borderWidth (0-10), borderColor (CSS color), shadow (none/sm/md/lg), shadowColor (CSS color).',
+              description: 'Component properties (varies by type). For deck-text: content (string, required), markdown (boolean, opt-in for GH-flavored markdown), size (xs/sm/md/lg/xl/2xl/display), weight (normal/medium/semibold/bold), align (left/center/right), transform (none/uppercase/lowercase/capitalize), color (CSS color string), gridWidth (0-12, optional). For deck-image: assetId, alt, caption, fit (contain/cover/fill), darken (0-100), blur (0-20), maxWidth (px), maxHeight (px), align, color (SVG fill), gridWidth. For deck-container: gridWidth (required 1-12), background, padding (none/sm/md/lg), gap, alignItems, justifyContent. Floating mode: anchorX (left/right), anchorY (top/bottom), x, y, width, height (CSS values), opacity (0-100). For deck-diagram: source (string, required — Mermaid syntax), theme (auto/default/dark/neutral/forest, default auto — inherits slide colors), gridWidth. Visual props (image, container & diagram): borderRadius (none/sm/md/lg/full/pill), borderWidth (0-10), borderColor (CSS color), shadow (none/sm/md/lg), shadowColor (CSS color).',
             },
           },
           required: ['type', 'props'],
@@ -552,6 +554,26 @@ export function executeToolCall(
           position?: number;
           parentId?: string;
         };
+        // Validate component type
+        if (!component?.type || !componentTypes.includes(component.type as any)) {
+          return {
+            success: false,
+            error: `Invalid component type "${component?.type}". Must be one of: ${componentTypes.join(', ')}`,
+          };
+        }
+        // Validate props against schema
+        const parseResult = ComponentSchema.safeParse({
+          id: 'temp',
+          type: component.type,
+          props: component.props || {},
+        });
+        if (!parseResult.success) {
+          const issues = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
+          return {
+            success: false,
+            error: `Invalid props for ${component.type}: ${issues}`,
+          };
+        }
         const options: AddComponentOptions = {
           type: component.type,
           props: component.props,
@@ -570,8 +592,29 @@ export function executeToolCall(
           componentId: string;
           props: Record<string, unknown>;
         };
+        const existingComponent = deck.slides[slideId]?.components.find(c => c.id === componentId);
+        if (!existingComponent) {
+          return {
+            success: false,
+            error: `Component "${componentId}" not found in slide "${slideId}"`,
+          };
+        }
+        // Validate merged props against schema
+        const mergedProps = { ...existingComponent.props, ...props };
+        const parseResult = ComponentSchema.safeParse({
+          id: existingComponent.id,
+          type: existingComponent.type,
+          props: mergedProps,
+        });
+        if (!parseResult.success) {
+          const issues = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
+          return {
+            success: false,
+            error: `Invalid props for ${existingComponent.type}: ${issues}`,
+          };
+        }
         console.log('[update_component] Input props:', JSON.stringify(props));
-        const oldComponent = deck.slides[slideId]?.components.find(c => c.id === componentId);
+        const oldComponent = existingComponent;
         console.log('[update_component] Old component props:', JSON.stringify(oldComponent?.props));
         newDeck = updateComponent(deck, slideId, componentId, props);
         const newComponent = newDeck.slides[slideId]?.components.find(c => c.id === componentId);

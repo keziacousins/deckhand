@@ -4,3 +4,4 @@ export * from './component';
 export * from './theme';
 export * from './richtext';
 export * from './mutations';
+export { generateComponentDocs } from './component-docs';

@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@deckhand/schema": "*",
-    "marked": "^17.0.1"
+    "marked": "^17.0.1",
+    "mermaid": "^11.4.0"
   },
   "devDependencies": {
     "@vitest/browser": "^2.0.0",

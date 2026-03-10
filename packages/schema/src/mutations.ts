@@ -168,6 +168,13 @@ export function addComponent(
   slideId: string,
   options: AddComponentOptions
 ): { deck: Deck; componentId: string } {
+  if (!options.type) {
+    throw new Error('Component type is required');
+  }
+  if (!options.props) {
+    throw new Error('Component props are required');
+  }
+
   const slide = deck.slides[slideId];
   if (!slide) {
     throw new Error(`Slide ${slideId} not found`);

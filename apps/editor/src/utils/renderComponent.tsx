@@ -46,7 +46,7 @@ function propsToAttributes(
   }
 
   // Convert each prop based on meta type
-  for (const [key, value] of Object.entries(component.props)) {
+  for (const [key, value] of Object.entries(component.props ?? {})) {
     if (value === undefined || value === null) continue;
 
     const attrName = camelToKebab(key);
@@ -126,8 +126,11 @@ export function renderComponent(
   component: Component,
   options: RenderComponentOptions = {}
 ): React.ReactElement | null {
+  // Guard against partially-synced components (e.g. during LLM streaming)
+  if (!component.type) return null;
+
   const meta = registry.getMeta(component.type);
-  
+
   // Even without meta, try to render - allows for components not yet in registry
   const attrs = propsToAttributes(component, meta, options);
 

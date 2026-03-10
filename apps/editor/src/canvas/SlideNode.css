@@ -178,6 +178,14 @@
   background: var(--interactive-primary-hover);
 }
 
+/* Per-component source handles — positioned at link badge (bottom-right of component) */
+.slide-node .react-flow__handle.component-handle {
+  width: 10px;
+  height: 10px;
+  background: var(--interactive-primary);
+  border: 2px solid var(--node-bg);
+}
+
 /* Hide handles when zoomed out */
 .react-flow.zoom-overview .slide-node .react-flow__handle {
   opacity: 0;

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
-  getSmoothStepPath,
+  getBezierPath,
   type EdgeProps,
 } from '@xyflow/react';
 
@@ -26,7 +26,7 @@ export const TransitionEdge = memo(function TransitionEdge({
   selected,
   markerEnd,
 }: EdgeProps) {
-  const [edgePath] = getSmoothStepPath({
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -38,22 +38,6 @@ export const TransitionEdge = memo(function TransitionEdge({
   const edgeData = data as TransitionEdgeData | undefined;
   const hasCustomTransition = edgeData?.transition !== undefined;
 
-  // Position badge at fixed distance from source along the initial axis
-  // Smoothstep edges go horizontally from left/right handles, vertically from top/bottom
-  const BADGE_OFFSET = 40;
-  let badgeX = sourceX;
-  let badgeY = sourceY;
-  
-  if (sourcePosition === 'left') {
-    badgeX = sourceX - BADGE_OFFSET;
-  } else if (sourcePosition === 'right') {
-    badgeX = sourceX + BADGE_OFFSET;
-  } else if (sourcePosition === 'top') {
-    badgeY = sourceY - BADGE_OFFSET;
-  } else if (sourcePosition === 'bottom') {
-    badgeY = sourceY + BADGE_OFFSET;
-  }
-
   return (
     <>
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} />
@@ -63,8 +47,9 @@ export const TransitionEdge = memo(function TransitionEdge({
             className={`edge-transition-badge ${selected ? 'selected' : ''}`}
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${badgeX}px, ${badgeY}px)`,
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: 'all',
+              zIndex: 1000,
             }}
             title={`Transition: ${edgeData.transition}`}
           >

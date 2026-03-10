@@ -357,29 +357,57 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
 
   // Navigate to a slide by ID (for component links).
   // Pushes current position onto navHistory so "back" returns here.
-  const navigateToSlide = useCallback((targetSlideId: string, edgeTransition?: TransitionType) => {
+  const navigateToSlide = useCallback((targetSlideId: string, edgeTransition?: TransitionType, edgeDuration?: number) => {
     if (!deck || transition?.isTransitioning) return;
     if (!deck.slides[targetSlideId]) return;
-    
+
     // Save current position so back returns here
     setNavHistory(h => [...h, { start: playOrderStart, index: currentIndex }]);
-    
+
     const targetIndex = playOrder.findIndex(e => e.slideId === targetSlideId);
-    
-    if (targetIndex !== -1) {
-      // Target is in current play order — just jump to it
-      setCurrentIndex(targetIndex);
+    const toIndex = targetIndex !== -1 ? targetIndex : 0;
+
+    // Determine transition to use
+    const type = edgeTransition ?? deck.flow.defaultTransition ?? 'instant';
+    const duration = edgeDuration ?? deck.flow.defaultTransitionDuration ?? DEFAULT_TRANSITION_DURATION;
+
+    const applyNav = () => {
+      if (targetIndex !== -1) {
+        setCurrentIndex(targetIndex);
+      } else {
+        setPlayOrderStart(targetSlideId);
+        setCurrentIndex(0);
+      }
+    };
+
+    if (type === 'instant' || duration === 0) {
+      applyNav();
     } else {
-      // Target not in current play order — recompute from target slide
-      setPlayOrderStart(targetSlideId);
-      setCurrentIndex(0);
+      // Start transition animation
+      setTransition({
+        isTransitioning: true,
+        type,
+        duration,
+        fromIndex: currentIndex,
+        toIndex,
+        phase: 'enter',
+      });
+
+      requestAnimationFrame(() => {
+        setTransition(t => t ? { ...t, phase: 'active' } : null);
+      });
+
+      setTimeout(() => {
+        applyNav();
+        setTransition(null);
+      }, duration * 1000);
     }
   }, [deck, transition, playOrder, currentIndex, playOrderStart]);
 
   const handleComponentClick = useCallback((componentId: string) => {
     const edge = componentLinks.get(componentId);
     if (edge) {
-      navigateToSlide(edge.to, edge.transition);
+      navigateToSlide(edge.to, edge.transition, edge.transitionDuration);
     }
   }, [componentLinks, navigateToSlide]);
 

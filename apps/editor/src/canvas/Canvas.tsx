@@ -20,7 +20,6 @@ import {
 import { SlideNode, type SlideNodeType } from './SlideNode';
 import { StartPointNode, type StartPointNodeType } from './StartPointNode';
 import { TransitionEdge } from './TransitionEdge';
-import { ComponentLinkEdge } from './ComponentLinkEdge';
 import { ContextMenu } from './ContextMenu';
 import { CanvasHeader } from './CanvasHeader';
 import { useSelection } from '../selection';
@@ -36,7 +35,6 @@ const nodeTypes = {
 
 const edgeTypes = {
   transition: TransitionEdge,
-  componentLink: ComponentLinkEdge,
 };
 
 // Union type for all node types
@@ -157,31 +155,46 @@ export function Canvas({
 
   // Derive edges from deck state
   const deckEdges = useMemo((): Edge[] => {
+    // Pick best target handle based on relative position of source and target
+    const pickTargetHandle = (sourceId: string, targetId: string): string => {
+      const sourceSlide = deck.slides[sourceId];
+      const targetSlide = deck.slides[targetId];
+      const startPoint = (deck.flow.startPoints ?? {})[sourceId];
+      const sourcePos = sourceSlide?.position ?? startPoint?.position;
+      const targetPos = targetSlide?.position;
+      if (!sourcePos || !targetPos) return 'target-left';
+      const dx = targetPos.x - sourcePos.x;
+      const dy = targetPos.y - sourcePos.y;
+      // If target is more below than to the side, use top handle
+      return Math.abs(dy) > Math.abs(dx) && dy > 0 ? 'target-top' : 'target-left';
+    };
+
     return Object.values(deck.flow.edges).map((edge) => {
       const source = resolveEdgeSource(deck, edge.from);
-      
+
       if (source?.type === 'component') {
-        // Component link edge — source is the slide, uses standard slide handle
+        // Component link edge — source is the slide, handle is on the component
         return {
           id: edge.id,
           source: source.slideId,
           target: edge.to,
-          sourceHandle: edge.sourceHandle ?? 'source-right',
-          targetHandle: edge.targetHandle,
-          type: 'componentLink',
+          sourceHandle: `link-${source.componentId}`,
+          targetHandle: pickTargetHandle(source.slideId, edge.to),
+          type: 'transition',
           data: {
-            componentId: source.componentId,
+            transition: edge.transition,
+            label: edge.label,
           },
         };
       }
-      
+
       // Slide or start point edge (existing logic)
       return {
         id: edge.id,
         source: edge.from,
         target: edge.to,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle,
+        sourceHandle: edge.sourceHandle ?? 'source-right',
+        targetHandle: pickTargetHandle(edge.from, edge.to),
         type: 'transition',
         data: {
           transition: edge.transition,
@@ -189,32 +202,46 @@ export function Canvas({
         },
       };
     });
-  }, [deck.flow.edges, deck.slides]);
+  }, [deck.flow.edges, deck.slides, deck.flow.startPoints]);
 
   // Use React Flow's state management - initialize with empty, sync via effect
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNodeType>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [edges, setEdges, onEdgesChangeBase] = useEdgesState<Edge>([]);
 
-  // Sync nodes when deck changes - merge to preserve React Flow's internal state
+  // Filter out React Flow's automatic edge additions — we manage edge creation
+  // ourselves via onConnect + deck state. Without this filter, RF adds a duplicate
+  // edge with an RF-generated ID and no data alongside our deck-synced edge.
+  const onEdgesChange = useCallback((changes: Parameters<typeof onEdgesChangeBase>[0]) => {
+    const filtered = changes.filter(c => c.type !== 'add');
+    if (filtered.length > 0) onEdgesChangeBase(filtered);
+  }, [onEdgesChangeBase]);
+
+  // Sync nodes and edges when deck changes.
+  // Nodes must render before edges so dynamic handles (link-*) exist in the DOM.
+  // We sync nodes immediately, then defer edge sync with double rAF to ensure
+  // React has committed the node update and handles are painted.
+  const deckEdgesRef = useRef(deckEdges);
+  deckEdgesRef.current = deckEdges;
+
   useEffect(() => {
     // Set flag to ignore selection changes during this update
     isUpdatingNodesRef.current = true;
-    
+
     setNodes((currentNodes) => {
       const currentById = new Map(currentNodes.map((n) => [n.id, n]));
-      
+
       // Build new array, preserving existing node objects where possible
       const newNodes: CanvasNodeType[] = [];
       for (const deckNode of deckNodes) {
         const current = currentById.get(deckNode.id);
         if (current) {
           // Update existing node in place - only change what's different
-          const needsUpdate = 
+          const needsUpdate =
             current.position.x !== deckNode.position.x ||
             current.position.y !== deckNode.position.y ||
             current.data !== deckNode.data ||
             current.selected !== deckNode.selected;
-          
+
           if (needsUpdate) {
             newNodes.push({ ...current, ...deckNode } as CanvasNodeType);
           } else {
@@ -225,25 +252,30 @@ export function Canvas({
           newNodes.push(deckNode);
         }
       }
-      
+
       return newNodes;
     });
-    
+
     // Clear flag after a microtask to allow React Flow to process the update
     queueMicrotask(() => {
       isUpdatingNodesRef.current = false;
     });
   }, [deckNodes, setNodes]);
 
-  // Sync edges when deck changes - preserve selection state
+  // Sync edges after nodes have rendered their handles.
   useEffect(() => {
-    setEdges((currentEdges) => {
-      const selectedIds = new Set(currentEdges.filter(e => e.selected).map(e => e.id));
-      return deckEdges.map(edge => ({
-        ...edge,
-        selected: selectedIds.has(edge.id),
-      }));
-    });
+    // Double rAF: first lets React commit node update, second ensures
+    // browser has painted so handles are in the DOM for edge resolution.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const currentDeckEdges = deckEdgesRef.current;
+      setEdges((currentEdges) => {
+        const selectedIds = new Set(currentEdges.filter(e => e.selected).map(e => e.id));
+        return currentDeckEdges.map(edge => ({
+          ...edge,
+          selected: selectedIds.has(edge.id),
+        }));
+      });
+    }));
   }, [deckEdges, setEdges]);
 
   const selectedNodes = useMemo(
@@ -896,13 +928,16 @@ export function Canvas({
         zoomOnScroll
         snapToGrid
         snapGrid={[25, 25]}
+        elevateEdgesOnSelect
         defaultEdgeOptions={{
           type: 'transition',
           markerEnd: {
-            type: MarkerType.ArrowClosed,
+            type: MarkerType.Arrow,
             width: 20,
             height: 20,
+            orient: 'auto',
           },
+          style: { zIndex: 1 },
         }}
       >
         <Background

@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import type { Slide, Theme, AspectRatio, Asset, SlidesMap } from '@deckhand/schema';
 import { SLIDE_WIDTH, getSlideHeight, themeToCssProperties } from '@deckhand/schema';
@@ -120,6 +120,47 @@ export const SlideNode = memo(function SlideNode({
   const { selectComponent, selectSlide } = useSelection();
   const assetsJson = JSON.stringify(assets);
   const nodeRef = useRef<HTMLDivElement>(null);
+
+  // Measure linked component positions for per-component source handles
+  // Position each handle at the link badge icon (.component-link-badge)
+  const [compHandles, setCompHandles] = useState<Array<{ id: string; top: number; right: number }>>([]);
+  useLayoutEffect(() => {
+    if (!linkedComponentIds?.length || !nodeRef.current) {
+      if (compHandles.length > 0) setCompHandles([]);
+      return;
+    }
+    const nodeRect = nodeRef.current.getBoundingClientRect();
+    const handles: typeof compHandles = [];
+    // Query all badge elements and match them back to component IDs
+    const badges = nodeRef.current.querySelectorAll('.component-link-badge');
+    for (const badge of badges) {
+      // The badge is inside a .component-link-wrapper with data-component-id
+      const wrapper = badge.closest('[data-component-id]');
+      if (!wrapper) continue;
+      const wrapperId = wrapper.getAttribute('data-component-id')!;
+      // Find which original linked component ID maps to this wrapper
+      const compId = linkedComponentIds.find(id => {
+        const comp = slide.components.find(c => c.id === id);
+        if (!comp) return false;
+        if (!comp.parentId) return comp.id === wrapperId;
+        // Walk up to top-level ancestor
+        let ancestor = slide.components.find(c => c.id === comp.parentId);
+        while (ancestor?.parentId) {
+          ancestor = slide.components.find(c => c.id === ancestor!.parentId);
+        }
+        return (ancestor?.id ?? id) === wrapperId;
+      });
+      if (!compId) continue;
+      const badgeRect = badge.getBoundingClientRect();
+      handles.push({
+        id: compId,
+        top: badgeRect.top - nodeRect.top + badgeRect.height / 2,
+        right: badgeRect.left - nodeRect.left + badgeRect.width / 2,
+      });
+    }
+    setCompHandles(handles);
+  }, [linkedComponentIds, slide.components]);
+
   // Build the set of component IDs that should show a link badge.
   // If a linked component is nested inside a container, bubble the badge
   // up to the top-level ancestor so it doesn't get clipped.
@@ -255,6 +296,23 @@ export const SlideNode = memo(function SlideNode({
           )}
         </deck-slide>
       </div>
+
+      {/* Per-component source handles for linked components */}
+      {/* Always render handles so React Flow can resolve edges immediately; */}
+      {/* useLayoutEffect updates positions once badges are measured. */}
+      {(linkedComponentIds ?? []).map(compId => {
+        const measured = compHandles.find(h => h.id === compId);
+        return (
+          <Handle
+            key={compId}
+            type="source"
+            position={Position.Right}
+            id={`link-${compId}`}
+            className="component-handle"
+            style={measured ? { top: measured.top, left: measured.right } : undefined}
+          />
+        );
+      })}
 
       {/* Source handles - outgoing connections */}
       <Handle type="source" position={Position.Right} id="source-right" />

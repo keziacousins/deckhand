@@ -24,7 +24,7 @@ import { ContextMenu } from './ContextMenu';
 import { CanvasHeader } from './CanvasHeader';
 import { useSelection } from '../selection';
 import type { Deck, Slide, StartPoint } from '@deckhand/schema';
-import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS, resolveEdgeSource, SLIDE_WIDTH, getSlideHeight } from '@deckhand/schema';
+import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS, resolveEdgeSource, SLIDE_WIDTH, getSlideHeight, duplicateSlide as duplicateSlideMutation } from '@deckhand/schema';
 import { findClosestTargetHandle } from './handleUtils';
 import { useAuthAssets } from '../hooks/useAuthAssets';
 
@@ -739,34 +739,14 @@ export function Canvas({
 
   const duplicateSlide = useCallback(
     (slideId: string) => {
-      const original = deck.slides[slideId];
-      if (!original) return;
-
-      const newSlide: Slide = {
-        ...original,
-        id: generateSlideId(),
-        title: `${original.title} (copy)`,
-        position: {
-          x: original.position.x + 50,
-          y: original.position.y + 50,
-        },
-        components: original.components.map((c) => ({
-          ...c,
-          id: `comp-${crypto.randomUUID().slice(0, 8)}`,
-        })),
-      };
-
-      onUpdateDeck((d) => ({
-        ...d,
-        slides: {
-          ...d.slides,
-          [newSlide.id]: newSlide,
-        },
-      }));
-
-      selectSlide(newSlide.id);
+      onUpdateDeck((d) => {
+        const result = duplicateSlideMutation(d, slideId);
+        // Select after next render via microtask so the new slide exists
+        queueMicrotask(() => selectSlide(result.newSlideId));
+        return result.deck;
+      });
     },
-    [deck.slides, onUpdateDeck, selectSlide]
+    [onUpdateDeck, selectSlide]
   );
 
   const deleteSlides = useCallback(

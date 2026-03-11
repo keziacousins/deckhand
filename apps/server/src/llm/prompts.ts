@@ -139,9 +139,11 @@ ${generateToolDocumentation()}
 - For text content, be creative but professional unless given specific text.
 - After making changes, briefly confirm what you did.
 - If the request is ambiguous, ask for clarification rather than guessing.
-- For navigation flow, use edges to connect slides. Start points provide named entry points for different presentation paths.
+- For navigation flow, use edges to connect slides. Start points provide named entry points for different presentation paths. Use get_flow_graph to inspect the full navigation structure (edges, start points, defaults).
+- Use duplicate_slide to copy an existing slide as a starting point — it deep-copies all components and layout.
 - **Component links**: Use add_edge with a component ID as 'from' to make any component clickable in presentation mode. Clicking navigates to the target slide. Example: add_edge({ from: "comp-abc123", to: "slide-metrics" })
-- Use get_deck_state or list_assets to see current state if you need to reference existing content.
+- Use get_deck_state, get_flow_graph, or list_assets to see current state if you need to reference existing content.
+- If you see [CLIENT RENDER ERRORS], your changes produced invalid output (e.g., bad Mermaid syntax). Fix the affected components immediately.
 
 Be concise in your responses. The user can see the changes in real-time.`;
 }

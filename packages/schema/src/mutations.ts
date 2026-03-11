@@ -68,6 +68,63 @@ export function addSlide(deck: Deck, options: AddSlideOptions = {}): { deck: Dec
   return { deck: newDeck, slideId };
 }
 
+/**
+ * Duplicate a slide with all its components, generating new IDs.
+ * Edges are NOT duplicated — the LLM can add them separately.
+ */
+export function duplicateSlide(deck: Deck, slideId: string, options?: { title?: string }): { deck: Deck; newSlideId: string } {
+  const source = deck.slides[slideId];
+  if (!source) {
+    throw new Error(`Slide ${slideId} not found`);
+  }
+
+  const newSlideId = generateId('slide');
+
+  // Build old→new ID map for components so parentId refs are remapped
+  const idMap = new Map<string, string>();
+  for (const comp of source.components) {
+    idMap.set(comp.id, generateId('comp'));
+  }
+
+  const newComponents: Component[] = source.components.map(comp => {
+    const newId = idMap.get(comp.id)!;
+    const cloned = JSON.parse(JSON.stringify(comp)) as Component;
+    cloned.id = newId;
+    if (cloned.parentId && idMap.has(cloned.parentId)) {
+      cloned.parentId = idMap.get(cloned.parentId)!;
+    }
+    return cloned;
+  });
+
+  // Place to the right of the source slide
+  const newPosition = {
+    x: source.position.x + SLIDE_WIDTH + SLIDE_GAP,
+    y: source.position.y,
+  };
+
+  const newSlide: Slide = {
+    id: newSlideId,
+    title: options?.title || `${source.title} (copy)`,
+    components: newComponents,
+    position: newPosition,
+    ...(source.layout ? { layout: JSON.parse(JSON.stringify(source.layout)) } : {}),
+    ...(source.style ? { style: JSON.parse(JSON.stringify(source.style)) } : {}),
+    ...(source.gridColumns !== undefined ? { gridColumns: source.gridColumns } : {}),
+    ...(source.notes ? { notes: source.notes } : {}),
+  };
+
+  return {
+    deck: {
+      ...deck,
+      slides: {
+        ...deck.slides,
+        [newSlideId]: newSlide,
+      },
+    },
+    newSlideId,
+  };
+}
+
 export interface UpdateSlideOptions {
   title?: string;
   notes?: string;

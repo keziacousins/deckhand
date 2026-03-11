@@ -9,6 +9,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { Deck } from '@deckhand/schema';
 import {
   addSlide,
+  duplicateSlide,
   updateSlide,
   deleteSlide,
   addComponent,
@@ -176,6 +177,33 @@ export const tools: Anthropic.Tool[] = [
           description: 'ID of slide to insert after (optional, adds at end if not specified)',
         },
       },
+      required: [],
+    },
+  },
+  {
+    name: 'duplicate_slide',
+    description: 'Create a copy of an existing slide with all its components and styling. Edges are NOT copied — add them separately if needed.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        slideId: {
+          type: 'string',
+          description: 'The ID of the slide to duplicate',
+        },
+        title: {
+          type: 'string',
+          description: 'Optional custom title for the new slide (defaults to "Original Title (copy)")',
+        },
+      },
+      required: ['slideId'],
+    },
+  },
+  {
+    name: 'get_flow_graph',
+    description: 'Get the slide flow graph: all slides (with IDs and titles), edges (connections between slides with triggers and transitions), and start points. Use this to understand the presentation navigation structure before making flow changes.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
       required: [],
     },
   },
@@ -533,6 +561,14 @@ export function executeToolCall(
         break;
       }
 
+      case 'duplicate_slide': {
+        const { slideId, title } = input as { slideId: string; title?: string };
+        const result = duplicateSlide(deck, slideId, title ? { title } : undefined);
+        newDeck = result.deck;
+        resultData = { newSlideId: result.newSlideId, sourceSlideId: slideId };
+        break;
+      }
+
       case 'update_slide': {
         const { slideId, updates } = input as { slideId: string; updates: UpdateSlideOptions };
         newDeck = updateSlide(deck, slideId, updates);
@@ -592,6 +628,13 @@ export function executeToolCall(
           componentId: string;
           props: Record<string, unknown>;
         };
+        // Guard: props must be a plain object (LLM may send a string)
+        if (!props || typeof props !== 'object' || Array.isArray(props)) {
+          return {
+            success: false,
+            error: `props must be an object, got ${typeof props}`,
+          };
+        }
         const existingComponent = deck.slides[slideId]?.components.find(c => c.id === componentId);
         if (!existingComponent) {
           return {
@@ -757,6 +800,39 @@ export function executeToolCall(
       }
 
       // State inspection (read-only, no mutations)
+      case 'get_flow_graph': {
+        const slides = Object.values(deck.slides).map(s => ({
+          id: s.id,
+          title: s.title,
+        }));
+        const edges = Object.values(deck.flow.edges).map(e => ({
+          id: e.id,
+          from: e.from,
+          to: e.to,
+          trigger: e.trigger,
+          label: e.label,
+          transition: e.transition,
+          transitionDuration: e.transitionDuration,
+        }));
+        const startPoints = deck.flow.startPoints
+          ? Object.values(deck.flow.startPoints).map(sp => ({
+              id: sp.id,
+              name: sp.name,
+            }))
+          : [];
+        return {
+          success: true,
+          data: {
+            slides,
+            edges,
+            startPoints,
+            defaultStartPointId: deck.defaultStartPointId || null,
+            defaultTransition: deck.flow.defaultTransition || 'instant',
+            defaultTransitionDuration: deck.flow.defaultTransitionDuration ?? 0.3,
+          },
+        };
+      }
+
       case 'list_assets': {
         const assets = Object.values(deck.assets || {}).map(asset => ({
           id: asset.id,
@@ -867,7 +943,7 @@ export function executeToolCall(
     if (patches.length > 0) {
       ydoc.transact(() => {
         applyPatchesToYDoc(patches, ydoc);
-      });
+      }, 'llm');
     }
 
     return { success: true, data: resultData };

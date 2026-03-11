@@ -6,9 +6,11 @@ import { StartPresentationModal } from '../components/StartPresentationModal';
 import { ShareDialog } from '../components/ShareDialog';
 import { SelectionProvider, useSelection } from '../selection';
 import { useYDoc } from '../sync';
+import { useAuth } from '../auth/AuthProvider';
 import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
 import { useCoverCapture } from '../hooks/useCoverCapture';
 import { useCaptureHandler } from '../hooks/useCaptureHandler';
+import { useRenderErrorReporter } from '../hooks/useRenderErrorReporter';
 import { getDeck, type DeckRole } from '../api/decks';
 import type { Deck } from '@deckhand/schema';
 import '../styles/layout.css';
@@ -22,7 +24,8 @@ interface DeckEditorProps {
 let presentationWindow: Window | null = null;
 
 function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
-  const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage } = useYDoc(deckId);
+  const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage, refreshWsToken } = useYDoc(deckId);
+  const { token: authToken } = useAuth();
   const [inspectorVisible, setInspectorVisible] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
@@ -41,6 +44,13 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
     }).catch(() => {});
   }, [deckId]);
 
+  // When the auth token refreshes, send it to the WebSocket to extend the session
+  useEffect(() => {
+    if (authToken) {
+      refreshWsToken();
+    }
+  }, [authToken, refreshWsToken]);
+
   // Register undo/redo keyboard shortcuts
   useUndoRedoShortcuts({ undo, redo, canUndo, canRedo });
 
@@ -49,6 +59,8 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
 
   // Handle server-initiated slide capture commands (for LLM vision)
   useCaptureHandler({ deckId, onMessage, sendMessage });
+  // Relay component render errors to server so LLM can fix them
+  useRenderErrorReporter({ sendMessage });
   const [isSaving, setIsSaving] = useState(false);
 
   // Mark initial load complete (no auto-selection)

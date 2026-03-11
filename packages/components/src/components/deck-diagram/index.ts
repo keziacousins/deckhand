@@ -244,6 +244,9 @@ export class DeckDiagram extends DeckComponent {
         </style>
         <div class="error">${this.escapeHtml(message)}</div>
       `;
+      this.emitError(message);
+      // Clean up any error elements mermaid may have injected into the document body
+      document.getElementById(id)?.remove();
     });
   }
 }

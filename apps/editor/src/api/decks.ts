@@ -7,6 +7,9 @@ const API_BASE = '/api';
 // Module-level token for auth headers
 let _authToken: string | null = null;
 
+// Callback for requesting a token refresh (set by AuthProvider)
+let _onTokenExpired: (() => Promise<void>) | null = null;
+
 export function setAuthToken(token: string | null) {
   _authToken = token;
 }
@@ -15,16 +18,38 @@ export function getAuthToken(): string | null {
   return _authToken;
 }
 
+/** Register a callback that AuthProvider calls to refresh the token on 401 */
+export function setTokenExpiredHandler(handler: (() => Promise<void>) | null) {
+  _onTokenExpired = handler;
+}
+
 /**
  * Authenticated fetch wrapper. Automatically attaches Authorization header.
- * Use this for all /api/* calls instead of raw fetch().
+ * On 401, attempts one token refresh and retries the request.
  */
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   if (_authToken && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${_authToken}`);
   }
-  return fetch(input, { ...init, headers });
+  const response = await fetch(input, { ...init, headers });
+
+  // On 401, try refreshing the token and retry once
+  if (response.status === 401 && _onTokenExpired) {
+    try {
+      await _onTokenExpired();
+      // Retry with the (now-updated) token
+      const retryHeaders = new Headers(init?.headers);
+      if (_authToken) {
+        retryHeaders.set('Authorization', `Bearer ${_authToken}`);
+      }
+      return fetch(input, { ...init, headers: retryHeaders });
+    } catch {
+      // Refresh failed — return original 401
+    }
+  }
+
+  return response;
 }
 
 export type DeckRole = 'owner' | 'editor' | 'viewer';

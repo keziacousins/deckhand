@@ -45,6 +45,8 @@ interface UseYDocResult {
   onMessage: (type: string, handler: MessageHandler) => () => void;
   /** Send a JSON control message to the server */
   sendMessage: (msg: ControlMessage) => void;
+  /** Send a refreshed auth token to extend the WebSocket session */
+  refreshWsToken: () => void;
 }
 
 // Use same-origin WebSocket - Vite proxies /ws in dev, same-origin in prod
@@ -212,6 +214,10 @@ export function useYDoc(deckId: string): UseYDocResult {
           setStatus('error');
           setError('This deck has been deleted');
           return; // Don't reconnect for deleted deck
+        } else if (event.code === 4003) {
+          // Token expired — reconnect immediately with fresh token
+          console.log('[YDoc] Token expired, reconnecting with fresh token...');
+          reconnectAttemptRef.current = 0;
         }
         
         // Don't reconnect if effect was cleaned up
@@ -385,8 +391,16 @@ export function useYDoc(deckId: string): UseYDocResult {
     }
   }, []);
 
+  // Send a refreshed auth token to the server to extend the WS session
+  const refreshWsToken = useCallback(() => {
+    const token = getAuthToken();
+    if (token && wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'auth:refresh-token', token }));
+    }
+  }, []);
+
   const canUndo = undoCount > 0;
   const canRedo = redoCount > 0;
 
-  return { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage };
+  return { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage, refreshWsToken };
 }

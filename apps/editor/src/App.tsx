@@ -117,10 +117,9 @@ function AppRoutes({
     );
   }
 
-  // Not authenticated — redirect to login
+  // Not authenticated — show login (use hash navigation to avoid full page reload)
   if (!user) {
-    window.location.href = '/login';
-    return null;
+    return <LoginPage />;
   }
 
   // Presentation mode — fullscreen, no app bar

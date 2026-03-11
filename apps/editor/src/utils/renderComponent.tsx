@@ -45,9 +45,19 @@ function propsToAttributes(
     }
   }
 
+  // Guard: if props is not a plain object (e.g. string during partial sync),
+  // skip attribute conversion to avoid numeric indices becoming attribute names
+  const props = component.props;
+  if (!props || typeof props !== 'object' || Array.isArray(props)) {
+    return attrs;
+  }
+
   // Convert each prop based on meta type
-  for (const [key, value] of Object.entries(component.props ?? {})) {
+  for (const [key, value] of Object.entries(props)) {
     if (value === undefined || value === null) continue;
+
+    // Skip numeric keys (corrupted data — e.g. props was a string)
+    if (/^\d+$/.test(key)) continue;
 
     const attrName = camelToKebab(key);
     const propMeta = meta?.properties[key];

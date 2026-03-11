@@ -82,7 +82,7 @@ describe('DeckDiagram', () => {
     expect(diagram).not.toBeNull();
   });
 
-  it('shows error message on mermaid parse failure', async () => {
+  it('shows error message on mermaid render failure', async () => {
     vi.mocked(mermaid.render).mockRejectedValueOnce(new Error('Parse error: invalid syntax'));
 
     const el = document.createElement('deck-diagram') as InstanceType<typeof DeckDiagram>;

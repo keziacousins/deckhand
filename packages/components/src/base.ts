@@ -57,6 +57,24 @@ export abstract class DeckComponent extends HTMLElement {
   }
 
   /**
+   * Emit a render error event.
+   * The editor relays these to the server so the LLM can fix its mistakes.
+   */
+  protected emitError(message: string): void {
+    this.dispatchEvent(
+      new CustomEvent('deck-render-error', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          componentType: (this.constructor as DeckComponentClass).meta.type,
+          componentId: this.getAttribute('data-component-id') || '',
+          error: message,
+        },
+      })
+    );
+  }
+
+  /**
    * Get an attribute as a specific type
    */
   protected getAttr(name: string, defaultValue = ''): string {

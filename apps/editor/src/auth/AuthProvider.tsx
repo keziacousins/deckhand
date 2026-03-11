@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import { setAuthToken } from '../api/decks';
+import { setAuthToken, setTokenExpiredHandler } from '../api/decks';
 
 // Auth config from env vars (with defaults for local dev)
 const PUBLIC_URL = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5178';
@@ -138,6 +138,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tokenRef = useRef<string | null>(null);
+
+  // Track current refresh token for use in callbacks
+  const refreshTokenRef = useRef<string | null>(null);
+
+  // Perform a token refresh with retry (up to 2 attempts)
+  // When clearOnFailure is false, auth state is preserved even if refresh fails
+  // (used for background/scheduled refreshes where transient failures shouldn't log the user out)
+  const doRefresh = useCallback(async (refreshToken: string, retries = 1, clearOnFailure = true): Promise<boolean> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await refreshAccessToken(refreshToken);
+        setAuthToken(result.access_token);
+        setToken(result.access_token);
+        tokenRef.current = result.access_token;
+        setUser(extractUser(result.access_token));
+
+        const newRefresh = result.refresh_token || refreshToken;
+        if (result.refresh_token) {
+          localStorage.setItem('deckhand_refresh_token', newRefresh);
+        }
+        refreshTokenRef.current = newRefresh;
+
+        // Schedule next timer-based refresh
+        scheduleRefresh(result.access_token, newRefresh);
+        return true;
+      } catch {
+        if (attempt < retries) {
+          // Brief pause before retry
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+    }
+    if (clearOnFailure) {
+      // All retries exhausted — clear auth
+      console.warn('[Auth] Token refresh failed after retries, logging out');
+      setToken(null);
+      tokenRef.current = null;
+      setUser(null);
+      setAuthToken(null);
+      localStorage.removeItem('deckhand_refresh_token');
+      refreshTokenRef.current = null;
+    } else {
+      console.warn('[Auth] Token refresh failed, will retry (session preserved)');
+    }
+    return false;
+  }, []);
 
   // Schedule auto-refresh before token expires
   const scheduleRefresh = useCallback((accessToken: string, refreshToken: string) => {
@@ -153,41 +200,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log(`[Auth] Token expires in ${Math.round(expiresIn / 1000)}s, scheduling refresh in ${Math.round(refreshIn / 1000)}s`);
 
     refreshTimerRef.current = setTimeout(async () => {
-      try {
-        const result = await refreshAccessToken(refreshToken);
-        setAuthToken(result.access_token);
-        setToken(result.access_token);
-        setUser(extractUser(result.access_token));
-
-        // Update stored refresh token if rotated
-        if (result.refresh_token) {
-          localStorage.setItem('deckhand_refresh_token', result.refresh_token);
-        }
-
-        // Schedule next refresh
-        scheduleRefresh(
-          result.access_token,
-          result.refresh_token || refreshToken
-        );
-      } catch {
-        // Refresh failed — clear auth state, user needs to re-login
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('deckhand_refresh_token');
+      const ok = await doRefresh(refreshToken, 1, false);
+      if (!ok) {
+        // Refresh failed — retry in 30s (don't clear auth for background refresh)
+        console.log('[Auth] Scheduled refresh failed, retrying in 30s');
+        refreshTimerRef.current = setTimeout(() => {
+          const rt = refreshTokenRef.current || localStorage.getItem('deckhand_refresh_token');
+          if (rt) doRefresh(rt, 1, false);
+        }, 30_000);
       }
     }, refreshIn);
-  }, []);
+  }, [doRefresh]);
 
   // Handle incoming tokens (from callback or refresh)
   const handleTokens = useCallback(
     (accessToken: string, refreshToken?: string) => {
-      // Sync token to API module immediately (before React re-renders)
+      // Sync token to API module and refs immediately (before React re-renders)
       setAuthToken(accessToken);
       setToken(accessToken);
+      tokenRef.current = accessToken;
       setUser(extractUser(accessToken));
 
       if (refreshToken) {
         localStorage.setItem('deckhand_refresh_token', refreshToken);
+        refreshTokenRef.current = refreshToken;
         scheduleRefresh(accessToken, refreshToken);
       }
     },
@@ -301,6 +337,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Redirect to logout via backend proxy
     window.location.href = '/api/auth/end-session';
   }, []);
+
+  // Register 401 interceptor so apiFetch can trigger a refresh
+  useEffect(() => {
+    const handler = async () => {
+      const rt = refreshTokenRef.current || localStorage.getItem('deckhand_refresh_token');
+      if (!rt) throw new Error('No refresh token');
+      const ok = await doRefresh(rt, 0); // single attempt for interceptor
+      if (!ok) throw new Error('Refresh failed');
+    };
+    setTokenExpiredHandler(handler);
+    return () => setTokenExpiredHandler(null);
+  }, [doRefresh]);
+
+  // When tab becomes visible, check token freshness and refresh if needed
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      const currentToken = tokenRef.current;
+      if (!currentToken) return;
+
+      const expiresIn = getTokenExpiresIn(currentToken);
+      // If expired or expiring within 2 minutes, refresh immediately
+      if (expiresIn < 120_000) {
+        const rt = refreshTokenRef.current || localStorage.getItem('deckhand_refresh_token');
+        if (rt) {
+          console.log(`[Auth] Tab visible, token ${expiresIn <= 0 ? 'expired' : 'expiring soon'} — refreshing`);
+          doRefresh(rt, 1, false);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [doRefresh]);
 
   // Cleanup timer on unmount
   useEffect(() => {

@@ -67,12 +67,15 @@ server.on('upgrade', async (request, socket, head) => {
   }
 
   wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request, deckId, role);
+    wss.emit('connection', ws, request, deckId, role, token);
   });
 });
 
+// Grace period after token expiry before closing WS (allows refresh cycle)
+const WS_TOKEN_GRACE_MS = 2 * 60 * 1000; // 2 minutes
+
 // WebSocket connection handling
-wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, role: string) => {
+wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, role: string, initialToken: string) => {
   const readOnly = role === 'viewer';
   console.log(`[WS] Client connecting to deck: ${deckId} (role: ${role}${readOnly ? ', read-only' : ''})`);
 
@@ -96,12 +99,52 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
   const initialState = Y.encodeStateAsUpdate(session.ydoc);
   ws.send(initialState);
 
+  // --- Token expiry tracking ---
+  let tokenExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const scheduleTokenExpiry = (jwtToken: string) => {
+    if (tokenExpiryTimer) clearTimeout(tokenExpiryTimer);
+    try {
+      const payload = JSON.parse(Buffer.from(jwtToken.split('.')[1], 'base64').toString());
+      const exp = payload.exp as number;
+      if (!exp) return;
+      const expiresIn = exp * 1000 - Date.now() + WS_TOKEN_GRACE_MS;
+      if (expiresIn <= 0) {
+        console.log(`[WS] Token already expired for ${deckId}, closing`);
+        ws.close(4003, 'Token expired');
+        return;
+      }
+      tokenExpiryTimer = setTimeout(() => {
+        console.log(`[WS] Token expired (with grace) for ${deckId}, closing connection`);
+        ws.close(4003, 'Token expired');
+      }, expiresIn);
+    } catch {
+      // Can't parse token — don't enforce expiry
+    }
+  };
+
+  // Start expiry timer from the initial connect token
+  scheduleTokenExpiry(initialToken);
+
   // Handle incoming messages from client
   ws.on('message', (data: Buffer, isBinary: boolean) => {
     // JSON control messages (text frames)
     if (!isBinary) {
       try {
         const msg = JSON.parse(data.toString());
+
+        // Handle token refresh — client sends fresh JWT to extend WS session
+        if (msg.type === 'auth:refresh-token' && typeof msg.token === 'string') {
+          verifyToken(msg.token).then(claims => {
+            if (claims) {
+              scheduleTokenExpiry(msg.token);
+            } else {
+              console.warn(`[WS] Invalid refresh token for ${deckId}`);
+            }
+          });
+          return;
+        }
+
         handleControlMessage(deckId, ws, msg);
       } catch (error) {
         console.error(`[WS] Invalid JSON message for ${deckId}:`, error);
@@ -130,6 +173,7 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
 
   // Handle disconnect
   ws.on('close', () => {
+    if (tokenExpiryTimer) clearTimeout(tokenExpiryTimer);
     removeClient(deckId, ws);
 
     // If last client, flush save immediately

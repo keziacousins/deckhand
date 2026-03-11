@@ -147,6 +147,40 @@
   background: var(--bg-surface-hover);
 }
 
+/* LLM Undo/Redo buttons */
+.chat-undo-buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.chat-undo-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.chat-undo-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+}
+
+.chat-undo-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 /* Model selector */
 .chat-model-selector {
   display: flex;

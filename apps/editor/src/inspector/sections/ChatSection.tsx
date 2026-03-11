@@ -33,6 +33,7 @@ type StreamingSegment = MessageSegment;
 interface ChatSession {
   id: string;
   title: string | null;
+  model: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,19 +45,32 @@ interface Model {
 
 type MessageHandler = (msg: { type: string; [key: string]: unknown }) => void;
 
+interface UndoState {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
 interface ChatSectionProps {
   context: InspectorContext;
   deckId: string;
   onMessage: (type: string, handler: MessageHandler) => () => void;
   sendMessage: (msg: { type: string; [key: string]: unknown }) => void;
+  selectedModel: string;
+  onModelChange: (model: string) => void;
+  undoState: UndoState;
+  onUndoStateChange: (state: UndoState) => void;
 }
 
-export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
+export function ChatSection({ context, deckId, onMessage, selectedModel, onModelChange, undoState, onUndoStateChange }: ChatSectionProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [undoingTurn, setUndoingTurn] = useState(false);
+  const { canUndo, canRedo } = undoState;
+  // Track undo/redo actions since last sent message — included as LLM context
+  const pendingUndoActionsRef = useRef<Array<'undo' | 'redo'>>([]);
 
   // Track last known slide/component selection so context survives deselection
   const lastSlideIdRef = useRef<string | null>(null);
@@ -70,7 +84,7 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
   const [streamingSegments, setStreamingSegments] = useState<StreamingSegment[]>([]);
   const streamingSegmentsRef = useRef<StreamingSegment[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('');
+  const setSelectedModel = onModelChange;
   const [modelsLoading, setModelsLoading] = useState(true);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showSessionList, setShowSessionList] = useState(false);
@@ -83,6 +97,9 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isInitialScrollRef = useRef(true);
 
+  // Track whether a session-restored model has been set (to prevent loadModels from overwriting)
+  const sessionModelSetRef = useRef(false);
+
   // Load sessions on mount
   useEffect(() => {
     async function loadSessions() {
@@ -91,9 +108,13 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
         if (response.ok) {
           const data = await response.json();
           setSessions(data.sessions || []);
-          // Auto-select most recent session
+          // Auto-select most recent session and restore its model
           if (data.sessions?.length > 0) {
             setCurrentSessionId(data.sessions[0].id);
+            if (data.sessions[0].model) {
+              sessionModelSetRef.current = true;
+              setSelectedModel(data.sessions[0].model);
+            }
           }
         }
       } catch (err) {
@@ -133,6 +154,7 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
   }, [deckId, currentSessionId]);
 
   // Load available models on mount
+  const defaultModelRef = useRef<string | null>(null);
   useEffect(() => {
     async function loadModels() {
       try {
@@ -140,12 +162,11 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
         if (response.ok) {
           const data = await response.json();
           setModels(data.models || []);
-          // Select default model from API, or first model as fallback
-          if (!selectedModel) {
-            const defaultId = data.defaultModel || data.models?.[0]?.id;
-            if (defaultId) {
-              setSelectedModel(defaultId);
-            }
+          const defaultId = data.defaultModel || data.models?.[0]?.id;
+          defaultModelRef.current = defaultId || null;
+          // Only set default if no session-restored model is active
+          if (!sessionModelSetRef.current && !selectedModel) {
+            setSelectedModel(defaultId || '');
           }
         }
       } catch (err) {
@@ -276,12 +297,23 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
     setCurrentSessionId(null);
     setMessages([]);
     setShowSessionList(false);
-  }, []);
+    onUndoStateChange({ canUndo: false, canRedo: false });
+    // Reset to default model for new chats
+    if (defaultModelRef.current) {
+      setSelectedModel(defaultModelRef.current);
+    }
+  }, [setSelectedModel, onUndoStateChange]);
 
   const selectSession = useCallback((sessionId: string) => {
     setCurrentSessionId(sessionId);
     setShowSessionList(false);
-  }, []);
+    onUndoStateChange({ canUndo: false, canRedo: false });
+    // Restore model selection for this session
+    const session = sessions.find(s => s.id === sessionId);
+    if (session?.model) {
+      setSelectedModel(session.model);
+    }
+  }, [sessions, setSelectedModel, onUndoStateChange]);
 
   const deleteSession = useCallback(async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -329,6 +361,7 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
           message: userMessage.content,
           sessionId: currentSessionId || undefined,
           model: selectedModel || undefined,
+          undoActions: pendingUndoActionsRef.current.length > 0 ? pendingUndoActionsRef.current : undefined,
           context: {
             selectedSlideId: context.selection.slideId || lastSlideIdRef.current,
             selectedComponentId: context.selection.componentId || lastComponentIdRef.current,
@@ -336,8 +369,9 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
         }),
       });
 
+      pendingUndoActionsRef.current = [];
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to send message');
       }
@@ -349,6 +383,7 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
         const newSession: ChatSession = {
           id: data.sessionId,
           title: userMessage.content.slice(0, 50) + (userMessage.content.length > 50 ? '...' : ''),
+          model: selectedModel || null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -373,12 +408,51 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
       setMessages((prev) => [...prev, assistantMessage]);
       setStreamingSegments([]);
       streamingSegmentsRef.current = [];
+
+      // Update LLM undo/redo state
+      if (data.canUndo !== undefined) {
+        onUndoStateChange({ canUndo: data.canUndo, canRedo: data.canRedo });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
   }, [input, isLoading, deckId, currentSessionId, selectedModel, context.selection]);
+
+  const handleUndoTurn = useCallback(async () => {
+    if (!currentSessionId || undoingTurn) return;
+    setUndoingTurn(true);
+    try {
+      const response = await apiFetch(`/api/decks/${deckId}/chat/sessions/${currentSessionId}/undo`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      onUndoStateChange({ canUndo: data.canUndo, canRedo: data.canRedo });
+      if (data.success) pendingUndoActionsRef.current.push('undo');
+    } catch (err) {
+      console.error('Undo failed:', err);
+    } finally {
+      setUndoingTurn(false);
+    }
+  }, [currentSessionId, deckId, undoingTurn, onUndoStateChange]);
+
+  const handleRedoTurn = useCallback(async () => {
+    if (!currentSessionId || undoingTurn) return;
+    setUndoingTurn(true);
+    try {
+      const response = await apiFetch(`/api/decks/${deckId}/chat/sessions/${currentSessionId}/redo`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+      onUndoStateChange({ canUndo: data.canUndo, canRedo: data.canRedo });
+      if (data.success) pendingUndoActionsRef.current.push('redo');
+    } catch (err) {
+      console.error('Redo failed:', err);
+    } finally {
+      setUndoingTurn(false);
+    }
+  }, [currentSessionId, deckId, undoingTurn, onUndoStateChange]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -419,8 +493,36 @@ export function ChatSection({ context, deckId, onMessage }: ChatSectionProps) {
             </svg>
           </button>
           
+          {/* LLM Undo/Redo */}
+          {currentSessionId && (canUndo || canRedo) && (
+            <div className="chat-undo-buttons">
+              <button
+                className="chat-undo-button"
+                onClick={handleUndoTurn}
+                disabled={!canUndo || undoingTurn}
+                title="Undo last AI change"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 7h7a3 3 0 0 1 0 6H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M6 4L3 7l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                className="chat-undo-button"
+                onClick={handleRedoTurn}
+                disabled={!canRedo || undoingTurn}
+                title="Redo AI change"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M13 7H6a3 3 0 0 0 0 6h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M10 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           {/* Model selector */}
-          <button 
+          <button
             className="chat-model-selector"
             onClick={() => setShowModelSelector(!showModelSelector)}
             disabled={modelsLoading}

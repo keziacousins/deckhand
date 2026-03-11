@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { config, isLLMEnabled } from '../config.js';
-import { getOrCreateSession, broadcastYDocState, broadcastJSON, requestCapture } from '../sessions.js';
+import { getOrCreateSession, broadcastYDocState, broadcastJSON, requestCapture, drainRenderErrors, waitForRenderErrors, getLlmUndoManager, undoLlmTurn, redoLlmTurn, getLlmUndoState } from '../sessions.js';
 import { loadYDoc, debouncedSaveYDoc } from '../persistence.js';
 import { yDocToDeck } from '@deckhand/sync';
 import { pool, type ChatMessageRow, type ChatSessionRow } from '../db/schema.js';
@@ -111,6 +111,7 @@ interface ChatRequest {
   message: string;
   sessionId?: string;
   model?: string;
+  undoActions?: Array<'undo' | 'redo'>;
   context?: {
     selectedSlideId?: string;
     selectedComponentId?: string;
@@ -136,6 +137,7 @@ router.get('/:deckId/chat/sessions', requireDeckRole('owner', 'editor', 'viewer'
     const sessions = (rows as ChatSessionRow[]).map(row => ({
       id: row.id,
       title: row.title,
+      model: row.model,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -197,6 +199,47 @@ router.patch('/:deckId/chat/sessions/:sessionId', requireDeckRole('owner', 'edit
     console.error('[Chat] Error updating session:', error);
     res.status(500).json({ error: 'Failed to update chat session' });
   }
+});
+
+// ============================================================================
+// LLM Undo/Redo Endpoints
+// ============================================================================
+
+/**
+ * POST /api/decks/:deckId/chat/sessions/:sessionId/undo
+ * Undo the last LLM turn for this chat session.
+ */
+router.post('/:deckId/chat/sessions/:sessionId/undo', requireDeckRole('owner', 'editor'), async (req, res) => {
+  const { deckId, sessionId } = req.params;
+
+  const didUndo = undoLlmTurn(deckId, sessionId);
+  if (didUndo) {
+    // Broadcast updated YDoc state and persist
+    broadcastYDocState(deckId);
+    const session = getOrCreateSession(deckId);
+    debouncedSaveYDoc(deckId, session.ydoc);
+  }
+
+  const state = getLlmUndoState(deckId, sessionId);
+  res.json({ success: didUndo, ...state });
+});
+
+/**
+ * POST /api/decks/:deckId/chat/sessions/:sessionId/redo
+ * Redo a previously undone LLM turn.
+ */
+router.post('/:deckId/chat/sessions/:sessionId/redo', requireDeckRole('owner', 'editor'), async (req, res) => {
+  const { deckId, sessionId } = req.params;
+
+  const didRedo = redoLlmTurn(deckId, sessionId);
+  if (didRedo) {
+    broadcastYDocState(deckId);
+    const session = getOrCreateSession(deckId);
+    debouncedSaveYDoc(deckId, session.ydoc);
+  }
+
+  const state = getLlmUndoState(deckId, sessionId);
+  res.json({ success: didRedo, ...state });
 });
 
 // ============================================================================
@@ -302,7 +345,7 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
   }
 
   const { deckId } = req.params;
-  const { message, sessionId: providedSessionId, model, context } = req.body as ChatRequest;
+  const { message, sessionId: providedSessionId, model, undoActions, context } = req.body as ChatRequest;
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'Message is required' });
@@ -397,7 +440,19 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
 
     // Add current user message with tool reminder
     const toolReminder = '\n\n[Remember: You MUST call tools to make any changes. Describe your plan briefly, then call the necessary tools.]';
-    messages.push({ role: 'user', content: message + toolReminder });
+
+    // Prepend any pending render errors from previous turns
+    const pendingErrors = drainRenderErrors(deckId);
+    const errorPrefix = pendingErrors.length > 0
+      ? `[CLIENT RENDER ERRORS from your previous changes — fix these first]\n${pendingErrors.map(e => `RENDER ERROR in ${e.componentType} (${e.componentId}): ${e.error}`).join('\n')}\n\n`
+      : '';
+
+    // Notify LLM if user undid/redid previous turns
+    const undoPrefix = undoActions?.length
+      ? `[The user ${undoActions.filter(a => a === 'undo').length ? `undid ${undoActions.filter(a => a === 'undo').length} of your previous change(s)` : ''}${undoActions.includes('undo') && undoActions.includes('redo') ? ' and ' : ''}${undoActions.filter(a => a === 'redo').length ? `redid ${undoActions.filter(a => a === 'redo').length} change(s)` : ''}. The deck state has changed — use get_deck_state if needed.]\n\n`
+      : '';
+
+    messages.push({ role: 'user', content: undoPrefix + errorPrefix + message + toolReminder });
 
     // Use full prompt for first message in session, lighter prompt for continuation
     const systemPrompt = hasHistory
@@ -448,6 +503,11 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       return finalMessage;
     }
 
+    // Initialize LLM undo tracking for this chat session.
+    // stopCapturing() ensures this turn's tool calls form a single undo entry.
+    const llmUndoManager = getLlmUndoManager(deckId, sessionId);
+    llmUndoManager.stopCapturing();
+
     // Agent loop - keep calling until no more tool use
     let response = await streamOnce();
 
@@ -469,7 +529,7 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
         (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
       );
 
-      const toolResultContents: Anthropic.ToolResultBlockParam[] = [];
+      const toolResultContents: (Anthropic.ToolResultBlockParam | Anthropic.TextBlockParam)[] = [];
 
       for (const toolUse of toolUseBlocks) {
         console.log(`[Chat] Tool call: ${toolUse.name}`, toolUse.input);
@@ -560,6 +620,23 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       debouncedSaveYDoc(deckId, session.ydoc);
       broadcastYDocState(deckId);
 
+      // Check for client-side render errors after component-mutating tools
+      const RENDER_RELEVANT_TOOLS = new Set(['add_component', 'update_component']);
+      const hasRenderRelevantTool = toolUseBlocks.some(t => RENDER_RELEVANT_TOOLS.has(t.name));
+      const renderErrors = hasRenderRelevantTool
+        ? await waitForRenderErrors(deckId, 300)
+        : drainRenderErrors(deckId);
+
+      if (renderErrors.length > 0) {
+        const errorSummary = renderErrors.map(e =>
+          `RENDER ERROR in ${e.componentType} (${e.componentId}): ${e.error}`
+        ).join('\n');
+        toolResultContents.push({
+          type: 'text' as const,
+          text: `[CLIENT RENDER ERRORS — fix these components]\n${errorSummary}`,
+        });
+      }
+
       // Continue conversation with tool results
       messages.push({ role: 'assistant', content: assistantContent });
       messages.push({ role: 'user', content: toolResultContents });
@@ -604,10 +681,11 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       return value;
     });
     await pool.query(
-      'UPDATE chat_sessions SET api_messages = $1, updated_at = NOW() WHERE id = $2',
-      [apiMessagesJson, sessionId]
+      'UPDATE chat_sessions SET api_messages = $1, model = $2, updated_at = NOW() WHERE id = $3',
+      [apiMessagesJson, modelId, sessionId]
     );
 
+    const undoState = getLlmUndoState(deckId, sessionId);
     res.json({
       id: assistantMessageId,
       sessionId,
@@ -616,6 +694,8 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       model: modelId,
       toolResults,
       segments,
+      canUndo: undoState.canUndo,
+      canRedo: undoState.canRedo,
     });
 
   } catch (error) {

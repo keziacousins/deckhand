@@ -39,6 +39,8 @@ interface InspectorProps {
 export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOnly, showGrid, onToggleShowGrid, onMessage, sendMessage }: InspectorProps) {
   const { selection, selectSlide, selectComponent, clearSelection } = useSelection();
   const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
+  const [chatModel, setChatModel] = useState<string>('');
+  const [chatUndoState, setChatUndoState] = useState<{ canUndo: boolean; canRedo: boolean }>({ canUndo: false, canRedo: false });
   const [showComponentBrowser, setShowComponentBrowser] = useState(false);
   const [addButtonDropActive, setAddButtonDropActive] = useState(false);
 
@@ -705,7 +707,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOn
           )}
 
           {activeTab === 'chat' && (
-            <ChatSection context={context} deckId={deckId} onMessage={onMessage} sendMessage={sendMessage} />
+            <ChatSection context={context} deckId={deckId} onMessage={onMessage} sendMessage={sendMessage} selectedModel={chatModel} onModelChange={setChatModel} undoState={chatUndoState} onUndoStateChange={setChatUndoState} />
           )}
         </div>
 

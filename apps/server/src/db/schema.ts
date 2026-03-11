@@ -106,6 +106,7 @@ export async function initSchema(): Promise<void> {
 
     -- Migrations
     ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS api_messages TEXT;
+    ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS model TEXT;
     ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS segments TEXT;
   `);
 
@@ -196,6 +197,7 @@ export interface ChatSessionRow {
   id: string;
   deck_id: string;
   title: string | null;
+  model: string | null;
   created_at: string;
   updated_at: string;
 }

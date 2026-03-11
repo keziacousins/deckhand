@@ -5,10 +5,20 @@
 import * as Y from 'yjs';
 import type { WebSocket } from 'ws';
 
+interface RenderError {
+  componentType: string;
+  componentId: string;
+  error: string;
+  timestamp: number;
+}
+
 interface Session {
   ydoc: Y.Doc;
   clients: Set<WebSocket>;
   lastActivity: Date;
+  renderErrors: RenderError[];
+  /** Per-chat-session LLM undo managers. Keyed by chat session ID. */
+  llmUndoManagers: Map<string, Y.UndoManager>;
 }
 
 // In-memory map of active sessions
@@ -24,6 +34,8 @@ export function getOrCreateSession(deckId: string): Session {
       ydoc: new Y.Doc(),
       clients: new Set(),
       lastActivity: new Date(),
+      renderErrors: [],
+      llmUndoManagers: new Map(),
     };
     sessions.set(deckId, session);
   }
@@ -66,6 +78,8 @@ export function removeClient(deckId: string, ws: WebSocket): void {
       setTimeout(() => {
         const current = sessions.get(deckId);
         if (current && current.clients.size === 0) {
+          for (const um of current.llmUndoManagers.values()) um.destroy();
+          current.llmUndoManagers.clear();
           sessions.delete(deckId);
           console.log(`[Session] Cleaned up ${deckId}`);
         }
@@ -135,6 +149,71 @@ export function sendJSON(ws: WebSocket, message: object): void {
   }
 }
 
+// ============================================================================
+// LLM Undo Management
+// ============================================================================
+
+/** Origin used for all LLM transactions — tracked by the LLM UndoManager. */
+export const LLM_ORIGIN = 'llm';
+
+/**
+ * Get or create an LLM UndoManager for a specific chat session.
+ * Each chat session gets its own undo stack so "undo last turn" is per-conversation.
+ */
+export function getLlmUndoManager(deckId: string, chatSessionId: string): Y.UndoManager {
+  const session = sessions.get(deckId);
+  if (!session) throw new Error(`No active session for deck ${deckId}`);
+
+  let um = session.llmUndoManagers.get(chatSessionId);
+  if (!um) {
+    const root = session.ydoc.getMap('root');
+    um = new Y.UndoManager([root], {
+      trackedOrigins: new Set([LLM_ORIGIN]),
+      // Each chat turn calls stopCapturing() to create a discrete entry
+      captureTimeout: 0,
+    });
+    session.llmUndoManagers.set(chatSessionId, um);
+  }
+  return um;
+}
+
+/**
+ * Undo the last LLM turn for a chat session.
+ * Returns true if an undo was performed.
+ */
+export function undoLlmTurn(deckId: string, chatSessionId: string): boolean {
+  const session = sessions.get(deckId);
+  if (!session) return false;
+  const um = session.llmUndoManagers.get(chatSessionId);
+  if (!um || um.undoStack.length === 0) return false;
+  um.undo();
+  return true;
+}
+
+/**
+ * Redo a previously undone LLM turn for a chat session.
+ * Returns true if a redo was performed.
+ */
+export function redoLlmTurn(deckId: string, chatSessionId: string): boolean {
+  const session = sessions.get(deckId);
+  if (!session) return false;
+  const um = session.llmUndoManagers.get(chatSessionId);
+  if (!um || um.redoStack.length === 0) return false;
+  um.redo();
+  return true;
+}
+
+/**
+ * Get undo/redo stack sizes for a chat session.
+ */
+export function getLlmUndoState(deckId: string, chatSessionId: string): { canUndo: boolean; canRedo: boolean } {
+  const session = sessions.get(deckId);
+  if (!session) return { canUndo: false, canRedo: false };
+  const um = session.llmUndoManagers.get(chatSessionId);
+  if (!um) return { canUndo: false, canRedo: false };
+  return { canUndo: um.undoStack.length > 0, canRedo: um.redoStack.length > 0 };
+}
+
 /**
  * Force-close all clients and remove a session.
  * Used when deleting a deck — owner has authority to end all connections.
@@ -147,6 +226,9 @@ export function closeSession(deckId: string): void {
   }
 
   console.log(`[Session] Closing session for ${deckId} — ${session.clients.size} client(s)`);
+  // Destroy LLM undo managers
+  for (const um of session.llmUndoManagers.values()) um.destroy();
+  session.llmUndoManagers.clear();
   // Send a control message before closing — Vite's WS proxy swallows close codes,
   // so the client needs to detect deletion from a message instead.
   broadcastJSON(deckId, { type: 'deck-deleted' });
@@ -208,6 +290,21 @@ export function handleControlMessage(_deckId: string, _ws: WebSocket, msg: Contr
       }
       break;
     }
+    case 'render-error': {
+      const session = sessions.get(_deckId);
+      if (session) {
+        const componentId = msg.componentId as string;
+        // Dedup: replace any existing error for the same component
+        session.renderErrors = session.renderErrors.filter(e => e.componentId !== componentId);
+        session.renderErrors.push({
+          componentType: msg.componentType as string,
+          componentId,
+          error: msg.error as string,
+          timestamp: Date.now(),
+        });
+      }
+      break;
+    }
     default:
       console.warn(`[Session] Unknown control message type: ${msg.type}`);
   }
@@ -240,6 +337,39 @@ export async function requestCapture(deckId: string, slideId: string): Promise<s
       requestId,
       slideId,
     });
+  });
+}
+
+/**
+ * Drain all pending render errors for a deck (returns and clears the queue).
+ */
+export function drainRenderErrors(deckId: string): RenderError[] {
+  const session = sessions.get(deckId);
+  if (!session || session.renderErrors.length === 0) return [];
+  const errors = session.renderErrors;
+  session.renderErrors = [];
+  return errors;
+}
+
+/**
+ * Wait up to timeoutMs for render errors to arrive, then drain.
+ */
+export function waitForRenderErrors(deckId: string, timeoutMs: number): Promise<RenderError[]> {
+  return new Promise((resolve) => {
+    // Check immediately
+    const immediate = drainRenderErrors(deckId);
+    if (immediate.length > 0) {
+      // Wait a bit more in case additional errors are coming
+      setTimeout(() => {
+        const more = drainRenderErrors(deckId);
+        resolve([...immediate, ...more]);
+      }, 100);
+      return;
+    }
+    // Wait for the timeout, then drain whatever arrived
+    setTimeout(() => {
+      resolve(drainRenderErrors(deckId));
+    }, timeoutMs);
   });
 }
 

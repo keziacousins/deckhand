@@ -214,4 +214,35 @@ describe('DeckText', () => {
     expect(el.shadowRoot?.querySelector('div.markdown')).not.toBeNull();
     expect(el.shadowRoot?.querySelector('strong')?.textContent).toBe('Bold');
   });
+
+  it('renders inline math with KaTeX', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('markdown', 'true');
+    el.setAttribute('content', 'Energy is $E=mc^2$ right?');
+    document.body.appendChild(el);
+
+    const katex = el.shadowRoot?.querySelector('.katex');
+    expect(katex).not.toBeNull();
+    // Should contain the math inline, not as a block
+    expect(el.shadowRoot?.querySelector('.math-inline')).not.toBeNull();
+  });
+
+  it('renders block math with KaTeX', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('markdown', 'true');
+    el.setAttribute('content', '$$\\sum_{i=1}^n x_i$$');
+    document.body.appendChild(el);
+
+    const katex = el.shadowRoot?.querySelector('.katex');
+    expect(katex).not.toBeNull();
+    expect(el.shadowRoot?.querySelector('.math-block')).not.toBeNull();
+  });
+
+  it('does not render math in plain text mode', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('content', '$E=mc^2$');
+    document.body.appendChild(el);
+
+    expect(el.shadowRoot?.querySelector('.katex')).toBeNull();
+  });
 });

@@ -13,9 +13,22 @@ import type { ComponentMeta } from '../../types';
 import { PropertyGroups, CommonProperties } from '../../types';
 import { marked } from 'marked';
 import { styles } from './styles';
+import { mathExtension } from './math';
+import { katexFontFaces, katexLayoutCss } from './katex-styles';
 
 // Configure marked for synchronous, inline-friendly rendering
 marked.setOptions({ async: false, gfm: true, breaks: true });
+marked.use(mathExtension);
+
+// Inject KaTeX @font-face rules into document head once (fonts are global, not shadow-scoped)
+let katexFontsInjected = false;
+function ensureKatexFonts(): void {
+  if (katexFontsInjected || typeof document === 'undefined') return;
+  katexFontsInjected = true;
+  const style = document.createElement('style');
+  style.textContent = katexFontFaces;
+  document.head.appendChild(style);
+}
 
 export class DeckText extends DeckComponent {
   static meta: ComponentMeta = {
@@ -173,7 +186,9 @@ export class DeckText extends DeckComponent {
     `;
 
     let bodyHtml: string;
+    const hasMath = isMarkdown && (content.includes('$'));
     if (isMarkdown) {
+      if (hasMath) ensureKatexFonts();
       const mdClasses = `text markdown${tableStriped ? ' table-striped' : ''}`;
       bodyHtml = `<div class="${mdClasses}"${editable ? ' contenteditable="true" data-placeholder="Enter markdown..."' : ''}>${marked.parse(content) as string}</div>`;
     } else {
@@ -195,6 +210,7 @@ export class DeckText extends DeckComponent {
       <style>
         ${this.getBaseStyles()}
         ${styles}
+        ${hasMath ? katexLayoutCss : ''}
         ${dynamicStyles}
         ${linkedStyles}
       </style>

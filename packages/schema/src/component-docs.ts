@@ -32,10 +32,11 @@ const componentDocMeta: Record<string, ComponentDocMeta> = {
       'For headings, use size="display" or "2xl" with weight="bold"',
       'For lists, use markdown=true with content like "- Item 1\\n- Item 2"',
       'For simple body text, just set content (no markdown flag needed)',
+      'For math equations, use markdown=true with LaTeX: $E=mc^2$ (inline) or $$\\\\sum_{i=1}^n x_i$$ (block). Rendered via KaTeX.',
     ],
     propDescriptions: {
-      content: 'text content',
-      markdown: 'opt-in for GH-flavored markdown rendering; default false',
+      content: 'text content (supports LaTeX math with $...$ and $$...$$ when markdown=true)',
+      markdown: 'opt-in for GH-flavored markdown rendering with LaTeX math support; default false',
       size: 'text size preset',
       weight: 'font weight',
       align: 'text alignment',

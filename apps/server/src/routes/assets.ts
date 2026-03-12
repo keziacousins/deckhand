@@ -7,9 +7,61 @@ import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
+import sharp from 'sharp';
 import { pool, type AssetRow } from '../db/schema.js';
 import { uploadObject, getObject, deleteObject, deleteByPrefix } from '../storage.js';
 import { requireDeckRole } from '../middleware/permissions.js';
+
+// Image proxy sizes
+const THUMBNAIL_MAX = 200;  // Small thumbnail for asset tab
+const PREVIEW_MAX = 800;    // Mid-size for canvas at low zoom
+
+/** Process an image upload: extract dimensions, generate thumbnail + preview. */
+async function processImage(buffer: Buffer, mimeType: string): Promise<{
+  width: number;
+  height: number;
+  thumbnail: Buffer;
+  preview: Buffer;
+} | null> {
+  // Only process raster images (not SVG, audio, video)
+  const rasterTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!rasterTypes.includes(mimeType)) return null;
+
+  try {
+    const metadata = await sharp(buffer).metadata();
+    if (!metadata.width || !metadata.height) return null;
+
+    // Thumbnail — small WebP for asset tab
+    const thumbnail = await sharp(buffer)
+      .rotate() // auto-orient from EXIF
+      .resize(THUMBNAIL_MAX, THUMBNAIL_MAX, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 75 })
+      .toBuffer();
+
+    // Preview — mid-size WebP for canvas
+    const preview = await sharp(buffer)
+      .rotate()
+      .resize(PREVIEW_MAX, PREVIEW_MAX, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    return {
+      width: metadata.width,
+      height: metadata.height,
+      thumbnail,
+      preview,
+    };
+  } catch (err) {
+    console.warn('[Assets] Image processing failed, storing original only:', err);
+    return null;
+  }
+}
 
 const router = Router();
 
@@ -67,6 +119,9 @@ router.get('/decks/:deckId/assets', requireDeckRole('owner', 'editor', 'viewer')
       thumbnailUrl: row.has_thumbnail
         ? `/api/decks/${deckId}/assets/${row.id}/thumbnail`
         : undefined,
+      previewUrl: row.has_thumbnail
+        ? `/api/decks/${deckId}/assets/${row.id}/preview`
+        : undefined,
     }));
 
     res.json(assets);
@@ -98,18 +153,32 @@ router.post(
       const ext = path.extname(file.originalname).toLowerCase();
       const storageKey = `${deckId}/${assetId}${ext}`;
 
-      // Upload to S3
+      // Upload original to S3
       await uploadObject(storageKey, file.buffer, file.mimetype);
 
-      // Get image dimensions if applicable
+      // Process image: extract dimensions, generate thumbnail + preview
+      const processed = await processImage(file.buffer, file.mimetype);
       let width: number | null = null;
       let height: number | null = null;
+      let hasThumbnail = false;
+
+      if (processed) {
+        width = processed.width;
+        height = processed.height;
+        hasThumbnail = true;
+
+        // Upload thumbnail and preview variants
+        await Promise.all([
+          uploadObject(`${deckId}/${assetId}_thumb.webp`, processed.thumbnail, 'image/webp'),
+          uploadObject(`${deckId}/${assetId}_preview.webp`, processed.preview, 'image/webp'),
+        ]);
+      }
 
       // Insert into database
       await pool.query(
         `INSERT INTO assets (id, deck_id, filename, mime_type, size, width, height, has_thumbnail, storage_key)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)`,
-        [assetId, deckId, file.originalname, file.mimetype, file.size, width, height, storageKey]
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [assetId, deckId, file.originalname, file.mimetype, file.size, width, height, hasThumbnail, storageKey]
       );
 
       const asset = {
@@ -120,11 +189,13 @@ router.post(
         size: file.size,
         width,
         height,
-        hasThumbnail: false,
+        hasThumbnail,
         url: `/api/decks/${deckId}/assets/${assetId}`,
+        thumbnailUrl: hasThumbnail ? `/api/decks/${deckId}/assets/${assetId}/thumbnail` : undefined,
+        previewUrl: hasThumbnail ? `/api/decks/${deckId}/assets/${assetId}/preview` : undefined,
       };
 
-      console.log(`[Assets] Uploaded ${file.originalname} as ${assetId} for deck ${deckId}`);
+      console.log(`[Assets] Uploaded ${file.originalname} as ${assetId} for deck ${deckId}${hasThumbnail ? ' (with thumbnail+preview)' : ''}`);
       res.status(201).json(asset);
     } catch (error) {
       console.error('[Assets] Error uploading asset:', error);
@@ -163,6 +234,66 @@ router.get('/decks/:deckId/assets/:assetId', requireDeckRole('owner', 'editor', 
 });
 
 /**
+ * GET /api/decks/:deckId/assets/:assetId/thumbnail
+ * Serve the small thumbnail variant (200px WebP)
+ */
+router.get('/decks/:deckId/assets/:assetId/thumbnail', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
+  const { deckId, assetId } = req.params;
+
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
+      [assetId, deckId]
+    );
+    const row = rows[0] as AssetRow | undefined;
+
+    if (!row || !row.has_thumbnail) {
+      res.status(404).json({ error: 'Thumbnail not found' });
+      return;
+    }
+
+    const thumbKey = `${deckId}/${assetId}_thumb.webp`;
+    const { body } = await getObject(thumbKey);
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    body.pipe(res);
+  } catch (error) {
+    console.error('[Assets] Error serving thumbnail:', error);
+    res.status(500).json({ error: 'Failed to serve thumbnail' });
+  }
+});
+
+/**
+ * GET /api/decks/:deckId/assets/:assetId/preview
+ * Serve the mid-size preview variant (800px WebP)
+ */
+router.get('/decks/:deckId/assets/:assetId/preview', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
+  const { deckId, assetId } = req.params;
+
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
+      [assetId, deckId]
+    );
+    const row = rows[0] as AssetRow | undefined;
+
+    if (!row || !row.has_thumbnail) {
+      res.status(404).json({ error: 'Preview not found' });
+      return;
+    }
+
+    const previewKey = `${deckId}/${assetId}_preview.webp`;
+    const { body } = await getObject(previewKey);
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    body.pipe(res);
+  } catch (error) {
+    console.error('[Assets] Error serving preview:', error);
+    res.status(500).json({ error: 'Failed to serve preview' });
+  }
+});
+
+/**
  * DELETE /api/decks/:deckId/assets/:assetId
  * Delete an asset
  */
@@ -181,8 +312,13 @@ router.delete('/decks/:deckId/assets/:assetId', requireDeckRole('owner', 'editor
       return;
     }
 
-    // Delete from S3
-    await deleteObject(row.storage_key);
+    // Delete from S3 (original + any variants)
+    const deletions = [deleteObject(row.storage_key)];
+    if (row.has_thumbnail) {
+      deletions.push(deleteObject(`${deckId}/${assetId}_thumb.webp`));
+      deletions.push(deleteObject(`${deckId}/${assetId}_preview.webp`));
+    }
+    await Promise.all(deletions);
 
     // Delete from database
     await pool.query('DELETE FROM assets WHERE id = $1 AND deck_id = $2', [assetId, deckId]);

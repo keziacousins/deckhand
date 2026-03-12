@@ -14,6 +14,7 @@ import {
 } from '../db/decks.js';
 import { createEmptyDeck, generateDeckId, validateDeck } from '@deckhand/schema';
 import { closeSession } from '../sessions.js';
+import { deleteByPrefix } from '../storage.js';
 import { getAuthUser } from '../middleware/auth.js';
 import { requireDeckRole } from '../middleware/permissions.js';
 
@@ -157,10 +158,15 @@ decksRouter.patch('/:id', requireDeckRole('owner', 'editor'), async (req, res) =
  */
 decksRouter.delete('/:id', requireDeckRole('owner'), async (req, res) => {
   try {
-    // Force-close any active sessions — owner is deleting the deck
-    closeSession(req.params.id);
+    const deckId = req.params.id;
 
-    const deleted = await deleteDeck(req.params.id);
+    // Force-close any active sessions — owner is deleting the deck
+    closeSession(deckId);
+
+    // Delete all S3 objects for this deck (assets, covers, variants)
+    await deleteByPrefix(`${deckId}/`);
+
+    const deleted = await deleteDeck(deckId);
     if (!deleted) {
       return res.status(404).json({ error: 'Deck not found' });
     }

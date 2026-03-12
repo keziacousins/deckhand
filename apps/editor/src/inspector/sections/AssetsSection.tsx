@@ -55,6 +55,9 @@ export function AssetsSection({ context, stickyIndex = 0 }: InspectorSectionProp
           size: asset.size,
           url: asset.url,
           uploaded: new Date().toISOString(),
+          ...(asset.hasThumbnail && { hasThumbnail: true }),
+          ...(asset.width != null && { width: asset.width }),
+          ...(asset.height != null && { height: asset.height }),
         } as Asset,
       });
 
@@ -197,7 +200,7 @@ export function AssetsSection({ context, stickyIndex = 0 }: InspectorSectionProp
               <div key={asset.id} className="asset-item" title={asset.filename}>
                 <div className="asset-thumbnail">
                   {asset.mimeType?.startsWith('image/') ? (
-                    <AuthImage src={asset.url} alt={asset.filename} />
+                    <AuthImage src={asset.hasThumbnail ? `${asset.url}/thumbnail` : asset.url} alt={asset.filename} />
                   ) : (
                     <div className="asset-icon">
                       {asset.mimeType?.startsWith('audio/') ? (

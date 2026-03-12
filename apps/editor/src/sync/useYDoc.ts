@@ -12,7 +12,7 @@ import * as Y from 'yjs';
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
 import { yDocToDeck, diffDeck, applyPatchesToYDoc } from '@deckhand/sync';
 import type { Deck } from '@deckhand/schema';
-import { getAuthToken } from '../api/decks';
+import { getAuthToken, tryRefreshToken } from '../api/decks';
 
 // Binary message type prefixes (first byte)
 const MSG_YDOC = 0;
@@ -263,16 +263,30 @@ export function useYDoc(deckId: string): UseYDocResult {
           console.log('[YDoc] Token expired, reconnecting with fresh token...');
           reconnectAttemptRef.current = 0;
         }
-        
+
         // Don't reconnect if effect was cleaned up
         if (aborted) return;
 
-        // Schedule reconnect with backoff
+        // Abnormal close (1006) without ever connecting often means the WS
+        // upgrade was rejected (401/403). Try refreshing the token before
+        // reconnecting so we don't loop with a stale token.
+        const needsTokenRefresh = event.code === 1006 && !event.wasClean;
+
         reconnectAttemptRef.current++;
         const delay = getReconnectDelay();
         console.log(`[YDoc] Disconnected, reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current})`);
 
-        reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = setTimeout(async () => {
+          if (aborted) return;
+          if (needsTokenRefresh) {
+            console.log('[YDoc] Attempting token refresh before reconnect...');
+            const refreshed = await tryRefreshToken();
+            if (!refreshed && reconnectAttemptRef.current >= 3) {
+              setStatus('error');
+              setError('Authentication failed — please reload the page');
+              return;
+            }
+          }
           connect();
         }, delay);
       };

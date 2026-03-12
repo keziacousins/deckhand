@@ -23,6 +23,17 @@ export function setTokenExpiredHandler(handler: (() => Promise<void>) | null) {
   _onTokenExpired = handler;
 }
 
+/** Attempt to refresh the auth token. Returns true if successful. */
+export async function tryRefreshToken(): Promise<boolean> {
+  if (!_onTokenExpired) return false;
+  try {
+    await _onTokenExpired();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Authenticated fetch wrapper. Automatically attaches Authorization header.
  * On 401, attempts one token refresh and retries the request.

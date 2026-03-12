@@ -112,8 +112,9 @@ export function Canvas({
   } | null>(null);
 
   // Resolve asset URLs to authenticated blob URLs for web components
+  // Use 'preview' (800px WebP) on canvas for performance; full-res in presentation
   const rawAssets = useMemo(() => deck.assets ?? {}, [deck.assets]);
-  const assets = useAuthAssets(rawAssets);
+  const assets = useAuthAssets(rawAssets, 'preview');
 
   // Derive slide nodes from deck state
   const slideNodes = useMemo(() => {

@@ -122,6 +122,9 @@ export const AssetSchema = z.object({
   size: z.number(),
   url: z.string(),
   uploaded: z.string().datetime(),
+  hasThumbnail: z.boolean().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
 });
 
 export type Asset = z.infer<typeof AssetSchema>;

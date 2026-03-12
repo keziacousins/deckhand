@@ -16,6 +16,7 @@ import {
   CURSOR_BURST_COUNT,
   CURSOR_BURST_RESET_MS,
   CURSOR_FADE_TIMEOUT_MS,
+  CURSOR_REMOVE_TIMEOUT_MS,
   VIEWPORT_BROADCAST_INTERVAL_MS,
   VIEWPORT_BURST_INTERVAL_MS,
   VIEWPORT_BURST_COUNT,
@@ -94,6 +95,7 @@ export function usePresence({
       cursor: null,
       viewport: null,
       followingUserId: localFollowingUserId,
+      cursorUpdatedAt: 0,
       lastUpdate: Date.now(),
     });
 
@@ -109,6 +111,8 @@ export function usePresence({
   }, [awareness, enabled, localFollowingUserId, updateLocalState]);
 
   // Re-announce periodically (handles server restarts / stale state)
+  // Only refreshes user info and lastUpdate — NOT cursorUpdatedAt, so idle
+  // cursors still fade out on remote clients.
   useEffect(() => {
     if (!awareness || !enabled) return;
     const interval = setInterval(() => {
@@ -138,8 +142,11 @@ export function usePresence({
         if (clientId === localClientId) return;
         if (!state.user) return;
 
-        const lastUpdate = state.lastUpdate ?? 0;
-        const isIdle = now - lastUpdate > CURSOR_FADE_TIMEOUT_MS;
+        // cursorUpdatedAt tracks actual cursor movement (not re-announce),
+        // so idle detection works even while the user stays connected.
+        const cursorUpdatedAt = state.cursorUpdatedAt ?? 0;
+        const cursorAge = now - cursorUpdatedAt;
+        const isCursorIdle = cursorUpdatedAt === 0 || cursorAge > CURSOR_REMOVE_TIMEOUT_MS;
 
         users.push({
           clientId,
@@ -149,9 +156,10 @@ export function usePresence({
             color: state.user.color ?? getUserColor(`user-${clientId}`),
             avatarUrl: state.user.avatarUrl,
           },
-          cursor: isIdle ? null : (state.cursor ?? null),
+          cursor: isCursorIdle ? null : (state.cursor ?? null),
           viewport: state.viewport ?? null,
-          lastUpdate,
+          // Pass cursorUpdatedAt so RemoteCursor can fade based on mouse inactivity
+          lastUpdate: cursorUpdatedAt,
           followingUserId: state.followingUserId ?? null,
         });
       });
@@ -186,7 +194,7 @@ export function usePresence({
     const interval = inBurst ? CURSOR_BURST_INTERVAL_MS : CURSOR_BROADCAST_INTERVAL_MS;
 
     if (now - lastCursorBroadcastRef.current >= interval) {
-      updateLocalState({ cursor: position });
+      updateLocalState({ cursor: position, cursorUpdatedAt: now });
       lastCursorBroadcastRef.current = now;
       cursorBurstCountRef.current++;
       if (cursorTimeoutRef.current) {
@@ -196,8 +204,9 @@ export function usePresence({
     } else if (!cursorTimeoutRef.current) {
       const remaining = interval - (now - lastCursorBroadcastRef.current);
       cursorTimeoutRef.current = window.setTimeout(() => {
-        updateLocalState({ cursor: pendingCursorRef.current });
-        lastCursorBroadcastRef.current = Date.now();
+        const t = Date.now();
+        updateLocalState({ cursor: pendingCursorRef.current, cursorUpdatedAt: t });
+        lastCursorBroadcastRef.current = t;
         cursorBurstCountRef.current++;
         cursorTimeoutRef.current = null;
       }, remaining);

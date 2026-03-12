@@ -25,6 +25,7 @@
 .app-bar-avatar {
   width: 32px;
   height: 32px;
+  padding: 0;
   border-radius: var(--radius-full);
   background: var(--interactive-primary);
   color: var(--text-on-accent);
@@ -36,6 +37,7 @@
   cursor: pointer;
   transition: opacity var(--transition-fast);
   text-transform: uppercase;
+  overflow: hidden;
 }
 
 .app-bar-avatar:hover {
@@ -167,4 +169,11 @@
 .app-bar-settings-btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.app-bar-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  object-fit: cover;
 }

@@ -8,6 +8,7 @@ export const CURSOR_BURST_INTERVAL_MS = 16; // ~60fps
 export const CURSOR_BURST_COUNT = 6;
 export const CURSOR_BURST_RESET_MS = 200;
 export const CURSOR_FADE_TIMEOUT_MS = 20000;
+export const CURSOR_REMOVE_TIMEOUT_MS = 30000;
 export const CURSOR_LERP_FACTOR = 0.3;
 export const CURSOR_LERP_THRESHOLD = 0.5;
 

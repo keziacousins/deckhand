@@ -1,0 +1,116 @@
+.avatar-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.avatar-modal-preview-container {
+  width: 160px;
+  height: 160px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  border: 2px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.avatar-modal-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-modal-preview-initials {
+  width: 100%;
+  height: 100%;
+  background: var(--interactive-primary);
+  color: var(--text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.avatar-modal-choose-different {
+  font-size: var(--font-size-sm);
+  color: var(--interactive-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.avatar-modal-choose-different:hover {
+  text-decoration: underline;
+}
+
+.avatar-modal-choose-different:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.avatar-modal-error {
+  font-size: var(--font-size-xs);
+  color: var(--text-danger, #e53e3e);
+  text-align: center;
+}
+
+.avatar-modal-hint {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.avatar-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.avatar-modal-footer-spacer {
+  flex: 1;
+}
+
+.avatar-modal-btn {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+}
+
+.avatar-modal-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.avatar-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.avatar-modal-btn-primary {
+  background: var(--interactive-primary);
+  color: var(--text-on-accent);
+}
+
+.avatar-modal-btn-primary:hover {
+  opacity: 0.9;
+  background: var(--interactive-primary);
+  color: var(--text-on-accent);
+}
+
+.avatar-modal-btn-danger {
+  color: var(--text-danger, #e53e3e);
+}
+
+.avatar-modal-btn-danger:hover {
+  background: rgba(229, 62, 62, 0.1);
+  color: var(--text-danger, #e53e3e);
+}

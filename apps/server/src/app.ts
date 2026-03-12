@@ -11,6 +11,7 @@ import modelsRouter from './routes/models.js';
 import { authRouter } from './routes/auth.js';
 import { sharesRouter } from './routes/shares.js';
 import { publicRouter } from './routes/public.js';
+import { meRouter, avatarsRouter } from './routes/me.js';
 import { jwtMiddleware } from './middleware/auth.js';
 import { getAllSessions } from './sessions.js';
 import { pool } from './db/schema.js';
@@ -54,10 +55,17 @@ export function createApp(options: AppOptions = {}): Express {
   // Public routes (before JWT middleware — no auth required)
   app.use('/api/public', publicRouter);
 
+  // Avatar serving (before JWT — loaded by <img> tags which can't send Authorization headers)
+  // User IDs are UUIDs, so URLs are unguessable
+  app.use('/api/avatars', avatarsRouter);
+
   // JWT middleware for all subsequent /api routes — requires valid token
   if (!options.skipAuth) {
     app.use('/api', jwtMiddleware);
   }
+
+  // User profile
+  app.use('/api/me', meRouter);
 
   // Sessions endpoint
   app.get('/api/sessions', (_req, res) => {

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../auth/AuthProvider';
+import { useProfile } from '../hooks/useProfile';
+import { AvatarModal } from './AvatarModal';
 import './AppBar.css';
 
 function getInitials(name: string | null, email: string | null): string {
@@ -13,9 +15,11 @@ function getInitials(name: string | null, email: string | null): string {
 }
 
 export function AppBar() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const { profile, uploadAvatar, deleteAvatar } = useProfile(token);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsPanel, setSettingsPanel] = useState<'name' | 'password' | null>(null);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +36,8 @@ export function AppBar() {
 
   if (!user) return null;
 
+  const avatarUrl = profile?.avatarUrl;
+
   return (
     <div className="app-bar">
       <a href="/#/" className="app-bar-logo">Deckhand</a>
@@ -41,7 +47,11 @@ export function AppBar() {
           onClick={() => { setMenuOpen(!menuOpen); setSettingsPanel(null); }}
           aria-label="User menu"
         >
-          {getInitials(user.name, user.email)}
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="app-bar-avatar-img" />
+          ) : (
+            getInitials(user.name, user.email)
+          )}
         </button>
         {menuOpen && (
           <div className="app-bar-menu">
@@ -58,6 +68,12 @@ export function AppBar() {
               <PasswordForm onClose={() => setSettingsPanel(null)} />
             ) : (
               <div className="app-bar-menu-items">
+                <button className="app-bar-menu-item" onClick={() => {
+                  setMenuOpen(false);
+                  setShowAvatarModal(true);
+                }}>
+                  Change avatar
+                </button>
                 <button className="app-bar-menu-item" onClick={() => setSettingsPanel('name')}>
                   Change name
                 </button>
@@ -73,6 +89,17 @@ export function AppBar() {
           </div>
         )}
       </div>
+
+      {showAvatarModal && (
+        <AvatarModal
+          currentAvatarUrl={avatarUrl ?? null}
+          userName={user.name}
+          userEmail={user.email}
+          onUpload={uploadAvatar}
+          onDelete={deleteAvatar}
+          onClose={() => setShowAvatarModal(false)}
+        />
+      )}
     </div>
   );
 }

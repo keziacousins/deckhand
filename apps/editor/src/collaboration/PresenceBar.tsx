@@ -19,6 +19,8 @@ export interface PresenceBarProps {
   onFollowUser?: (userId: string | null) => void;
 }
 
+const AVATAR_BORDER = '1.5px solid rgba(255,255,255,0.85)';
+
 function UserAvatar({
   user,
   size = 24,
@@ -31,10 +33,17 @@ function UserAvatar({
   onClick?: () => void;
 }) {
   const cursorStyle = onClick ? 'pointer' : 'default';
-  const followingStyle = isFollowing ? {
-    boxShadow: `0 0 0 3px ${user.color}`,
-    transform: 'scale(1.1)',
-  } : {};
+  const baseStyle: React.CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    border: AVATAR_BORDER,
+    boxSizing: 'border-box',
+    cursor: cursorStyle,
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+    boxShadow: isFollowing ? `0 0 0 2.5px ${user.color}` : 'none',
+    transform: isFollowing ? 'scale(1.1)' : 'scale(1)',
+  };
 
   if (user.avatarUrl) {
     return (
@@ -43,16 +52,7 @@ function UserAvatar({
         alt={user.name}
         title={user.name}
         onClick={onClick}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          border: `2px solid ${user.color}`,
-          boxSizing: 'border-box',
-          cursor: cursorStyle,
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          ...followingStyle,
-        }}
+        style={{ ...baseStyle, objectFit: 'cover', display: 'block' }}
       />
     );
   }
@@ -62,9 +62,7 @@ function UserAvatar({
       title={user.name}
       onClick={onClick}
       style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
+        ...baseStyle,
         backgroundColor: user.color,
         color: 'white',
         display: 'flex',
@@ -72,12 +70,6 @@ function UserAvatar({
         justifyContent: 'center',
         fontSize: size * 0.38,
         fontWeight: 600,
-        border: '2px solid white',
-        boxSizing: 'border-box',
-        boxShadow: isFollowing ? `0 0 0 3px ${user.color}` : '0 1px 2px rgba(0,0,0,0.15)',
-        cursor: cursorStyle,
-        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-        transform: isFollowing ? 'scale(1.1)' : 'scale(1)',
       }}
     >
       {getInitials(user.name)}

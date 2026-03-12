@@ -93,13 +93,26 @@ export function RemoteCursor({ position, user, lastUpdate }: RemoteCursorProps) 
         gap: 4,
         backgroundColor: user.color,
         color: 'white',
-        padding: '2px 8px 2px 6px',
+        padding: user.avatarUrl ? '2px 8px 2px 2px' : '2px 8px 2px 6px',
         borderRadius: 12,
         fontSize: 11,
         fontWeight: 500,
         whiteSpace: 'nowrap',
         boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
       }}>
+        {user.avatarUrl && (
+          <img
+            src={user.avatarUrl}
+            alt=""
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              border: '1px solid rgba(255,255,255,0.4)',
+            }}
+          />
+        )}
         <span>{user.name}</span>
       </div>
     </div>

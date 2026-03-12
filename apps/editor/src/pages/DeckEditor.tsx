@@ -12,6 +12,7 @@ import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
 import { useCoverCapture } from '../hooks/useCoverCapture';
 import { useCaptureHandler } from '../hooks/useCaptureHandler';
 import { useRenderErrorReporter } from '../hooks/useRenderErrorReporter';
+import { useProfile } from '../hooks/useProfile';
 import { getDeck, type DeckRole } from '../api/decks';
 import type { Deck } from '@deckhand/schema';
 import '../styles/layout.css';
@@ -27,10 +28,15 @@ let presentationWindow: Window | null = null;
 function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
   const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage, refreshWsToken, awareness } = useYDoc(deckId);
   const { token: authToken, user: authUser } = useAuth();
+  const { profile } = useProfile(authToken);
   const [followingUserId, setFollowingUserId] = useState<string | null>(null);
   const { updateCursor, updateViewport, remoteUsers, localUserInfo } = usePresence({
     awareness,
-    localUser: { id: authUser?.sub ?? 'anonymous', name: authUser?.name ?? 'Anonymous' },
+    localUser: {
+      id: authUser?.sub ?? 'anonymous',
+      name: profile?.name ?? authUser?.name ?? 'Anonymous',
+      avatarUrl: profile?.avatarUrl ?? undefined,
+    },
     followingUserId,
   });
   const [inspectorVisible, setInspectorVisible] = useState(true);

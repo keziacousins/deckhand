@@ -436,6 +436,13 @@
   border: 1px solid var(--border-default);
 }
 
+.chat-capture-thumbnail {
+  display: block;
+  width: 100%;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface-secondary);
+}
+
 .chat-tool-call-header {
   display: flex;
   align-items: center;

@@ -6,7 +6,7 @@ import './ChatSection.css';
 
 type MessageSegment =
   | { type: 'text'; content: string }
-  | { type: 'tool'; tool: string; success?: boolean; result?: unknown };
+  | { type: 'tool'; tool: string; success?: boolean; result?: unknown; image?: string };
 
 interface Message {
   id: string;
@@ -249,7 +249,7 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
         updateSegments(prev =>
           prev.map(seg =>
             seg.type === 'tool' && seg.tool === (msg.tool as string) && seg.success === undefined
-              ? { ...seg, success: msg.success as boolean }
+              ? { ...seg, success: msg.success as boolean, ...(msg.image ? { image: msg.image as string } : {}) }
               : seg
           )
         );
@@ -722,6 +722,9 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
                         <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
+                    {seg.image && (
+                      <img className="chat-capture-thumbnail" src={seg.image} alt="Slide capture" />
+                    )}
                     {expandedToolResult === `${message.id}-${i}` && seg.result != null && (
                       <div className="chat-tool-call-details">
                         <div className="chat-tool-call-section">
@@ -768,6 +771,9 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
                       <span className="chat-tool-call-spinner" />
                     )}
                   </div>
+                  {seg.image && (
+                    <img className="chat-capture-thumbnail" src={seg.image} alt="Slide capture" />
+                  )}
                 </div>
               )
             )}

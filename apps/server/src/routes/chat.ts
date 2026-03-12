@@ -68,6 +68,7 @@ interface MessageSegment {
   tool?: string;
   success?: boolean;
   result?: unknown;
+  image?: string;
 }
 
 async function saveMessage(
@@ -586,9 +587,9 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
             const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
 
             toolResults.push({ tool: 'capture_slide', success: true });
-            segments.push({ type: 'tool', tool: 'capture_slide', success: true });
+            segments.push({ type: 'tool', tool: 'capture_slide', success: true, image: dataUrl });
             broadcastJSON(deckId, {
-              type: 'chat:tool-result', sessionId, messageId, tool: 'capture_slide', success: true,
+              type: 'chat:tool-result', sessionId, messageId, tool: 'capture_slide', success: true, image: dataUrl,
             });
             toolResultContents.push({
               type: 'tool_result',
@@ -689,6 +690,11 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
 
     const responseText = assistantMessages.join('\n');
 
+    // Strip base64 image data from segments before persisting (too large for DB)
+    const persistSegments = segments.length > 0
+      ? segments.map(s => s.image ? { ...s, image: undefined } : s)
+      : undefined;
+
     const assistantMessageId = await saveMessage(
       sessionId,
       deckId,
@@ -697,7 +703,7 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       {
         model: modelId,
         toolResults: toolResults.length > 0 ? toolResults : undefined,
-        segments: segments.length > 0 ? segments : undefined,
+        segments: persistSegments,
       }
     );
 

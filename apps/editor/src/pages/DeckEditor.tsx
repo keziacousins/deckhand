@@ -7,6 +7,7 @@ import { ShareDialog } from '../components/ShareDialog';
 import { SelectionProvider, useSelection } from '../selection';
 import { useYDoc } from '../sync';
 import { useAuth } from '../auth/AuthProvider';
+import { usePresence } from '../collaboration';
 import { useUndoRedoShortcuts } from '../hooks/useUndoRedoShortcuts';
 import { useCoverCapture } from '../hooks/useCoverCapture';
 import { useCaptureHandler } from '../hooks/useCaptureHandler';
@@ -24,8 +25,14 @@ interface DeckEditorProps {
 let presentationWindow: Window | null = null;
 
 function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
-  const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage, refreshWsToken } = useYDoc(deckId);
-  const { token: authToken } = useAuth();
+  const { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage, refreshWsToken, awareness } = useYDoc(deckId);
+  const { token: authToken, user: authUser } = useAuth();
+  const [followingUserId, setFollowingUserId] = useState<string | null>(null);
+  const { updateCursor, updateViewport, remoteUsers, localUserInfo } = usePresence({
+    awareness,
+    localUser: { id: authUser?.sub ?? 'anonymous', name: authUser?.name ?? 'Anonymous' },
+    followingUserId,
+  });
   const [inspectorVisible, setInspectorVisible] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [initialSelectionDone, setInitialSelectionDone] = useState(false);
@@ -279,6 +286,12 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
             showGrid={showGrid}
             connectionStatus={status}
             connectionError={error}
+            remoteUsers={remoteUsers}
+            localUser={localUserInfo}
+            updateCursor={updateCursor}
+            updateViewport={updateViewport}
+            followingUserId={followingUserId}
+            onFollowUser={setFollowingUserId}
           />
         </ReactFlowProvider>
       </div>

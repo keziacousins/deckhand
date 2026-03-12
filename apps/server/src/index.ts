@@ -95,9 +95,12 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
   // Add client to session
   addClient(deckId, ws);
 
-  // Send initial state to client
+  // Send initial state to client (prefixed with MSG_YDOC type byte)
   const initialState = Y.encodeStateAsUpdate(session.ydoc);
-  ws.send(initialState);
+  const prefixed = new Uint8Array(1 + initialState.length);
+  prefixed[0] = 0x00; // MSG_YDOC
+  prefixed.set(initialState, 1);
+  ws.send(prefixed);
 
   // --- Token expiry tracking ---
   let tokenExpiryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -154,22 +157,38 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
       return;
     }
 
-    // Binary YDoc updates — viewers cannot send these
+    // Binary messages with type prefix: [0x00 = YDoc | 0x01 = Awareness] + payload
+    const raw = new Uint8Array(data);
+    if (raw.length < 2) return;
+
+    const msgType = raw[0];
+    const payload = raw.subarray(1);
+
+    if (msgType === 0x01) {
+      // Awareness update — relay to other clients (no apply, no save)
+      broadcastUpdate(deckId, raw, ws);
+      return;
+    }
+
+    if (msgType !== 0x00) {
+      console.warn(`[WS] Unknown binary message type ${msgType} for ${deckId}`);
+      return;
+    }
+
+    // YDoc update — viewers cannot send these
     if (readOnly) return;
 
     try {
-      const update = new Uint8Array(data);
-
       // Apply update to YDoc
-      Y.applyUpdate(session.ydoc, update);
+      Y.applyUpdate(session.ydoc, payload);
 
-      // Broadcast to other clients (excluding sender)
-      broadcastUpdate(deckId, update, ws);
+      // Broadcast to other clients (excluding sender) — with prefix intact
+      broadcastUpdate(deckId, raw, ws);
 
       // Debounced save to database
       debouncedSaveYDoc(deckId, session.ydoc);
     } catch (error) {
-      console.error(`[WS] Error processing message for ${deckId}:`, error);
+      console.error(`[WS] Error processing YDoc update for ${deckId}:`, error);
     }
   });
 

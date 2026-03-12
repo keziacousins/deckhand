@@ -122,7 +122,11 @@ export function broadcastYDocState(deckId: string): void {
   if (session.clients.size === 0) return;
 
   const update = Y.encodeStateAsUpdate(session.ydoc);
-  broadcastUpdate(deckId, update);
+  // Prefix with MSG_YDOC type byte for the binary protocol
+  const prefixed = new Uint8Array(1 + update.length);
+  prefixed[0] = 0x00;
+  prefixed.set(update, 1);
+  broadcastUpdate(deckId, prefixed);
 }
 
 /**

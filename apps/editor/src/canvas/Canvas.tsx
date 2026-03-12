@@ -27,6 +27,8 @@ import type { Deck, Slide, StartPoint } from '@deckhand/schema';
 import { generateSlideId, generateEdgeId, generateStartPointId, createStartPoint, DEFAULT_GRID_COLUMNS, resolveEdgeSource, SLIDE_WIDTH, getSlideHeight, duplicateSlide as duplicateSlideMutation } from '@deckhand/schema';
 import { findClosestTargetHandle } from './handleUtils';
 import { useAuthAssets } from '../hooks/useAuthAssets';
+import { RemoteCursors, FollowModeOverlay } from '../collaboration';
+import type { RemoteUser, UserInfo, CursorPosition, ViewportState } from '../collaboration';
 
 const nodeTypes = {
   slide: SlideNode,
@@ -56,6 +58,12 @@ interface CanvasProps {
   showGrid?: boolean;
   connectionStatus: ConnectionStatusType;
   connectionError?: string | null;
+  remoteUsers: RemoteUser[];
+  localUser: UserInfo;
+  updateCursor: (pos: CursorPosition | null) => void;
+  updateViewport: (vp: ViewportState) => void;
+  followingUserId: string | null;
+  onFollowUser: (userId: string | null) => void;
 }
 
 export function Canvas({
@@ -72,8 +80,14 @@ export function Canvas({
   showGrid,
   connectionStatus,
   connectionError,
+  remoteUsers,
+  localUser,
+  updateCursor,
+  updateViewport,
+  followingUserId,
+  onFollowUser,
 }: CanvasProps) {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setViewport } = useReactFlow();
   const store = useStoreApi();
   const { selection, selectSlide, selectEdge, selectStartPoint, clearSelection } = useSelection();
   const selectedSlideId = selection.slideId;
@@ -861,16 +875,112 @@ export function Canvas({
     [deleteEdges]
   );
 
-  // LOD zoom tracking
+  // LOD zoom tracking + viewport broadcasting
   const onMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
       const shouldShowDetails = viewport.zoom >= DETAIL_ZOOM_THRESHOLD;
       if (shouldShowDetails !== showDetails) {
         setShowDetails(shouldShowDetails);
       }
+      // Exit follow mode if the user manually moved the canvas
+      if (followingUserId && !isFollowAnimatingRef.current) {
+        onFollowUser(null);
+      }
+      // Broadcast viewport for follow mode
+      const container = document.querySelector('.react-flow');
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        updateViewport({
+          x: viewport.x,
+          y: viewport.y,
+          zoom: viewport.zoom,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
     },
-    [showDetails]
+    [showDetails, updateViewport, followingUserId, onFollowUser]
   );
+
+  // Track last screen position so we can re-broadcast during pan/zoom
+  // (screen pos doesn't change, but flow coords under it do)
+  const lastMouseScreenPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Mouse move → broadcast cursor position in flow coordinates
+  const onMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      lastMouseScreenPosRef.current = { x: event.clientX, y: event.clientY };
+      if (!followingUserId) {
+        const pos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        updateCursor(pos);
+      }
+    },
+    [screenToFlowPosition, updateCursor, followingUserId]
+  );
+
+  const onMouseLeave = useCallback(() => {
+    lastMouseScreenPosRef.current = null;
+    updateCursor(null);
+  }, [updateCursor]);
+
+  // During pan/zoom, re-broadcast cursor at updated flow coordinates
+  const onMove = useCallback(
+    () => {
+      if (!followingUserId && lastMouseScreenPosRef.current) {
+        const pos = screenToFlowPosition(lastMouseScreenPosRef.current);
+        updateCursor(pos);
+      }
+    },
+    [screenToFlowPosition, updateCursor, followingUserId]
+  );
+
+  // Follow mode: sync viewport to followed user's viewport
+  const isFollowAnimatingRef = useRef(false);
+
+  useEffect(() => {
+    if (!followingUserId) return;
+
+    const followed = remoteUsers.find(u => u.user.id === followingUserId);
+    if (!followed?.viewport) return;
+
+    const vp = followed.viewport;
+    isFollowAnimatingRef.current = true;
+    setViewport(
+      { x: vp.x, y: vp.y, zoom: vp.zoom },
+      { duration: 300 },
+    );
+    // Reset animation flag after transition
+    const timer = setTimeout(() => {
+      isFollowAnimatingRef.current = false;
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [followingUserId, remoteUsers, setViewport]);
+
+  // Exit follow mode on Escape key
+  useEffect(() => {
+    if (!followingUserId) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onFollowUser(null);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [followingUserId, onFollowUser]);
+
+  // Stop following if the followed user disconnects or follows us back (cycle)
+  useEffect(() => {
+    if (!followingUserId) return;
+    const followed = remoteUsers.find(u => u.user.id === followingUserId);
+    if (!followed) {
+      onFollowUser(null);
+      return;
+    }
+    // Break follow cycle: if they're following us, we stop
+    if (followed.followingUserId === localUser.id) {
+      onFollowUser(null);
+    }
+  }, [followingUserId, remoteUsers, localUser.id, onFollowUser]);
 
   // Delete component from slide
   const deleteComponent = useCallback(
@@ -940,8 +1050,13 @@ export function Canvas({
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [readOnly, addSlide, duplicateSlide, deleteComponent, selectedSlideId, selectedComponentId]);
 
+  // Find the followed user for overlay
+  const followedUser = followingUserId
+    ? remoteUsers.find(u => u.user.id === followingUserId)
+    : null;
+
   return (
-    <>
+    <div onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} style={{ width: '100%', height: '100%' }}>
       <ReactFlow
         className={showDetails ? '' : 'zoom-overview'}
         nodes={nodes}
@@ -959,6 +1074,7 @@ export function Canvas({
         edgesReconnectable={!readOnly}
         onConnectStart={readOnly ? undefined : onConnectStart}
         onConnectEnd={readOnly ? undefined : onConnectEnd}
+        onMove={onMove}
         onMoveEnd={onMoveEnd}
         onPaneContextMenu={readOnly ? undefined : onPaneContextMenu}
         onNodeContextMenu={readOnly ? undefined : onNodeContextMenu}
@@ -996,6 +1112,7 @@ export function Canvas({
           style={{ backgroundColor: 'var(--canvas-bg)' }}
         />
         <Controls />
+        <RemoteCursors remoteUsers={remoteUsers} />
         <CanvasHeader
           deckName={deck.meta.title}
           onBack={onBack}
@@ -1009,8 +1126,19 @@ export function Canvas({
           readOnly={readOnly}
           connectionStatus={connectionStatus}
           connectionError={connectionError}
+          remoteUsers={remoteUsers}
+          localUser={localUser}
+          followingUserId={followingUserId}
+          onFollowUser={onFollowUser}
         />
       </ReactFlow>
+
+      {followedUser && (
+        <FollowModeOverlay
+          user={followedUser.user}
+          onStop={() => onFollowUser(null)}
+        />
+      )}
 
       <ContextMenu
         position={contextMenu?.position ?? null}
@@ -1025,6 +1153,6 @@ export function Canvas({
         onDeleteSlide={deleteSlides}
         onDeleteComponent={deleteComponent}
       />
-    </>
+    </div>
   );
 }

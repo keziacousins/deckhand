@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { ConnectionStatus } from '../components/ConnectionStatus';
+import { PresenceBar } from '../collaboration';
+import type { RemoteUser, UserInfo } from '../collaboration';
 import './CanvasHeader.css';
 
 type ConnectionStatusType = 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -17,6 +18,10 @@ interface CanvasHeaderProps {
   readOnly?: boolean;
   connectionStatus: ConnectionStatusType;
   connectionError?: string | null;
+  remoteUsers: RemoteUser[];
+  localUser: UserInfo;
+  followingUserId: string | null;
+  onFollowUser: (userId: string | null) => void;
 }
 
 export function CanvasHeader({
@@ -32,6 +37,10 @@ export function CanvasHeader({
   readOnly,
   connectionStatus,
   connectionError,
+  remoteUsers,
+  localUser,
+  followingUserId,
+  onFollowUser,
 }: CanvasHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(deckName);
@@ -197,8 +206,14 @@ export function CanvasHeader({
       </div>
 
       <div className="canvas-header-right">
-        {/* Connection status */}
-        <ConnectionStatus status={connectionStatus} error={connectionError} />
+        {/* Presence / connection status */}
+        <PresenceBar
+          connectionStatus={connectionStatus}
+          localUser={localUser}
+          remoteUsers={remoteUsers}
+          followingUserId={followingUserId}
+          onFollowUser={onFollowUser}
+        />
 
         {/* Inspector toggle */}
         <button

@@ -9,9 +9,22 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Y from 'yjs';
+import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
 import { yDocToDeck, diffDeck, applyPatchesToYDoc } from '@deckhand/sync';
 import type { Deck } from '@deckhand/schema';
 import { getAuthToken } from '../api/decks';
+
+// Binary message type prefixes (first byte)
+const MSG_YDOC = 0;
+const MSG_AWARENESS = 1;
+
+/** Prepend a type byte to a binary payload */
+function prefixMessage(type: number, payload: Uint8Array): Uint8Array {
+  const msg = new Uint8Array(1 + payload.length);
+  msg[0] = type;
+  msg.set(payload, 1);
+  return msg;
+}
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -47,6 +60,8 @@ interface UseYDocResult {
   sendMessage: (msg: ControlMessage) => void;
   /** Send a refreshed auth token to extend the WebSocket session */
   refreshWsToken: () => void;
+  /** YJS Awareness instance for presence/cursor sharing */
+  awareness: Awareness | null;
 }
 
 // Use same-origin WebSocket - Vite proxies /ws in dev, same-origin in prod
@@ -66,6 +81,7 @@ export function useYDoc(deckId: string): UseYDocResult {
   const [redoCount, setRedoCount] = useState(0);
 
   const ydocRef = useRef<Y.Doc | null>(null);
+  const awarenessRef = useRef<Awareness | null>(null);
   const undoManagerRef = useRef<Y.UndoManager | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const deckRef = useRef<Deck | null>(null);
@@ -94,6 +110,10 @@ export function useYDoc(deckId: string): UseYDocResult {
     let aborted = false; // Prevents stale closures from reconnecting after cleanup
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
+
+    // Create awareness instance for presence/cursor sharing
+    const awareness = new Awareness(ydoc);
+    awarenessRef.current = awareness;
 
     // Set up UndoManager to track all changes from 'local' origin
     const root = ydoc.getMap('root');
@@ -158,12 +178,16 @@ export function useYDoc(deckId: string): UseYDocResult {
         setStatus('connected');
         setError(null);
         reconnectAttemptRef.current = 0; // Reset backoff on successful connect
-        
+
         // If we already have state, send it to sync
         if (ydoc.store.clients.size > 0) {
           const update = Y.encodeStateAsUpdate(ydoc);
-          ws.send(update);
+          ws.send(prefixMessage(MSG_YDOC, update));
         }
+
+        // Announce awareness state to new peers
+        const awarenessUpdate = encodeAwarenessUpdate(awareness, [awareness.clientID]);
+        ws.send(prefixMessage(MSG_AWARENESS, awarenessUpdate));
       };
 
       ws.onmessage = (event) => {
@@ -188,15 +212,35 @@ export function useYDoc(deckId: string): UseYDocResult {
           return;
         }
         try {
-          const update = new Uint8Array(event.data);
-          Y.applyUpdate(ydoc, update);
+          const data = new Uint8Array(event.data);
+          const msgType = data[0];
+          const payload = data.subarray(1);
+
+          if (msgType === MSG_YDOC) {
+            Y.applyUpdate(ydoc, payload);
+          } else if (msgType === MSG_AWARENESS) {
+            applyAwarenessUpdate(awareness, payload, 'remote');
+          } else {
+            console.warn('[YDoc] Unknown binary message type:', msgType);
+          }
         } catch (err) {
           console.error('[YDoc] Error applying update:', err);
         }
       };
 
+      // Send local awareness changes to server
+      const handleAwarenessUpdate = ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
+        const clients = [...added, ...updated, ...removed];
+        if (ws.readyState === WebSocket.OPEN) {
+          const update = encodeAwarenessUpdate(awareness, clients);
+          ws.send(prefixMessage(MSG_AWARENESS, update));
+        }
+      };
+      awareness.on('update', handleAwarenessUpdate);
+
       ws.onclose = (event) => {
         console.log(`[YDoc] WS closed: code=${event.code} reason=${event.reason} clean=${event.wasClean}`);
+        awareness.off('update', handleAwarenessUpdate);
         wsRef.current = null;
 
         // If deck was deleted (via control message), don't reconnect
@@ -268,23 +312,28 @@ export function useYDoc(deckId: string): UseYDocResult {
     return () => {
       aborted = true;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      
+
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (initialSyncTimeoutRef.current) {
         clearTimeout(initialSyncTimeoutRef.current);
       }
-      
+
+      // Clean up awareness before closing WS
+      removeAwarenessStates(awareness, [awareness.clientID], 'local');
+      awareness.destroy();
+      awarenessRef.current = null;
+
       ydoc.off('update', updateFromYDoc);
       undoManager.destroy();
       ydoc.destroy();
-      
+
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
-      
+
       ydocRef.current = null;
       undoManagerRef.current = null;
     };
@@ -321,7 +370,7 @@ export function useYDoc(deckId: string): UseYDocResult {
     // Send update to server if connected
     if (ws && ws.readyState === WebSocket.OPEN) {
       const update = Y.encodeStateAsUpdate(ydoc);
-      ws.send(update);
+      ws.send(prefixMessage(MSG_YDOC, update));
     }
     // If not connected, changes are still in YDoc and will sync on reconnect
   }, []);
@@ -346,7 +395,7 @@ export function useYDoc(deckId: string): UseYDocResult {
     // Send update to server if connected
     if (ws && ws.readyState === WebSocket.OPEN) {
       const update = Y.encodeStateAsUpdate(ydoc);
-      ws.send(update);
+      ws.send(prefixMessage(MSG_YDOC, update));
     }
   }, []);
 
@@ -354,23 +403,23 @@ export function useYDoc(deckId: string): UseYDocResult {
     const undoManager = undoManagerRef.current;
     const ydoc = ydocRef.current;
     const ws = wsRef.current;
-    
+
     if (!undoManager || !ydoc) {
       return;
     }
 
     undoManager.redo();
-    
+
     // Rebuild deck state from YDoc
     const newDeck = yDocToDeck(ydoc);
     if (newDeck?.meta?.id) {
       setDeck(newDeck);
     }
-    
+
     // Send update to server if connected
     if (ws && ws.readyState === WebSocket.OPEN) {
       const update = Y.encodeStateAsUpdate(ydoc);
-      ws.send(update);
+      ws.send(prefixMessage(MSG_YDOC, update));
     }
   }, []);
 
@@ -402,5 +451,5 @@ export function useYDoc(deckId: string): UseYDocResult {
   const canUndo = undoCount > 0;
   const canRedo = redoCount > 0;
 
-  return { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage, refreshWsToken };
+  return { deck, status, hasEverSynced, error, updateDeck, undo, redo, canUndo, canRedo, onMessage, sendMessage, refreshWsToken, awareness: awarenessRef.current };
 }

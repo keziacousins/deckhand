@@ -95,6 +95,26 @@ npm run db:init --workspace=apps/server
 
 The `reference-code/` directory contains code from ProcessFactory Studio that this project draws patterns from. It's excluded from TypeScript compilation and is for reference only.
 
+## Production Hardening Principles
+
+These principles apply to all new and modified code:
+
+1. **No silent failures.** Every `catch` must log the error *and* propagate it (throw, return error, or reject). A function that swallows an error and returns normally is lying to its caller. The only exception is graceful-degradation paths that are explicitly documented as best-effort.
+
+2. **Async errors must be observable.** Never fire-and-forget an async operation (`void asyncFn()`, `.then()` with no `.catch()`). Use `await`, or attach a `.catch()` that logs and handles the failure. If a promise is intentionally unhandled, comment why.
+
+3. **Structured logging with context.** Log messages include `[Module]` prefix, deck/session IDs where available, and the operation being performed. Errors log the full error object, not just a message string.
+
+4. **Fail-fast on corruption.** If data is invalid or missing where it shouldn't be (e.g., YDoc produces null deck, DB write returns unexpected result), throw immediately rather than continuing with bad state. It's better to drop one operation loudly than corrupt data silently.
+
+5. **Clean up failed connections.** When a WebSocket send fails, remove that client from the session. Don't leave dead clients in the set to fail again on every broadcast.
+
+6. **Database operations that must be atomic should use transactions.** Multi-step DB writes (e.g., update content + save YDoc state) should be wrapped in a transaction so partial writes don't leave inconsistent state.
+
+7. **Centralized error handling at boundaries.** Express routes and WebSocket message handlers should have top-level try/catch that logs and returns appropriate error responses. Interior code should throw, not catch-and-log.
+
+8. **Timeouts and health signals.** Long-running operations (DB writes, external API calls) should have explicit timeouts. The server should expose a health endpoint that verifies DB connectivity.
+
 ## Working Guidelines
 
 - Do not start dev servers (`npm run dev`, `npm run dev:server`, `npm run dev:all`). The user manages their own dev environment.

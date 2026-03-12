@@ -55,8 +55,9 @@ export function useAuthAssets(assets: AssetsMap): AssetsMap {
           const blobUrl = URL.createObjectURL(blob);
           blobUrlsRef.current.set(asset.url, blobUrl);
           fetchedRef.current.add(asset.url);
-        } catch {
-          // Failed to fetch — leave original URL
+        } catch (err) {
+          // Failed to fetch — leave original URL, log for debugging
+          console.warn('[Assets] Failed to fetch asset:', asset.url, err);
           fetchedRef.current.add(asset.url);
         }
       })

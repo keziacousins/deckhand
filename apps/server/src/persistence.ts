@@ -10,11 +10,10 @@
 import * as Y from 'yjs';
 import {
   getDeckWithYDocState,
-  updateDeckContent,
-  saveYDocState,
   deleteYDocState,
   hashContent,
 } from './db/decks.js';
+import { pool } from './db/schema.js';
 import { deckToYDoc, yDocToDeck } from '@deckhand/sync';
 import type { Deck } from '@deckhand/schema';
 
@@ -59,33 +58,54 @@ export async function loadYDoc(deckId: string): Promise<Y.Doc | null> {
 
 /**
  * Save a YDoc to the database.
- * Converts to JSON, computes hash, and saves both binary and JSON.
+ * Converts to JSON, computes hash, and saves both binary and JSON atomically.
+ * Throws on failure — callers must handle errors.
  */
 export async function saveYDoc(deckId: string, ydoc: Y.Doc): Promise<void> {
+  // Convert YDoc to deck JSON
+  const deck = yDocToDeck(ydoc);
+
+  // Fail-fast on corruption (P4)
+  if (!deck || !deck.meta || !deck.slides) {
+    throw new Error(`[Persistence] Invalid deck data from YDoc for ${deckId}`);
+  }
+
+  // Atomic save: content + YDoc state in a single transaction (P6)
+  const client = await pool.connect();
   try {
-    // Convert YDoc to deck JSON
-    const deck = yDocToDeck(ydoc);
+    await client.query('BEGIN');
 
-    // Validate we got valid data
-    if (!deck || !deck.meta || !deck.slides) {
-      console.error(`[Persistence] Invalid deck data from YDoc for ${deckId}`);
-      return;
+    const content = JSON.stringify(deck);
+    const contentHash = hashContent(content);
+    const slideCount = Object.keys(deck.slides).length;
+
+    const result = await client.query(
+      `UPDATE decks
+       SET title = $1, description = $2, content = $3, content_hash = $4,
+           slide_count = $5, updated_at = NOW()
+       WHERE id = $6`,
+      [deck.meta.title, deck.meta.description || null, content, contentHash, slideCount, deckId]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(`[Persistence] Deck ${deckId} not found during save`);
     }
 
-    // Update the deck content in database
-    const updated = await updateDeckContent(deckId, deck);
-    if (!updated) {
-      console.error(`[Persistence] Failed to update deck ${deckId}`);
-      return;
-    }
-
-    // Save binary YDoc state
     const state = Y.encodeStateAsUpdate(ydoc);
-    await saveYDocState(deckId, Buffer.from(state));
+    await client.query(
+      `INSERT INTO ydoc_states (deck_id, data, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (deck_id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+      [deckId, Buffer.from(state)]
+    );
 
-    console.log(`[Persistence] Saved ${deckId} (${Object.keys(deck.slides).length} slides)`);
+    await client.query('COMMIT');
+    console.log(`[Persistence] Saved ${deckId} (${slideCount} slides)`);
   } catch (error) {
-    console.error(`[Persistence] Error saving ${deckId}:`, error);
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -96,16 +116,16 @@ const saveTimers = new Map<string, NodeJS.Timeout>();
 const SAVE_DEBOUNCE_MS = 2000;
 
 export function debouncedSaveYDoc(deckId: string, ydoc: Y.Doc): void {
-  // Clear existing timer
   const existing = saveTimers.get(deckId);
   if (existing) {
     clearTimeout(existing);
   }
 
-  // Set new timer
-  const timer = setTimeout(async () => {
+  const timer = setTimeout(() => {
     saveTimers.delete(deckId);
-    await saveYDoc(deckId, ydoc);
+    saveYDoc(deckId, ydoc).catch((error) => {
+      console.error(`[Persistence] Debounced save failed for ${deckId}:`, error);
+    });
   }, SAVE_DEBOUNCE_MS);
 
   saveTimers.set(deckId, timer);
@@ -113,15 +133,14 @@ export function debouncedSaveYDoc(deckId: string, ydoc: Y.Doc): void {
 
 /**
  * Force immediate save (e.g., on last client disconnect).
+ * Throws on failure — callers must handle errors.
  */
 export async function flushSave(deckId: string, ydoc: Y.Doc): Promise<void> {
-  // Clear any pending debounced save
   const existing = saveTimers.get(deckId);
   if (existing) {
     clearTimeout(existing);
     saveTimers.delete(deckId);
   }
 
-  // Save immediately
   await saveYDoc(deckId, ydoc);
 }

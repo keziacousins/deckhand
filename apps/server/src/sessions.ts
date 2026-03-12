@@ -93,14 +93,18 @@ export function removeClient(deckId: string, ws: WebSocket): void {
  */
 export function broadcastUpdate(deckId: string, update: Uint8Array, excludeWs?: WebSocket): void {
   const session = sessions.get(deckId);
-  if (!session) return;
+  if (!session) {
+    console.warn(`[Session] broadcastUpdate called for unknown session ${deckId}`);
+    return;
+  }
 
   for (const client of session.clients) {
     if (client !== excludeWs && client.readyState === 1) { // 1 = OPEN
       try {
         client.send(update);
       } catch (err) {
-        console.error(`[Session] Failed to send to client:`, err);
+        console.error(`[Session] Failed to send to client in ${deckId}, removing:`, err);
+        session.clients.delete(client);
       }
     }
   }
@@ -111,7 +115,11 @@ export function broadcastUpdate(deckId: string, update: Uint8Array, excludeWs?: 
  */
 export function broadcastYDocState(deckId: string): void {
   const session = sessions.get(deckId);
-  if (!session || session.clients.size === 0) return;
+  if (!session) {
+    console.warn(`[Session] broadcastYDocState called for unknown session ${deckId}`);
+    return;
+  }
+  if (session.clients.size === 0) return;
 
   const update = Y.encodeStateAsUpdate(session.ydoc);
   broadcastUpdate(deckId, update);
@@ -122,7 +130,10 @@ export function broadcastYDocState(deckId: string): void {
  */
 export function broadcastJSON(deckId: string, message: object, excludeWs?: WebSocket): void {
   const session = sessions.get(deckId);
-  if (!session) return;
+  if (!session) {
+    console.warn(`[Session] broadcastJSON called for unknown session ${deckId}`);
+    return;
+  }
 
   const data = JSON.stringify(message);
   for (const client of session.clients) {
@@ -130,7 +141,8 @@ export function broadcastJSON(deckId: string, message: object, excludeWs?: WebSo
       try {
         client.send(data);
       } catch (err) {
-        console.error('[Session] Failed to send JSON to client:', err);
+        console.error(`[Session] Failed to send JSON to client in ${deckId}, removing:`, err);
+        session.clients.delete(client);
       }
     }
   }

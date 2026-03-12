@@ -105,20 +105,22 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
     async function loadSessions() {
       try {
         const response = await apiFetch(`/api/decks/${deckId}/chat/sessions`);
-        if (response.ok) {
-          const data = await response.json();
-          setSessions(data.sessions || []);
-          // Auto-select most recent session and restore its model
-          if (data.sessions?.length > 0) {
-            setCurrentSessionId(data.sessions[0].id);
-            if (data.sessions[0].model) {
-              sessionModelSetRef.current = true;
-              setSelectedModel(data.sessions[0].model);
-            }
+        if (!response.ok) {
+          console.error(`[Chat] Failed to load sessions: ${response.status}`);
+          return;
+        }
+        const data = await response.json();
+        setSessions(data.sessions || []);
+        // Auto-select most recent session and restore its model
+        if (data.sessions?.length > 0) {
+          setCurrentSessionId(data.sessions[0].id);
+          if (data.sessions[0].model) {
+            sessionModelSetRef.current = true;
+            setSelectedModel(data.sessions[0].model);
           }
         }
       } catch (err) {
-        console.error('Failed to load sessions:', err);
+        console.error('[Chat] Failed to load sessions:', err);
       }
     }
     loadSessions();
@@ -136,16 +138,18 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
       setHistoryLoading(true);
       try {
         const response = await apiFetch(`/api/decks/${deckId}/chat/sessions/${currentSessionId}/messages`);
-        if (response.ok) {
-          const data = await response.json();
-          const msgs = (data.messages || []).map((m: Message) => ({
-            ...m,
-            segments: m.segments || (m.role === 'assistant' ? buildSegments(m.content, m.toolResults) : undefined),
-          }));
-          setMessages(msgs);
+        if (!response.ok) {
+          console.error(`[Chat] Failed to load messages: ${response.status}`);
+          return;
         }
+        const data = await response.json();
+        const msgs = (data.messages || []).map((m: Message) => ({
+          ...m,
+          segments: m.segments || (m.role === 'assistant' ? buildSegments(m.content, m.toolResults) : undefined),
+        }));
+        setMessages(msgs);
       } catch (err) {
-        console.error('Failed to load messages:', err);
+        console.error('[Chat] Failed to load messages:', err);
       } finally {
         setHistoryLoading(false);
       }
@@ -170,7 +174,7 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
           }
         }
       } catch (err) {
-        console.error('Failed to load models:', err);
+        console.error('[Chat] Failed to load models:', err);
       } finally {
         setModelsLoading(false);
       }
@@ -329,7 +333,7 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
         }
       }
     } catch (err) {
-      console.error('Failed to delete session:', err);
+      console.error('[Chat] Failed to delete session:', err);
     }
   }, [deckId, currentSessionId]);
 
@@ -431,7 +435,8 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
       onUndoStateChange({ canUndo: data.canUndo, canRedo: data.canRedo });
       if (data.success) pendingUndoActionsRef.current.push('undo');
     } catch (err) {
-      console.error('Undo failed:', err);
+      console.error('[Chat] Undo failed:', err);
+      setError('Undo failed — please try again');
     } finally {
       setUndoingTurn(false);
     }
@@ -448,7 +453,8 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
       onUndoStateChange({ canUndo: data.canUndo, canRedo: data.canRedo });
       if (data.success) pendingUndoActionsRef.current.push('redo');
     } catch (err) {
-      console.error('Redo failed:', err);
+      console.error('[Chat] Redo failed:', err);
+      setError('Redo failed — please try again');
     } finally {
       setUndoingTurn(false);
     }

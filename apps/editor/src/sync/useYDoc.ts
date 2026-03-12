@@ -129,8 +129,8 @@ export function useYDoc(deckId: string): UseYDocResult {
             }
           }
         }
-      } catch {
-        // Error converting YDoc to deck - ignore
+      } catch (err) {
+        console.error('[YDoc] Error converting YDoc to deck:', err);
       }
     };
 
@@ -182,16 +182,16 @@ export function useYDoc(deckId: string): UseYDocResult {
             // Dispatch to subscribers
             const handlers = messageHandlersRef.current.get(msg.type);
             handlers?.forEach(h => h(msg));
-          } catch {
-            // Not JSON — ignore
+          } catch (err) {
+            console.warn('[YDoc] Failed to parse control message:', err);
           }
           return;
         }
         try {
           const update = new Uint8Array(event.data);
           Y.applyUpdate(ydoc, update);
-        } catch {
-          // Error applying update - ignore
+        } catch (err) {
+          console.error('[YDoc] Error applying update:', err);
         }
       };
 

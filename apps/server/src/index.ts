@@ -118,8 +118,8 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
         console.log(`[WS] Token expired (with grace) for ${deckId}, closing connection`);
         ws.close(4003, 'Token expired');
       }, expiresIn);
-    } catch {
-      // Can't parse token — don't enforce expiry
+    } catch (error) {
+      console.warn(`[WS] Failed to parse JWT for expiry scheduling on ${deckId}:`, error);
     }
   };
 
@@ -141,6 +141,8 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
             } else {
               console.warn(`[WS] Invalid refresh token for ${deckId}`);
             }
+          }).catch(error => {
+            console.error(`[WS] Token refresh verification failed for ${deckId}:`, error);
           });
           return;
         }
@@ -178,7 +180,9 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
 
     // If last client, flush save immediately
     if (getClientCount(deckId) === 0) {
-      void flushSave(deckId, session.ydoc);
+      flushSave(deckId, session.ydoc).catch((error) => {
+        console.error(`[WS] Flush save failed on disconnect for ${deckId}:`, error);
+      });
     }
   });
 

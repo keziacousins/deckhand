@@ -13,6 +13,7 @@ import { sharesRouter } from './routes/shares.js';
 import { publicRouter } from './routes/public.js';
 import { jwtMiddleware } from './middleware/auth.js';
 import { getAllSessions } from './sessions.js';
+import { pool } from './db/schema.js';
 
 interface AppOptions {
   skipAuth?: boolean;
@@ -35,9 +36,16 @@ export function createApp(options: AppOptions = {}): Express {
     next();
   });
 
-  // Health check
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok' });
+  // Health check — verifies DB connectivity and reports session count
+  app.get('/api/health', async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      const sessions = getAllSessions();
+      res.json({ status: 'ok', db: true, activeSessions: sessions.length });
+    } catch (error) {
+      console.error('[Health] DB check failed:', error);
+      res.status(503).json({ status: 'degraded', db: false, error: 'Database unreachable' });
+    }
   });
 
   // Auth routes (before JWT middleware — these ARE the auth flow)

@@ -8,7 +8,8 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { config, isLLMEnabled } from '../config.js';
-import { getOrCreateSession, broadcastYDocState, broadcastJSON, requestCapture, drainRenderErrors, waitForRenderErrors, getLlmUndoManager, undoLlmTurn, redoLlmTurn, getLlmUndoState } from '../sessions.js';
+import { getOrCreateSession, broadcastYDocState, broadcastJSON, requestCapture, drainRenderErrors, waitForRenderErrors, getLlmUndoManager, undoLlmTurn, redoLlmTurn, getLlmUndoState, startChat, endChat } from '../sessions.js';
+import { getAuthUser } from '../middleware/auth.js';
 import { loadYDoc, debouncedSaveYDoc } from '../persistence.js';
 import { yDocToDeck } from '@deckhand/sync';
 import { pool, type ChatMessageRow, type ChatSessionRow } from '../db/schema.js';
@@ -74,23 +75,29 @@ async function saveMessage(
   deckId: string,
   role: 'user' | 'assistant',
   content: string,
-  model?: string,
-  toolResults?: Array<{ tool: string; success: boolean }>,
-  segments?: MessageSegment[]
+  opts?: {
+    model?: string;
+    toolResults?: Array<{ tool: string; success: boolean }>;
+    segments?: MessageSegment[];
+    userId?: string;
+    userName?: string;
+  }
 ): Promise<string> {
   const id = generateId('msg');
   await pool.query(
-    `INSERT INTO chat_messages (id, session_id, deck_id, role, content, model, tool_results, segments)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `INSERT INTO chat_messages (id, session_id, deck_id, role, content, model, tool_results, segments, user_id, user_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       id,
       sessionId,
       deckId,
       role,
       content,
-      model || null,
-      toolResults ? JSON.stringify(toolResults) : null,
-      segments ? JSON.stringify(segments) : null,
+      opts?.model || null,
+      opts?.toolResults ? JSON.stringify(opts.toolResults) : null,
+      opts?.segments ? JSON.stringify(opts.segments) : null,
+      opts?.userId || null,
+      opts?.userName || null,
     ]
   );
   return id;
@@ -267,6 +274,9 @@ router.get('/:deckId/chat/sessions/:sessionId/messages', requireDeckRole('owner'
         model: row.model,
         toolResults: row.tool_results ? JSON.parse(row.tool_results) : undefined,
         segments: row.segments ? JSON.parse(row.segments) : undefined,
+        userId: row.user_id,
+        userName: row.user_name,
+        avatarUrl: row.user_id ? `/api/avatars/${row.user_id}` : undefined,
         createdAt: row.created_at,
       }));
 
@@ -351,6 +361,12 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
     return res.status(400).json({ error: 'Message is required' });
   }
 
+  // Extract user info from JWT
+  const claims = getAuthUser(req);
+  const userId = claims?.sub ?? 'anonymous';
+  const userName = claims?.ext?.name || claims?.ext?.email || 'Anonymous';
+  const avatarUrl = `/api/avatars/${userId}`;
+
   const modelId = model || DEFAULT_MODEL;
 
   // Get or create session
@@ -363,8 +379,24 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
     isNewSession = true;
   }
 
-  // Save user message
-  await saveMessage(sessionId, deckId, 'user', message);
+  // Guard against concurrent LLM requests on the same chat session
+  if (!startChat(deckId, sessionId, userId)) {
+    return res.status(409).json({ error: 'Another request is already in progress for this chat session' });
+  }
+
+  // Save user message with attribution
+  const userMessageId = await saveMessage(sessionId, deckId, 'user', message, { userId, userName });
+
+  // Broadcast user message to all connected clients (observers will pick this up)
+  broadcastJSON(deckId, {
+    type: 'chat:user-message',
+    sessionId,
+    messageId: userMessageId,
+    userId,
+    userName,
+    avatarUrl,
+    content: message,
+  });
 
   // Update session timestamp
   await updateSession(sessionId);
@@ -466,6 +498,8 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       type: 'chat:start',
       sessionId,
       messageId,
+      userId,
+      userName,
     });
 
     const assistantMessages: string[] = [];
@@ -547,7 +581,7 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
         if (toolUse.name === 'capture_slide') {
           const { slideId } = toolUse.input as { slideId: string };
           try {
-            const dataUrl = await requestCapture(deckId, slideId);
+            const dataUrl = await requestCapture(deckId, slideId, userId);
             // Strip the data:image/jpeg;base64, prefix to get raw base64
             const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
 
@@ -655,22 +689,33 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
 
     const responseText = assistantMessages.join('\n');
 
-    // Broadcast completion
-    broadcastJSON(deckId, {
-      type: 'chat:complete',
-      sessionId,
-      messageId,
-    });
-
     const assistantMessageId = await saveMessage(
       sessionId,
       deckId,
       'assistant',
       responseText,
-      modelId,
-      toolResults.length > 0 ? toolResults : undefined,
-      segments.length > 0 ? segments : undefined
+      {
+        model: modelId,
+        toolResults: toolResults.length > 0 ? toolResults : undefined,
+        segments: segments.length > 0 ? segments : undefined,
+      }
     );
+
+    const undoState = getLlmUndoState(deckId, sessionId);
+
+    // Broadcast completion with full data so observers can build the message
+    broadcastJSON(deckId, {
+      type: 'chat:complete',
+      sessionId,
+      messageId: assistantMessageId,
+      userId,
+      content: responseText,
+      segments: segments.length > 0 ? segments : undefined,
+      toolResults: toolResults.length > 0 ? toolResults : undefined,
+      model: modelId,
+      canUndo: undoState.canUndo,
+      canRedo: undoState.canRedo,
+    });
 
     // Save full API messages (with base64 images stripped) for proper history reconstruction
     const apiMessagesJson = JSON.stringify(messages, (_key, value) => {
@@ -685,7 +730,8 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       [apiMessagesJson, modelId, sessionId]
     );
 
-    const undoState = getLlmUndoState(deckId, sessionId);
+    endChat(deckId, sessionId);
+
     res.json({
       id: assistantMessageId,
       sessionId,
@@ -699,6 +745,7 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
     });
 
   } catch (error) {
+    endChat(deckId, sessionId);
     console.error('[Chat] Error:', error);
 
     let errorMessage = 'Failed to process chat message';

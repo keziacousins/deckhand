@@ -14,6 +14,9 @@ interface Message {
   content: string;
   segments?: MessageSegment[];
   toolResults?: Array<{ tool: string; success: boolean; result?: unknown }>;
+  userId?: string;
+  userName?: string;
+  avatarUrl?: string;
 }
 
 /** Build interleaved segments from flat content + toolResults (for history messages) */
@@ -59,14 +62,17 @@ interface ChatSectionProps {
   onModelChange: (model: string) => void;
   undoState: UndoState;
   onUndoStateChange: (state: UndoState) => void;
+  localUser: { id: string; name: string; avatarUrl?: string };
 }
 
-export function ChatSection({ context, deckId, onMessage, selectedModel, onModelChange, undoState, onUndoStateChange }: ChatSectionProps) {
+export function ChatSection({ context, deckId, onMessage, sendMessage: sendControlMessage, selectedModel, onModelChange, undoState, onUndoStateChange, localUser }: ChatSectionProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRemoteStreaming, setIsRemoteStreaming] = useState(false);
+  const [remoteStreamingUser, setRemoteStreamingUser] = useState<string | null>(null);
   const [undoingTurn, setUndoingTurn] = useState(false);
   const { canUndo, canRedo } = undoState;
   // Track undo/redo actions since last sent message — included as LLM context
@@ -96,6 +102,10 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isInitialScrollRef = useRef(true);
+
+  // Ref for session ID so WS handlers can read the latest without re-subscribing
+  const currentSessionIdRef = useRef(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
 
   // Track whether a session-restored model has been set (to prevent loadModels from overwriting)
   const sessionModelSetRef = useRef(false);
@@ -192,11 +202,35 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
       });
     };
 
+    // Skip events not matching the active session
+    const forActiveSession = (msg: { [key: string]: unknown }) =>
+      !msg.sessionId || msg.sessionId === currentSessionIdRef.current;
+
     const unsubs = [
-      onMessage('chat:start', () => {
+      // Remote user sent a message — add to chat (sender adds optimistically)
+      onMessage('chat:user-message', (msg) => {
+        if (!forActiveSession(msg)) return;
+        if (msg.userId === localUser.id) return; // sender already has it
+        setMessages(prev => [...prev, {
+          id: msg.messageId as string,
+          role: 'user',
+          content: msg.content as string,
+          userId: msg.userId as string,
+          userName: msg.userName as string,
+          avatarUrl: msg.avatarUrl as string | undefined,
+        }]);
+      }),
+      onMessage('chat:start', (msg) => {
+        if (!forActiveSession(msg)) return;
         updateSegments(() => []);
+        // If this is another user's request, track remote streaming
+        if (msg.userId !== localUser.id) {
+          setIsRemoteStreaming(true);
+          setRemoteStreamingUser(msg.userName as string || 'Someone');
+        }
       }),
       onMessage('chat:chunk', (msg) => {
+        if (!forActiveSession(msg)) return;
         const delta = msg.delta as string;
         updateSegments(prev => {
           const last = prev[prev.length - 1];
@@ -207,9 +241,11 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
         });
       }),
       onMessage('chat:tool-call', (msg) => {
+        if (!forActiveSession(msg)) return;
         updateSegments(prev => [...prev, { type: 'tool', tool: msg.tool as string }]);
       }),
       onMessage('chat:tool-result', (msg) => {
+        if (!forActiveSession(msg)) return;
         updateSegments(prev =>
           prev.map(seg =>
             seg.type === 'tool' && seg.tool === (msg.tool as string) && seg.success === undefined
@@ -218,16 +254,45 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
           )
         );
       }),
-      onMessage('chat:complete', () => {
-        // Don't clear — sendMessage handler will snapshot segments into the message
+      onMessage('chat:complete', (msg) => {
+        if (!forActiveSession(msg)) return;
+        // For observers (not the sender): finalize the assistant message from WS data
+        if (msg.userId !== localUser.id) {
+          const content = msg.content as string;
+          const segments = msg.segments as MessageSegment[] | undefined;
+          const toolResults = msg.toolResults as Array<{ tool: string; success: boolean; result?: unknown }> | undefined;
+          setMessages(prev => [...prev, {
+            id: msg.messageId as string || `msg-${Date.now()}`,
+            role: 'assistant',
+            content,
+            segments: segments || buildSegments(content, toolResults),
+            toolResults,
+          }]);
+          updateSegments(() => []);
+          setIsRemoteStreaming(false);
+          setRemoteStreamingUser(null);
+          // Update undo state from server
+          if (msg.canUndo !== undefined) {
+            onUndoStateChange({ canUndo: msg.canUndo as boolean, canRedo: msg.canRedo as boolean });
+          }
+        }
+        // For sender: don't clear — sendMessage handler snapshots segments from HTTP response
       }),
       onMessage('chat:error', (msg) => {
+        if (!forActiveSession(msg)) return;
         updateSegments(() => []);
+        setIsRemoteStreaming(false);
+        setRemoteStreamingUser(null);
         setError(msg.error as string);
+      }),
+      onMessage('chat:model-change', (msg) => {
+        if (!forActiveSession(msg)) return;
+        const model = msg.model as string;
+        if (model) setSelectedModel(model);
       }),
     ];
     return () => unsubs.forEach(u => u());
-  }, [onMessage]);
+  }, [onMessage, localUser.id, onUndoStateChange, setSelectedModel]);
 
   // Track scroll position to decide auto-scroll.
   // shouldFollowRef is the source of truth for follow mode.
@@ -344,6 +409,9 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
       id: `msg-${Date.now()}`,
       role: 'user',
       content: input.trim(),
+      userId: localUser.id,
+      userName: localUser.name,
+      avatarUrl: localUser.avatarUrl,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -582,6 +650,11 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
                 onClick={() => {
                   setSelectedModel(model.id);
                   setShowModelSelector(false);
+                  sendControlMessage({
+                    type: 'chat:model-change',
+                    sessionId: currentSessionId,
+                    model: model.id,
+                  });
                 }}
               >
                 {model.name}
@@ -610,9 +683,19 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
         {messages.map((message) => (
           <div key={message.id} className={`chat-message chat-message-${message.role}`}>
             {message.role === 'user' ? (
-              <div className="chat-message-content">
-                <p>{message.content}</p>
-              </div>
+              <>
+                {message.userId && message.userId !== localUser.id && (
+                  <div className="chat-message-user-header">
+                    <div className="chat-message-avatar" style={message.avatarUrl ? { backgroundImage: `url(${message.avatarUrl})` } : undefined}>
+                      {!message.avatarUrl && (message.userName?.[0] || '?').toUpperCase()}
+                    </div>
+                    <span className="chat-message-user-name">{message.userName || 'Unknown'}</span>
+                  </div>
+                )}
+                <div className="chat-message-content">
+                  <p>{message.content}</p>
+                </div>
+              </>
             ) : (
               /* Assistant messages render interleaved segments */
               (message.segments || buildSegments(message.content, message.toolResults)).map((seg, i) =>
@@ -658,8 +741,13 @@ export function ChatSection({ context, deckId, onMessage, selectedModel, onModel
           </div>
         ))}
 
-        {isLoading && (
+        {(isLoading || isRemoteStreaming) && (
           <div className="chat-message chat-message-assistant">
+            {isRemoteStreaming && !isLoading && (
+              <div className="chat-remote-streaming-label">
+                {remoteStreamingUser} is asking...
+              </div>
+            )}
             {streamingSegments.length === 0 && (
               <div className="chat-loading">
                 <span className="chat-loading-dot" />

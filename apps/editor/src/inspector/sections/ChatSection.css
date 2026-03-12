@@ -322,6 +322,44 @@
   align-self: flex-start;
 }
 
+/* User message attribution (shown for remote users) */
+.chat-message-user-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--space-1);
+  margin-bottom: 2px;
+}
+
+.chat-message-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-accent);
+  color: var(--text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.chat-message-user-name {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* Remote streaming label */
+.chat-remote-streaming-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  padding: var(--space-1) var(--space-3);
+  font-style: italic;
+}
+
 .chat-message-content {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);

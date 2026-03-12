@@ -34,9 +34,10 @@ interface InspectorProps {
   onToggleShowGrid?: () => void;
   onMessage: (type: string, handler: (msg: { type: string; [key: string]: unknown }) => void) => () => void;
   sendMessage: (msg: { type: string; [key: string]: unknown }) => void;
+  localUser: { id: string; name: string; avatarUrl?: string };
 }
 
-export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOnly, showGrid, onToggleShowGrid, onMessage, sendMessage }: InspectorProps) {
+export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOnly, showGrid, onToggleShowGrid, onMessage, sendMessage, localUser }: InspectorProps) {
   const { selection, selectSlide, selectComponent, clearSelection } = useSelection();
   const [activeTab, setActiveTab] = useState<InspectorTab>('selection');
   const [chatModel, setChatModel] = useState<string>('');
@@ -707,7 +708,7 @@ export function Inspector({ visible, onClose, deck, deckId, onUpdateDeck, readOn
           )}
 
           {activeTab === 'chat' && (
-            <ChatSection context={context} deckId={deckId} onMessage={onMessage} sendMessage={sendMessage} selectedModel={chatModel} onModelChange={setChatModel} undoState={chatUndoState} onUndoStateChange={setChatUndoState} />
+            <ChatSection context={context} deckId={deckId} onMessage={onMessage} sendMessage={sendMessage} selectedModel={chatModel} onModelChange={setChatModel} undoState={chatUndoState} onUndoStateChange={setChatUndoState} localUser={localUser} />
           )}
         </div>
 

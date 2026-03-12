@@ -12,13 +12,19 @@ interface RenderError {
   timestamp: number;
 }
 
+interface ClientInfo {
+  userId: string;
+}
+
 interface Session {
   ydoc: Y.Doc;
-  clients: Set<WebSocket>;
+  clients: Map<WebSocket, ClientInfo>;
   lastActivity: Date;
   renderErrors: RenderError[];
   /** Per-chat-session LLM undo managers. Keyed by chat session ID. */
   llmUndoManagers: Map<string, Y.UndoManager>;
+  /** Chat sessions with an active LLM request. Maps chatSessionId → userId. */
+  activeChats: Map<string, string>;
 }
 
 // In-memory map of active sessions
@@ -32,10 +38,11 @@ export function getOrCreateSession(deckId: string): Session {
   if (!session) {
     session = {
       ydoc: new Y.Doc(),
-      clients: new Set(),
+      clients: new Map(),
       lastActivity: new Date(),
       renderErrors: [],
       llmUndoManagers: new Map(),
+      activeChats: new Map(),
     };
     sessions.set(deckId, session);
   }
@@ -56,11 +63,11 @@ export function getActiveSession(deckId: string): Session | null {
 /**
  * Add a client WebSocket to a session
  */
-export function addClient(deckId: string, ws: WebSocket): void {
+export function addClient(deckId: string, ws: WebSocket, userId: string): void {
   const session = getOrCreateSession(deckId);
-  session.clients.add(ws);
+  session.clients.set(ws, { userId });
   session.lastActivity = new Date();
-  console.log(`[Session] Client joined ${deckId} (${session.clients.size} clients)`);
+  console.log(`[Session] Client joined ${deckId} (${session.clients.size} clients, user=${userId})`);
 }
 
 /**
@@ -98,7 +105,7 @@ export function broadcastUpdate(deckId: string, update: Uint8Array, excludeWs?: 
     return;
   }
 
-  for (const client of session.clients) {
+  for (const client of session.clients.keys()) {
     if (client !== excludeWs && client.readyState === 1) { // 1 = OPEN
       try {
         client.send(update);
@@ -140,7 +147,7 @@ export function broadcastJSON(deckId: string, message: object, excludeWs?: WebSo
   }
 
   const data = JSON.stringify(message);
-  for (const client of session.clients) {
+  for (const client of session.clients.keys()) {
     if (client !== excludeWs && client.readyState === 1) {
       try {
         client.send(data);
@@ -248,7 +255,7 @@ export function closeSession(deckId: string): void {
   // Send a control message before closing — Vite's WS proxy swallows close codes,
   // so the client needs to detect deletion from a message instead.
   broadcastJSON(deckId, { type: 'deck-deleted' });
-  for (const client of session.clients) {
+  for (const client of session.clients.keys()) {
     try {
       client.close(4002, 'Deck deleted');
     } catch {
@@ -321,6 +328,11 @@ export function handleControlMessage(_deckId: string, _ws: WebSocket, msg: Contr
       }
       break;
     }
+    case 'chat:model-change': {
+      // Relay to other clients so model selector stays in sync
+      broadcastJSON(_deckId, msg, _ws);
+      break;
+    }
     default:
       console.warn(`[Session] Unknown control message type: ${msg.type}`);
   }
@@ -328,11 +340,36 @@ export function handleControlMessage(_deckId: string, _ws: WebSocket, msg: Contr
 
 /**
  * Request a slide capture from a connected client.
+ * If preferUserId is provided, targets that user's client (the chat sender).
+ * Falls back to any connected client.
  * Returns a promise that resolves with the base64 data URL (data:image/jpeg;base64,...).
  */
-export async function requestCapture(deckId: string, slideId: string): Promise<string> {
+export async function requestCapture(deckId: string, slideId: string, preferUserId?: string): Promise<string> {
   const session = sessions.get(deckId);
   if (!session || session.clients.size === 0) {
+    throw new Error('No clients connected to capture slide');
+  }
+
+  // Find the best client: prefer the requesting user's socket
+  let target: WebSocket | undefined;
+  if (preferUserId) {
+    for (const [ws, info] of session.clients) {
+      if (info.userId === preferUserId && ws.readyState === 1) {
+        target = ws;
+        break;
+      }
+    }
+  }
+  // Fallback to any open client
+  if (!target) {
+    for (const ws of session.clients.keys()) {
+      if (ws.readyState === 1) {
+        target = ws;
+        break;
+      }
+    }
+  }
+  if (!target) {
     throw new Error('No clients connected to capture slide');
   }
 
@@ -346,9 +383,7 @@ export async function requestCapture(deckId: string, slideId: string): Promise<s
 
     pendingCaptures.set(requestId, { resolve, reject, timeout });
 
-    // Send to first connected client
-    const client = session.clients.values().next().value!;
-    sendJSON(client, {
+    sendJSON(target!, {
       type: 'command:capture-slide',
       requestId,
       slideId,
@@ -387,6 +422,29 @@ export function waitForRenderErrors(deckId: string, timeoutMs: number): Promise<
       resolve(drainRenderErrors(deckId));
     }, timeoutMs);
   });
+}
+
+// ============================================================================
+// Active Chat Guards (prevent concurrent LLM requests per chat session)
+// ============================================================================
+
+/**
+ * Mark a chat session as actively streaming. Returns false if already busy.
+ */
+export function startChat(deckId: string, chatSessionId: string, userId: string): boolean {
+  const session = sessions.get(deckId);
+  if (!session) return false;
+  if (session.activeChats.has(chatSessionId)) return false;
+  session.activeChats.set(chatSessionId, userId);
+  return true;
+}
+
+/**
+ * Clear the active chat flag for a session.
+ */
+export function endChat(deckId: string, chatSessionId: string): void {
+  const session = sessions.get(deckId);
+  if (session) session.activeChats.delete(chatSessionId);
 }
 
 /**

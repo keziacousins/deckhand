@@ -67,7 +67,7 @@ server.on('upgrade', async (request, socket, head) => {
   }
 
   wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request, deckId, role, token);
+    wss.emit('connection', ws, request, deckId, role, token, claims.sub);
   });
 });
 
@@ -75,7 +75,7 @@ server.on('upgrade', async (request, socket, head) => {
 const WS_TOKEN_GRACE_MS = 2 * 60 * 1000; // 2 minutes
 
 // WebSocket connection handling
-wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, role: string, initialToken: string) => {
+wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, role: string, initialToken: string, userId: string) => {
   const readOnly = role === 'viewer';
   console.log(`[WS] Client connecting to deck: ${deckId} (role: ${role}${readOnly ? ', read-only' : ''})`);
 
@@ -93,7 +93,7 @@ wss.on('connection', async (ws: WebSocket, _request: unknown, deckId: string, ro
   }
 
   // Add client to session
-  addClient(deckId, ws);
+  addClient(deckId, ws, userId);
 
   // Send initial state to client (prefixed with MSG_YDOC type byte)
   const initialState = Y.encodeStateAsUpdate(session.ydoc);

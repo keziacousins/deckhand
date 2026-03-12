@@ -110,6 +110,8 @@ export async function initSchema(): Promise<void> {
     ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS segments TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_storage_key TEXT;
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS user_id TEXT;
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS user_name TEXT;
   `);
 
   console.log('[DB] Schema initialized');
@@ -217,5 +219,7 @@ export interface ChatMessageRow {
   content: string;
   model: string | null;
   tool_results: string | null;
+  user_id: string | null;
+  user_name: string | null;
   created_at: string;
 }

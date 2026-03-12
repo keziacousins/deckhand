@@ -312,6 +312,11 @@ function DeckEditorInner({ deckId, onBack }: DeckEditorProps) {
         onToggleShowGrid={() => setShowGrid((v) => !v)}
         onMessage={onMessage}
         sendMessage={sendMessage}
+        localUser={{
+          id: authUser?.sub ?? 'anonymous',
+          name: profile?.name ?? authUser?.name ?? 'Anonymous',
+          avatarUrl: profile?.avatarUrl ?? undefined,
+        }}
       />
       
       {showStartModal && deck && (

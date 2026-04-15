@@ -1,0 +1,21 @@
+{
+  "identities": [
+    {
+      "name": "deckhand",
+      "credentials": [
+        {
+          "accessKey": "your-access-key",
+          "secretKey": "your-secret-key"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging",
+        "Lock"
+      ]
+    }
+  ]
+}

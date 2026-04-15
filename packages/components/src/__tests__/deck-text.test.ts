@@ -51,6 +51,36 @@ describe('DeckText', () => {
     expect(p?.textContent).toContain('<script>');
   });
 
+  it('sanitizes script tags in markdown mode', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('markdown', 'true');
+    el.setAttribute('content', '<script>alert("xss")</script>');
+    document.body.appendChild(el);
+
+    const html = el.shadowRoot?.innerHTML || '';
+    expect(html).not.toContain('<script>');
+  });
+
+  it('sanitizes attribute-based XSS in markdown mode', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('markdown', 'true');
+    el.setAttribute('content', '<img src=x onerror="alert(1)">');
+    document.body.appendChild(el);
+
+    const html = el.shadowRoot?.innerHTML || '';
+    expect(html).not.toContain('onerror');
+  });
+
+  it('sanitizes javascript: URLs in markdown mode', () => {
+    const el = document.createElement('deck-text') as DeckText;
+    el.setAttribute('markdown', 'true');
+    el.setAttribute('content', '[click me](javascript:alert(1))');
+    document.body.appendChild(el);
+
+    const html = el.shadowRoot?.innerHTML || '';
+    expect(html).not.toContain('javascript:');
+  });
+
   it('handles empty content', () => {
     const el = document.createElement('deck-text') as DeckText;
     el.setAttribute('content', '');

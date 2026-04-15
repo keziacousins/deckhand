@@ -12,6 +12,7 @@ import { DeckComponent } from '../../base';
 import type { ComponentMeta } from '../../types';
 import { PropertyGroups, CommonProperties } from '../../types';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { styles } from './styles';
 import { mathExtension } from './math';
 import { katexFontFaces, katexLayoutCss } from './katex-styles';
@@ -190,7 +191,9 @@ export class DeckText extends DeckComponent {
     if (isMarkdown) {
       if (hasMath) ensureKatexFonts();
       const mdClasses = `text markdown${tableStriped ? ' table-striped' : ''}`;
-      bodyHtml = `<div class="${mdClasses}"${editable ? ' contenteditable="true" data-placeholder="Enter markdown..."' : ''}>${marked.parse(content) as string}</div>`;
+      const rawHtml = marked.parse(content) as string;
+      const cleanHtml = DOMPurify.sanitize(rawHtml);
+      bodyHtml = `<div class="${mdClasses}"${editable ? ' contenteditable="true" data-placeholder="Enter markdown..."' : ''}>${cleanHtml}</div>`;
     } else {
       bodyHtml = `<p class="text"${editable ? ' contenteditable="true" data-placeholder="Enter text..."' : ''}>${this.escapeHtml(content)}</p>`;
     }

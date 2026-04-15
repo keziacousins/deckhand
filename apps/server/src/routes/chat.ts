@@ -180,10 +180,10 @@ router.post('/:deckId/chat/sessions', requireDeckRole('owner', 'editor'), async 
  * DELETE /api/decks/:deckId/chat/sessions/:sessionId
  */
 router.delete('/:deckId/chat/sessions/:sessionId', requireDeckRole('owner', 'editor'), async (req, res) => {
-  const { sessionId } = req.params;
+  const { deckId, sessionId } = req.params;
 
   try {
-    await pool.query('DELETE FROM chat_sessions WHERE id = $1', [sessionId]);
+    await pool.query('DELETE FROM chat_sessions WHERE id = $1 AND deck_id = $2', [sessionId, deckId]);
     res.json({ success: true });
   } catch (error) {
     console.error('[Chat] Error deleting session:', error);

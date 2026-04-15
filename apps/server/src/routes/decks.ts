@@ -71,6 +71,8 @@ decksRouter.post('/', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Authentication required' });
 
     const { title, description } = req.body;
+    if (title && title.length > 255) return res.status(400).json({ error: 'Title must be 255 characters or fewer' });
+    if (description && description.length > 2000) return res.status(400).json({ error: 'Description must be 2000 characters or fewer' });
 
     const deck = createEmptyDeck(title || 'Untitled Deck');
     if (description) {
@@ -133,6 +135,8 @@ decksRouter.put('/:id', requireDeckRole('owner', 'editor'), async (req, res) => 
 decksRouter.patch('/:id', requireDeckRole('owner', 'editor'), async (req, res) => {
   try {
     const { title, description } = req.body;
+    if (title && title.length > 255) return res.status(400).json({ error: 'Title must be 255 characters or fewer' });
+    if (description && description.length > 2000) return res.status(400).json({ error: 'Description must be 2000 characters or fewer' });
 
     const row = await updateDeckMetadata(req.params.id, { title, description });
     if (!row) {

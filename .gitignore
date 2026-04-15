@@ -48,3 +48,11 @@ coverage/
 
 # MCP config (local)
 .mcp.json
+
+# Sensitive / planning files
+pw
+PLAN-*.md
+RESEARCH-*.md
+
+# Service credentials (local dev)
+ory/seaweedfs/s3.json

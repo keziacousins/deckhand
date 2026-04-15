@@ -6,8 +6,19 @@
 import pg from 'pg';
 import { dbConfig } from '../config.js';
 
-export const pool = new pg.Pool({
-  connectionString: dbConfig.connectionString,
+let _pool: pg.Pool | null = null;
+
+function getPool(): pg.Pool {
+  if (!_pool) {
+    _pool = new pg.Pool({ connectionString: dbConfig.connectionString });
+  }
+  return _pool;
+}
+
+export const pool: pg.Pool = new Proxy({} as pg.Pool, {
+  get(_target, prop) {
+    return (getPool() as unknown as Record<string | symbol, unknown>)[prop];
+  },
 });
 
 /**

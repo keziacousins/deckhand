@@ -1,7 +1,16 @@
 import crypto from 'node:crypto';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { Configuration, OAuth2Api, FrontendApi } from '@ory/client';
-import { oryConfig } from '../config.js';
+import { oryConfig, allowedOrigins } from '../config.js';
+
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
 import { upsertUser, updateUserName } from '../db/users.js';
 import { getUser } from '../db/users.js';
 import { jwtMiddleware, getAuthUser } from '../middleware/auth.js';
@@ -67,7 +76,7 @@ export const authRouter = Router();
  * POST /register — Proxy registration through Kratos native flow.
  * Body: { email, password, name? }
  */
-authRouter.post('/register', async (req, res) => {
+authRouter.post('/register', authRateLimiter, async (req, res) => {
   const { email, password, name } = req.body;
 
   if (!email || !password) {
@@ -107,7 +116,7 @@ authRouter.post('/register', async (req, res) => {
  * Body: { email, password }
  * Returns: { success: true, loginNonce: string }
  */
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', authRateLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -159,7 +168,7 @@ authRouter.post('/login', async (req, res) => {
  * Always returns success to prevent email enumeration.
  * Body: { email }
  */
-authRouter.post('/recovery', async (req, res) => {
+authRouter.post('/recovery', authRateLimiter, async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
@@ -214,6 +223,10 @@ authRouter.post('/token', async (req, res) => {
 
   if (!code || !code_verifier || !redirect_uri) {
     return res.status(400).json({ error: 'Missing code, code_verifier, or redirect_uri' });
+  }
+
+  if (!allowedOrigins.some((origin: string) => redirect_uri.startsWith(origin + '/'))) {
+    return res.status(400).json({ error: 'Invalid redirect_uri' });
   }
 
   try {

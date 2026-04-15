@@ -8,6 +8,14 @@ if (process.env.NODE_ENV !== 'production') {
   dotenvConfig();
 }
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3008', 10),
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -18,18 +26,26 @@ export function isLLMEnabled(): boolean {
 }
 
 export const dbConfig = {
-  connectionString:
-    process.env.DATABASE_URL ||
-    'postgresql://deckhand:deckhand@localhost:5433/deckhand',
+  get connectionString(): string {
+    return requireEnv('DATABASE_URL');
+  },
 };
 
 export const s3Config = {
   endpoint: process.env.S3_ENDPOINT || 'http://localhost:8333',
-  accessKeyId: process.env.S3_ACCESS_KEY || 'deckhand-dev-key',
-  secretAccessKey: process.env.S3_SECRET_KEY || 'deckhand-dev-secret',
+  get accessKeyId(): string {
+    return requireEnv('S3_ACCESS_KEY');
+  },
+  get secretAccessKey(): string {
+    return requireEnv('S3_SECRET_KEY');
+  },
   bucket: process.env.S3_BUCKET || 'deckhand-assets',
   region: process.env.S3_REGION || 'us-east-1',
 };
+
+export const allowedOrigins: string[] = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+  : ['http://localhost:5173', 'http://localhost:5178'];
 
 export const oryConfig = {
   kratosPublicUrl: process.env.KRATOS_PUBLIC_URL || 'http://localhost:4433',

@@ -52,7 +52,7 @@ describe('API Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await pool.end();
+    if (pgAvailable) await pool.end();
   });
 
   beforeEach(async (ctx) => {

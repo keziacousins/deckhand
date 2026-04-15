@@ -4,8 +4,7 @@ export default defineConfig({
   test: {
     env: {
       // Use separate test database to avoid clobbering dev data
-      DATABASE_URL: process.env.DATABASE_URL?.replace('/deckhand', '/deckhand_test')
-        || 'postgresql://deckhand:deckhand@minimax.local:5433/deckhand_test',
+      DATABASE_URL: process.env.DATABASE_URL?.replace('/deckhand', '/deckhand_test') || '',
     },
   },
 });

@@ -15,6 +15,7 @@ import { meRouter, avatarsRouter } from './routes/me.js';
 import { jwtMiddleware } from './middleware/auth.js';
 import { getAllSessions } from './sessions.js';
 import { pool } from './db/schema.js';
+import { allowedOrigins } from './config.js';
 
 interface AppOptions {
   skipAuth?: boolean;
@@ -26,12 +27,15 @@ export function createApp(options: AppOptions = {}): Express {
   // JSON body parsing
   app.use(express.json());
 
-  // CORS for development
-  app.use((_req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (_req.method === 'OPTIONS') {
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Vary', 'Origin');
+    }
+    if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
     }
     next();

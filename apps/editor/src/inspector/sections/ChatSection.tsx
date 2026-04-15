@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
 import { apiFetch } from '../../api/decks';
 import type { InspectorContext } from '../types';
 import './ChatSection.css';
@@ -701,7 +702,7 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
               (message.segments || buildSegments(message.content, message.toolResults)).map((seg, i) =>
                 seg.type === 'text' ? (
                   <div key={i} className="chat-message-content">
-                    <ReactMarkdown>{seg.content}</ReactMarkdown>
+                    <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{seg.content}</ReactMarkdown>
                   </div>
                 ) : (
                   <div key={i} className="chat-tool-call">
@@ -761,7 +762,7 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
             {streamingSegments.map((seg, i) =>
               seg.type === 'text' ? (
                 <div key={i} className="chat-message-content">
-                  <ReactMarkdown>{seg.content}</ReactMarkdown>
+                  <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{seg.content}</ReactMarkdown>
                 </div>
               ) : (
                 <div key={i} className="chat-tool-call">

@@ -2,38 +2,81 @@
 
 LLM-first presentation authoring. Describe slides in natural language, and an AI builds them using structured components. Real-time multi-user collaboration via YJS.
 
-## Prerequisites
+## Deployment
 
-- Node.js 20+
-- Docker (for infrastructure services)
-- An [Anthropic API key](https://console.anthropic.com/) for LLM features
+Everything runs in Docker. A single `docker compose up -d` starts the full stack: app server, frontend, PostgreSQL, Ory Kratos/Hydra (auth), SeaweedFS (object storage), and nginx (TLS/reverse proxy).
 
-## Getting Started
-
-### 1. Start infrastructure
-
-Docker Compose manages PostgreSQL, Ory Kratos/Hydra (auth), and SeaweedFS (object storage). The editor and server run natively.
+### 1. Generate credentials
 
 ```bash
-cp .env.example .env          # adjust secrets for non-local use
+./scripts/generate-env.sh
+```
+
+This creates `.env` and `ory/seaweedfs/s3.json` with random passwords and secrets. All credentials are kept in sync between services.
+
+### 2. Configure
+
+Edit `.env` and set:
+- `ANTHROPIC_API_KEY` — your [Anthropic API key](https://console.anthropic.com/)
+- `PUBLIC_URL` — the public URL where users will access the app (e.g. `https://deck.example.com`)
+
+### 3. TLS certificates
+
+Place your TLS certificate and key at:
+```
+nginx/certs/cert.pem
+nginx/certs/key.pem
+```
+
+For [Tailscale](https://tailscale.com/) hosts, generate certs with:
+```bash
+sudo tailscale cert --cert-file nginx/certs/cert.pem --key-file nginx/certs/key.pem your-hostname.ts.net
+```
+
+For public domains, use [certbot](https://certbot.eff.org/) or your preferred ACME client.
+
+### 4. Start
+
+```bash
 docker compose up -d
 ```
 
-### 2. Configure the server
+The app will be available at your `PUBLIC_URL`.
+
+## Development
+
+### Prerequisites
+
+- Node.js 20+
+- Docker (for infrastructure services)
+
+### Setup
+
+Start only the infrastructure services (databases, auth, object storage):
 
 ```bash
-cp apps/server/.env.example apps/server/.env
-# Edit apps/server/.env — set ANTHROPIC_API_KEY at minimum
+./scripts/generate-env.sh
+# Edit .env — set ANTHROPIC_API_KEY
+docker compose up -d deckhand-postgres ory-postgres kratos hydra seaweedfs
 ```
 
-### 3. Install and run
+Then install dependencies and run the dev servers:
 
 ```bash
 npm install
-npm run dev:all               # starts editor (Vite) + server (tsx watch)
+npm run dev:all    # starts editor (Vite) + server (tsx watch)
 ```
 
 The editor opens at `http://localhost:5178`.
+
+### Commands
+
+```bash
+npm run build         # build all packages
+npm run test          # run unit tests across all workspaces
+npm run typecheck     # type check all packages
+npx playwright test   # E2E tests (requires dev servers running)
+```
 
 ## Project Structure
 
@@ -46,15 +89,6 @@ apps/server           Express backend + WebSocket + LLM integration
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design decisions and detailed system documentation.
-
-## Development
-
-```bash
-npm run build         # build all packages
-npm run test          # run unit tests across all workspaces
-npm run typecheck     # type check all packages
-npx playwright test   # E2E tests (requires dev servers running)
-```
 
 ## How It Works
 

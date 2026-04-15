@@ -56,3 +56,6 @@ RESEARCH-*.md
 
 # Service credentials (local dev)
 ory/seaweedfs/s3.json
+
+# TLS certs (per-deployment)
+nginx/certs/

@@ -1,11 +1,46 @@
-# Deckhand infrastructure services.
-# The editor and server run natively (npm run dev) — this only manages
-# Postgres, Kratos, Hydra, and SeaweedFS.
-#
-# No volume mounts for config — everything is baked into images via Dockerfiles,
-# so this works with remote Docker hosts.
+# Deckhand — full stack.
+# `docker compose up -d` starts everything: app, databases, auth, object storage, reverse proxy.
 
 services:
+  # --- Reverse Proxy ---
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${TLS_CERT_DIR:-./nginx/certs}:/etc/nginx/certs:ro
+    depends_on:
+      - app
+      - hydra
+    restart: unless-stopped
+
+  # --- App ---
+
+  app:
+    build: .
+    environment:
+      PORT: "3008"
+      DATABASE_URL: postgresql://${DECKHAND_DB_USER:-deckhand}:${DECKHAND_DB_PASSWORD:-deckhand}@deckhand-postgres:5432/${DECKHAND_DB_NAME:-deckhand}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      S3_ENDPOINT: http://seaweedfs:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-deckhand-assets}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      KRATOS_PUBLIC_URL: http://kratos:4433
+      KRATOS_ADMIN_URL: http://kratos:4434
+      HYDRA_PUBLIC_URL: ${PUBLIC_URL:-https://localhost}/oauth2
+      HYDRA_ADMIN_URL: http://hydra:4445
+      CORS_ORIGINS: ${PUBLIC_URL:-https://localhost}
+    depends_on:
+      deckhand-postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    restart: unless-stopped
+
   # --- Databases ---
 
   ory-postgres:
@@ -55,21 +90,16 @@ services:
   kratos:
     build: ./ory/kratos
     command: serve -c /etc/kratos/kratos.yml --dev --watch-courier
-    ports:
-      - "${KRATOS_PUBLIC_PORT:-4433}:4433"
-      - "${KRATOS_ADMIN_PORT:-4434}:4434"
     environment:
       DSN: postgres://${ORY_DB_USER:-ory}:${ORY_DB_PASSWORD:-ory}@ory-postgres:5432/kratos?sslmode=disable
       SECRETS_COOKIE: ${KRATOS_COOKIE_SECRET:-CHANGE-ME-IN-PRODUCTION-KRATOS-COOKIE-SECRET}
       SECRETS_CIPHER: ${KRATOS_CIPHER_SECRET:-change-me-in-prod-32-char-key!!!}
       SERVE_PUBLIC_BASE_URL: ${KRATOS_PUBLIC_URL:-http://localhost:4433}/
       SERVE_ADMIN_BASE_URL: ${KRATOS_ADMIN_URL:-http://localhost:4434}/
-      DECKHAND_API_URL: ${DECKHAND_API_URL:-http://host.docker.internal:3008}
+      DECKHAND_API_URL: http://app:3008
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   # --- Ory Hydra (OAuth2 / JWT) ---
@@ -87,22 +117,17 @@ services:
   hydra:
     build: ./ory/hydra
     command: serve all -c /etc/hydra/hydra.yml --dev
-    ports:
-      - "${HYDRA_PUBLIC_PORT:-4444}:4444"
-      - "${HYDRA_ADMIN_PORT:-4445}:4445"
     environment:
       DSN: postgres://${ORY_DB_USER:-ory}:${ORY_DB_PASSWORD:-ory}@ory-postgres:5432/hydra?sslmode=disable
       SECRETS_SYSTEM: ${HYDRA_SYSTEM_SECRET:-CHANGE-ME-IN-PRODUCTION-HYDRA-SYSTEM-SECRET!}
-      URLS_SELF_ISSUER: ${HYDRA_ISSUER:-http://localhost:4444}
-      URLS_LOGIN: ${LOGIN_URL:-http://localhost:3008/api/auth/login}
-      URLS_CONSENT: ${CONSENT_URL:-http://localhost:3008/api/auth/consent}
-      URLS_LOGOUT: ${LOGOUT_URL:-http://localhost:3008/api/auth/logout}
-      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:-http://localhost:5178}
+      URLS_SELF_ISSUER: ${PUBLIC_URL:-https://localhost}/oauth2
+      URLS_LOGIN: http://app:3008/api/auth/login
+      URLS_CONSENT: http://app:3008/api/auth/consent
+      URLS_LOGOUT: http://app:3008/api/auth/logout
+      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:-https://localhost}
     depends_on:
       hydra-migrate:
         condition: service_completed_successfully
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   # --- SeaweedFS (Object Storage) ---
@@ -117,10 +142,11 @@ services:
     volumes:
       - seaweedfs-data:/data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9333/cluster/status"]
-      interval: 5s
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/status"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   # --- One-shot init: register OAuth2 client ---

@@ -5,6 +5,9 @@ See `ARCHITECTURE.md` for project overview, design decisions, and system structu
 ## Commands
 
 ```bash
+# Start infrastructure for local dev (databases, auth, object storage)
+docker compose up -d deckhand-postgres ory-postgres kratos hydra seaweedfs
+
 # Install dependencies
 npm install
 

@@ -1,0 +1,11 @@
+node_modules
+.git
+reference-code
+*.md
+.env
+.env.*
+pw
+PLAN-*
+RESEARCH-*
+coverage
+.DS_Store

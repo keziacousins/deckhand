@@ -3,6 +3,9 @@
  * Separated from index.ts to allow testing.
  */
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import express, { type Express } from 'express';
 import { decksRouter } from './routes/decks.js';
 import assetsRouter from './routes/assets.js';
@@ -90,6 +93,16 @@ export function createApp(options: AppOptions = {}): Express {
 
   // Models routes
   app.use('/api/models', modelsRouter);
+
+  // Serve frontend static files in production
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const editorDist = path.resolve(__dirname, '../../../dist/editor');
+  if (fs.existsSync(editorDist)) {
+    app.use(express.static(editorDist));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(editorDist, 'index.html'));
+    });
+  }
 
   return app;
 }

@@ -121,16 +121,15 @@ export function AssetsSection({ context, stickyIndex = 0 }: InspectorSectionProp
         value: newAssets,
       });
 
-      // Clean up any slide references to this asset's URL
-      const assetUrl = assetToDelete.url;
+      // Clean up any slide references to this asset
       for (const slide of Object.values(deck.slides)) {
-        if (slide.style?.backgroundImage === assetUrl) {
+        if (slide.style?.backgroundAssetId === assetId) {
           onUpdate({
             type: 'slide',
             slideId: slide.id,
             field: 'style',
-            value: { 
-              backgroundImage: undefined,
+            value: {
+              backgroundAssetId: undefined,
               backgroundSize: undefined,
               backgroundDarken: undefined,
               backgroundBlur: undefined,

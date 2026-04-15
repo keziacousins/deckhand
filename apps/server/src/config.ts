@@ -52,5 +52,4 @@ export const oryConfig = {
   kratosAdminUrl: process.env.KRATOS_ADMIN_URL || 'http://localhost:4434',
   hydraPublicUrl: process.env.HYDRA_PUBLIC_URL || 'http://localhost:4444',
   hydraAdminUrl: process.env.HYDRA_ADMIN_URL || 'http://localhost:4445',
-  publicUrl: process.env.PUBLIC_URL || 'http://localhost:5178',
 };

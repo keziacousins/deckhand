@@ -32,7 +32,6 @@ function buildSegments(content: string, toolResults?: Array<{ tool: string; succ
   return segs;
 }
 
-type StreamingSegment = MessageSegment;
 
 interface ChatSession {
   id: string;
@@ -88,10 +87,9 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
   }
   const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [streamingSegments, setStreamingSegments] = useState<StreamingSegment[]>([]);
-  const streamingSegmentsRef = useRef<StreamingSegment[]>([]);
+  const [streamingSegments, setMessageSegments] = useState<MessageSegment[]>([]);
+  const streamingSegmentsRef = useRef<MessageSegment[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const setSelectedModel = onModelChange;
   const [modelsLoading, setModelsLoading] = useState(true);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showSessionList, setShowSessionList] = useState(false);
@@ -127,7 +125,7 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
           setCurrentSessionId(data.sessions[0].id);
           if (data.sessions[0].model) {
             sessionModelSetRef.current = true;
-            setSelectedModel(data.sessions[0].model);
+            onModelChange(data.sessions[0].model);
           }
         }
       } catch (err) {
@@ -181,7 +179,7 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
           defaultModelRef.current = defaultId || null;
           // Only set default if no session-restored model is active
           if (!sessionModelSetRef.current && !selectedModel) {
-            setSelectedModel(defaultId || '');
+            onModelChange(defaultId || '');
           }
         }
       } catch (err) {
@@ -195,8 +193,8 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
 
   // Subscribe to streaming chat messages via WebSocket
   useEffect(() => {
-    const updateSegments = (updater: (prev: StreamingSegment[]) => StreamingSegment[]) => {
-      setStreamingSegments(prev => {
+    const updateSegments = (updater: (prev: MessageSegment[]) => MessageSegment[]) => {
+      setMessageSegments(prev => {
         const next = updater(prev);
         streamingSegmentsRef.current = next;
         return next;
@@ -289,11 +287,11 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
       onMessage('chat:model-change', (msg) => {
         if (!forActiveSession(msg)) return;
         const model = msg.model as string;
-        if (model) setSelectedModel(model);
+        if (model) onModelChange(model);
       }),
     ];
     return () => unsubs.forEach(u => u());
-  }, [onMessage, localUser.id, onUndoStateChange, setSelectedModel]);
+  }, [onMessage, localUser.id, onUndoStateChange, onModelChange]);
 
   // Track scroll position to decide auto-scroll.
   // shouldFollowRef is the source of truth for follow mode.
@@ -370,9 +368,9 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
     onUndoStateChange({ canUndo: false, canRedo: false });
     // Reset to default model for new chats
     if (defaultModelRef.current) {
-      setSelectedModel(defaultModelRef.current);
+      onModelChange(defaultModelRef.current);
     }
-  }, [setSelectedModel, onUndoStateChange]);
+  }, [onModelChange, onUndoStateChange]);
 
   const selectSession = useCallback((sessionId: string) => {
     setCurrentSessionId(sessionId);
@@ -381,9 +379,9 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
     // Restore model selection for this session
     const session = sessions.find(s => s.id === sessionId);
     if (session?.model) {
-      setSelectedModel(session.model);
+      onModelChange(session.model);
     }
-  }, [sessions, setSelectedModel, onUndoStateChange]);
+  }, [sessions, onModelChange, onUndoStateChange]);
 
   const deleteSession = useCallback(async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -479,7 +477,7 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-      setStreamingSegments([]);
+      setMessageSegments([]);
       streamingSegmentsRef.current = [];
 
       // Update LLM undo/redo state
@@ -649,7 +647,7 @@ export function ChatSection({ context, deckId, onMessage, sendMessage: sendContr
                 key={model.id}
                 className={`chat-model-option ${model.id === selectedModel ? 'selected' : ''}`}
                 onClick={() => {
-                  setSelectedModel(model.id);
+                  onModelChange(model.id);
                   setShowModelSelector(false);
                   sendControlMessage({
                     type: 'chat:model-change',

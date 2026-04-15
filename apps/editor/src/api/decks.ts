@@ -130,20 +130,6 @@ export async function createDeck(data: {
   return handleResponse(response);
 }
 
-/**
- * Update deck metadata
- */
-export async function updateDeckMetadata(
-  id: string,
-  data: { title?: string; description?: string }
-): Promise<DeckMetadata> {
-  const response = await apiFetch(`${API_BASE}/decks/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  return handleResponse(response);
-}
 
 /**
  * Delete a deck

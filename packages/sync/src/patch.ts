@@ -15,7 +15,6 @@ import { toYValue, fromYValue } from './ydoc';
 /**
  * Root-level keys in a Deck document
  */
-const ROOT_MAPS = ['meta', 'theme', 'slides', 'flow', 'assets'] as const;
 
 /**
  * Apply a list of patches to a Y.Doc.
@@ -219,4 +218,3 @@ function navigateToPath(
   return current as Y.Map<unknown> | Y.Array<unknown>;
 }
 
-export { findIndexById, navigateToPath };

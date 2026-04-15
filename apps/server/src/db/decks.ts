@@ -174,19 +174,6 @@ export async function getYDocState(deckId: string): Promise<Buffer | null> {
   return rows[0]?.data ?? null;
 }
 
-/**
- * Save YDoc state for a deck
- */
-export async function saveYDocState(deckId: string, data: Buffer): Promise<void> {
-  await pool.query(
-    `INSERT INTO ydoc_states (deck_id, data, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (deck_id) DO UPDATE SET
-       data = EXCLUDED.data,
-       updated_at = NOW()`,
-    [deckId, data]
-  );
-}
 
 /**
  * Delete YDoc state for a deck

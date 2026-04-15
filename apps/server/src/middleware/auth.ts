@@ -32,9 +32,6 @@ const jwksClient = jwksRsa({
  * JWT validation middleware.
  * Requires a valid token — returns 401 if missing or invalid.
  */
-// Debug: log expected issuer on startup
-console.log('[Auth] Expected JWT issuer:', oryConfig.hydraPublicUrl);
-
 export const jwtMiddleware = expressjwt({
   secret: jwksRsa.expressJwtSecret({
     cache: true,

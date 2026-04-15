@@ -200,7 +200,7 @@ router.patch('/:deckId/chat/sessions/:sessionId', requireDeckRole('owner', 'edit
 
   try {
     if (title !== undefined) {
-      await pool.query('UPDATE chat_sessions SET title = $1 WHERE id = $2', [title, sessionId]);
+      await pool.query('UPDATE chat_sessions SET title = $1, updated_at = NOW() WHERE id = $2', [title, sessionId]);
     }
     res.json({ success: true });
   } catch (error) {
@@ -403,31 +403,19 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
   await updateSession(sessionId);
 
   try {
-    // Get current deck state
-    console.log(`[Chat] Processing request for deckId: ${deckId}`);
     const session = getOrCreateSession(deckId);
-    console.log(`[Chat] Session clients: ${session.clients.size}`);
 
-    // Load from DB if no active clients
     if (session.clients.size === 0) {
-      console.log(`[Chat] No clients, loading from DB...`);
       const loadedDoc = await loadYDoc(deckId);
       if (loadedDoc) {
         const state = Y.encodeStateAsUpdate(loadedDoc);
         Y.applyUpdate(session.ydoc, state);
-        console.log(`[Chat] Loaded YDoc from DB`);
-      } else {
-        console.log(`[Chat] No YDoc found in DB for ${deckId}`);
       }
     }
 
     const deck = yDocToDeck(session.ydoc);
-    console.log(`[Chat] Deck meta:`, deck?.meta?.title);
-    console.log(`[Chat] Deck slides:`, deck?.slides ? Object.keys(deck.slides).length : 0);
-    console.log(`[Chat] Context:`, JSON.stringify(context));
 
     if (!deck || !deck.meta) {
-      console.log(`[Chat] Deck not found or no meta - returning 404`);
       return res.status(404).json({ error: 'Deck not found' });
     }
 
@@ -546,8 +534,6 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
     // Agent loop - keep calling until no more tool use
     let response = await streamOnce();
 
-    console.log(`[Chat] Response stop_reason: ${response.stop_reason}`);
-
     // Process tool calls in a loop
     while (response.stop_reason === 'tool_use') {
       const assistantContent = response.content;
@@ -567,8 +553,6 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
       const toolResultContents: (Anthropic.ToolResultBlockParam | Anthropic.TextBlockParam)[] = [];
 
       for (const toolUse of toolUseBlocks) {
-        console.log(`[Chat] Tool call: ${toolUse.name}`, toolUse.input);
-
         // Broadcast tool call to clients
         broadcastJSON(deckId, {
           type: 'chat:tool-call',

@@ -11,8 +11,7 @@ const authRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
 });
-import { upsertUser, updateUserName } from '../db/users.js';
-import { getUser } from '../db/users.js';
+import { upsertUser, getUser, updateUser } from '../db/users.js';
 import { jwtMiddleware, getAuthUser } from '../middleware/auth.js';
 
 const hydraAdmin = new OAuth2Api(
@@ -33,7 +32,7 @@ const kratosFrontend = new FrontendApi(
  */
 const recentLogins = new Map<
   string,
-  { identityId: string; email: string; name: string; expiresAt: number }
+  { identityId: string; expiresAt: number }
 >();
 
 function cleanupRecentLogins() {
@@ -143,8 +142,6 @@ authRouter.post('/login', authRateLimiter, async (req, res) => {
     }
     recentLogins.set(nonce, {
       identityId: identity.id,
-      email: (identity.traits as any).email,
-      name: (identity.traits as any).name || '',
       expiresAt: Date.now() + 60_000,
     });
 
@@ -287,13 +284,6 @@ authRouter.post('/refresh', async (req, res) => {
       return res.status(response.status).json(data);
     }
 
-    // Debug: log the issuer in the new access token
-    if (data.access_token) {
-      try {
-        const payload = JSON.parse(Buffer.from(data.access_token.split('.')[1], 'base64').toString());
-        console.log('[Auth] Refreshed token issuer:', payload.iss);
-      } catch {}
-    }
 
     return res.json(data);
   } catch (error) {
@@ -466,7 +456,7 @@ authRouter.post('/settings/profile', jwtMiddleware, async (req, res) => {
 
   try {
     // Update local DB
-    await updateUserName(claims.sub, name.trim());
+    await updateUser(claims.sub, { name: name.trim() });
 
     // Update Kratos identity traits
     const identityRes = await fetch(

@@ -1,92 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
-import { applyPatchesToYDoc, findIndexById, navigateToPath } from '../patch';
-import { deckToYDoc, yDocToDeck, toYValue } from '../ydoc';
+import { applyPatchesToYDoc } from '../patch';
+import { deckToYDoc, yDocToDeck } from '../ydoc';
 import { diffDeck, type Patch } from '../diff';
 import { createEmptyDeck } from '@deckhand/schema';
 
-describe('findIndexById', () => {
-  it('finds item by ID in Y.Array', () => {
-    const doc = new Y.Doc();
-    const root = doc.getMap('root');
-    const yArray = new Y.Array();
-    root.set('items', yArray);
-    const items = root.get('items') as Y.Array<unknown>;
-    
-    items.push([
-      toYValue({ id: 'item-1', name: 'First' }),
-      toYValue({ id: 'item-2', name: 'Second' }),
-      toYValue({ id: 'item-3', name: 'Third' }),
-    ]);
-    
-    expect(findIndexById(items, 'item-1')).toBe(0);
-    expect(findIndexById(items, 'item-2')).toBe(1);
-    expect(findIndexById(items, 'item-3')).toBe(2);
-  });
-
-  it('returns -1 for non-existent ID', () => {
-    const doc = new Y.Doc();
-    const root = doc.getMap('root');
-    const yArray = new Y.Array();
-    root.set('items', yArray);
-    const items = root.get('items') as Y.Array<unknown>;
-    items.push([toYValue({ id: 'item-1', name: 'First' })]);
-    
-    expect(findIndexById(items, 'non-existent')).toBe(-1);
-  });
-
-  it('returns -1 for empty array', () => {
-    const doc = new Y.Doc();
-    const root = doc.getMap('root');
-    root.set('items', new Y.Array());
-    const items = root.get('items') as Y.Array<unknown>;
-    expect(findIndexById(items, 'any-id')).toBe(-1);
-  });
-});
-
-describe('navigateToPath', () => {
-  it('returns root for empty path', () => {
-    const ydoc = new Y.Doc();
-    const root = ydoc.getMap('root');
-    root.set('test', 'value');
-    
-    const result = navigateToPath(ydoc, []);
-    expect(result).toBe(root);
-  });
-
-  it('navigates to top-level key', () => {
-    const deck = createEmptyDeck();
-    const ydoc = deckToYDoc(deck);
-    
-    const meta = navigateToPath(ydoc, ['meta']);
-    expect(meta).toBeInstanceOf(Y.Map);
-    expect((meta as Y.Map<unknown>).get('title')).toBe('Untitled Deck');
-  });
-
-  it('navigates through nested maps', () => {
-    const deck = createEmptyDeck();
-    const ydoc = deckToYDoc(deck);
-    
-    const tokens = navigateToPath(ydoc, ['theme', 'tokens']);
-    expect(tokens).toBeInstanceOf(Y.Map);
-  });
-
-  it('navigates to slide by key', () => {
-    const deck = createEmptyDeck();
-    const slideId = Object.keys(deck.slides)[0];
-    const ydoc = deckToYDoc(deck);
-    
-    const slide = navigateToPath(ydoc, ['slides', slideId]);
-    expect(slide).toBeInstanceOf(Y.Map);
-    expect((slide as Y.Map<unknown>).get('id')).toBe(slideId);
-  });
-
-  it('throws for invalid root segment', () => {
-    const ydoc = new Y.Doc();
-    
-    expect(() => navigateToPath(ydoc, [{ id: 'invalid' }])).toThrow();
-  });
-});
 
 describe('applyPatchesToYDoc', () => {
   describe('set operations', () => {

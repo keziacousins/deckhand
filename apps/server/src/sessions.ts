@@ -49,16 +49,6 @@ export function getOrCreateSession(deckId: string): Session {
   return session;
 }
 
-/**
- * Get an active session (if exists)
- */
-export function getActiveSession(deckId: string): Session | null {
-  const session = sessions.get(deckId);
-  if (session && session.clients.size > 0) {
-    return session;
-  }
-  return null;
-}
 
 /**
  * Add a client WebSocket to a session

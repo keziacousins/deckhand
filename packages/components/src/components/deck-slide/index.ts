@@ -13,7 +13,7 @@
 import { DeckComponent } from '../../base';
 import type { ComponentMeta } from '../../types';
 import { styles } from './styles';
-import { generateImageBackgroundHtml, resolveAssetUrl, sizeToCss } from '../../utils/image-renderer';
+import { generateImageBackgroundHtml, resolveAssetUrl } from '../../utils/image-renderer';
 
 export class DeckSlide extends DeckComponent {
   static meta: ComponentMeta = {

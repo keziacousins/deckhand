@@ -198,24 +198,13 @@ export class DeckText extends DeckComponent {
       bodyHtml = `<p class="text"${editable ? ' contenteditable="true" data-placeholder="Enter text..."' : ''}>${this.escapeHtml(content)}</p>`;
     }
 
-    const linkedStyles = `
-      :host([linked]) {
-        transition: box-shadow 200ms ease, transform 200ms ease;
-      }
-      :host([linked]:hover) {
-        box-shadow: 0 0 0 3px var(--deck-color-accent, #3b82f6),
-                    0 0 12px 2px color-mix(in srgb, var(--deck-color-accent, #3b82f6) 40%, transparent);
-        transform: scale(1.02);
-      }
-    `;
-
     this.shadow.innerHTML = `
       <style>
         ${this.getBaseStyles()}
         ${styles}
         ${hasMath ? katexLayoutCss : ''}
         ${dynamicStyles}
-        ${linkedStyles}
+        ${this.getLinkedStyles()}
       </style>
       ${bodyHtml}
     `;

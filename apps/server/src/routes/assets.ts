@@ -65,6 +65,15 @@ async function processImage(buffer: Buffer, mimeType: string): Promise<{
 
 const router = Router();
 
+/** Fetch a single asset row by ID and deck ID, or null if not found. */
+async function getAssetRow(assetId: string, deckId: string): Promise<AssetRow | null> {
+  const { rows } = await pool.query(
+    'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
+    [assetId, deckId]
+  );
+  return (rows[0] as AssetRow | undefined) ?? null;
+}
+
 // Multer with memory storage (buffer, no temp files)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -212,11 +221,7 @@ router.get('/decks/:deckId/assets/:assetId', requireDeckRole('owner', 'editor', 
   const { deckId, assetId } = req.params;
 
   try {
-    const { rows } = await pool.query(
-      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
-      [assetId, deckId]
-    );
-    const row = rows[0] as AssetRow | undefined;
+    const row = await getAssetRow(assetId, deckId);
 
     if (!row) {
       res.status(404).json({ error: 'Asset not found' });
@@ -235,61 +240,29 @@ router.get('/decks/:deckId/assets/:assetId', requireDeckRole('owner', 'editor', 
 
 /**
  * GET /api/decks/:deckId/assets/:assetId/thumbnail
- * Serve the small thumbnail variant (200px WebP)
- */
-router.get('/decks/:deckId/assets/:assetId/thumbnail', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
-  const { deckId, assetId } = req.params;
-
-  try {
-    const { rows } = await pool.query(
-      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
-      [assetId, deckId]
-    );
-    const row = rows[0] as AssetRow | undefined;
-
-    if (!row || !row.has_thumbnail) {
-      res.status(404).json({ error: 'Thumbnail not found' });
-      return;
-    }
-
-    const thumbKey = `${deckId}/${assetId}_thumb.webp`;
-    const { body } = await getObject(thumbKey);
-    res.setHeader('Content-Type', 'image/webp');
-    res.setHeader('Cache-Control', 'public, max-age=31536000');
-    body.pipe(res);
-  } catch (error) {
-    console.error('[Assets] Error serving thumbnail:', error);
-    res.status(500).json({ error: 'Failed to serve thumbnail' });
-  }
-});
-
-/**
  * GET /api/decks/:deckId/assets/:assetId/preview
- * Serve the mid-size preview variant (800px WebP)
+ * Serve a sized variant (thumbnail = 200px WebP, preview = 800px WebP)
  */
-router.get('/decks/:deckId/assets/:assetId/preview', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
-  const { deckId, assetId } = req.params;
+router.get('/decks/:deckId/assets/:assetId/:variant(thumbnail|preview)', requireDeckRole('owner', 'editor', 'viewer'), async (req: Request, res: Response) => {
+  const { deckId, assetId, variant } = req.params;
 
   try {
-    const { rows } = await pool.query(
-      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
-      [assetId, deckId]
-    );
-    const row = rows[0] as AssetRow | undefined;
+    const row = await getAssetRow(assetId, deckId);
 
     if (!row || !row.has_thumbnail) {
-      res.status(404).json({ error: 'Preview not found' });
+      res.status(404).json({ error: `${variant.charAt(0).toUpperCase() + variant.slice(1)} not found` });
       return;
     }
 
-    const previewKey = `${deckId}/${assetId}_preview.webp`;
-    const { body } = await getObject(previewKey);
+    const suffix = variant === 'thumbnail' ? '_thumb.webp' : '_preview.webp';
+    const storageKey = `${deckId}/${assetId}${suffix}`;
+    const { body } = await getObject(storageKey);
     res.setHeader('Content-Type', 'image/webp');
     res.setHeader('Cache-Control', 'public, max-age=31536000');
     body.pipe(res);
   } catch (error) {
-    console.error('[Assets] Error serving preview:', error);
-    res.status(500).json({ error: 'Failed to serve preview' });
+    console.error(`[Assets] Error serving ${variant}:`, error);
+    res.status(500).json({ error: `Failed to serve ${variant}` });
   }
 });
 
@@ -301,11 +274,7 @@ router.delete('/decks/:deckId/assets/:assetId', requireDeckRole('owner', 'editor
   const { deckId, assetId } = req.params;
 
   try {
-    const { rows } = await pool.query(
-      'SELECT * FROM assets WHERE id = $1 AND deck_id = $2',
-      [assetId, deckId]
-    );
-    const row = rows[0] as AssetRow | undefined;
+    const row = await getAssetRow(assetId, deckId);
 
     if (!row) {
       res.status(404).json({ error: 'Asset not found' });

@@ -125,52 +125,28 @@ export abstract class DeckComponent extends HTMLElement {
     `;
   }
 
-  /**
-   * Get typography styles using the theme's type scale
-   */
-  protected getTypographyStyles(): string {
-    return `
-      .text-xs { font-size: var(--deck-font-size-xs, 0.75rem); }
-      .text-sm { font-size: var(--deck-font-size-sm, 0.875rem); }
-      .text-md { font-size: var(--deck-font-size-md, 1rem); }
-      .text-lg { font-size: var(--deck-font-size-lg, 1.25rem); }
-      .text-xl { font-size: var(--deck-font-size-xl, 1.5rem); }
-      .text-2xl { font-size: var(--deck-font-size-2xl, 2rem); }
-      .text-3xl { font-size: var(--deck-font-size-3xl, 2.5rem); }
-      .text-4xl { font-size: var(--deck-font-size-4xl, 3rem); }
-      .text-5xl { font-size: var(--deck-font-size-5xl, 4rem); }
-      
-      .font-display { font-family: var(--deck-font-display, system-ui, sans-serif); }
-      .font-body { font-family: var(--deck-font-body, system-ui, sans-serif); }
-      .font-mono { font-family: var(--deck-font-mono, ui-monospace, monospace); }
-      
-      .font-normal { font-weight: 400; }
-      .font-medium { font-weight: 500; }
-      .font-semibold { font-weight: 600; }
-      .font-bold { font-weight: 700; }
-      
-      .text-primary { color: var(--deck-color-text-primary); }
-      .text-secondary { color: var(--deck-color-text-secondary); }
-      .text-accent { color: var(--deck-color-accent); }
-    `;
-  }
 
   /**
-   * Get spacing utility styles using the theme's space scale
+   * Get CSS for the linked hover glow effect.
+   * By default targets :host; pass a selector to target an inner element instead
+   * (e.g. deck-image targets '.image-wrapper').
    */
-  protected getSpacingStyles(): string {
+  protected getLinkedStyles(innerSelector?: string): string {
+    const sel = innerSelector
+      ? `:host([linked]) ${innerSelector}`
+      : ':host([linked])';
+    const hoverSel = innerSelector
+      ? `:host([linked]:hover) ${innerSelector}`
+      : ':host([linked]:hover)';
     return `
-      .gap-xs { gap: var(--deck-space-xs, 0.25rem); }
-      .gap-sm { gap: var(--deck-space-sm, 0.5rem); }
-      .gap-md { gap: var(--deck-space-md, 1rem); }
-      .gap-lg { gap: var(--deck-space-lg, 1.5rem); }
-      .gap-xl { gap: var(--deck-space-xl, 2rem); }
-      
-      .p-xs { padding: var(--deck-space-xs); }
-      .p-sm { padding: var(--deck-space-sm); }
-      .p-md { padding: var(--deck-space-md); }
-      .p-lg { padding: var(--deck-space-lg); }
-      .p-xl { padding: var(--deck-space-xl); }
+      ${sel} {
+        transition: box-shadow 200ms ease, transform 200ms ease;
+      }
+      ${hoverSel} {
+        box-shadow: 0 0 0 3px var(--deck-color-accent, #3b82f6),
+                    0 0 12px 2px color-mix(in srgb, var(--deck-color-accent, #3b82f6) 40%, transparent) !important;
+        transform: scale(1.02);
+      }
     `;
   }
 

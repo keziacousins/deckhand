@@ -102,12 +102,6 @@ export interface ComponentMeta {
   };
 }
 
-/**
- * Type helper for extracting props type from metadata
- */
-export type PropsFromMeta<M extends ComponentMeta> = {
-  [K in keyof M['properties']]: unknown;
-};
 
 /**
  * Standard property groups

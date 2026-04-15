@@ -12,6 +12,7 @@ import {
   deleteDeck,
   duplicateDeck,
 } from '../db/decks.js';
+import { pool } from '../db/schema.js';
 import { createEmptyDeck, generateDeckId, validateDeck } from '@deckhand/schema';
 import { closeSession } from '../sessions.js';
 import { deleteByPrefix } from '../storage.js';
@@ -192,11 +193,9 @@ decksRouter.patch('/:id/public', requireDeckRole('owner'), async (req, res) => {
       return res.status(400).json({ error: 'publicAccess must be "none" or "present"' });
     }
 
-    const result = await import('../db/schema.js').then(({ pool }) =>
-      pool.query(
-        'UPDATE decks SET public_access = $1, updated_at = NOW() WHERE id = $2 RETURNING public_access',
-        [publicAccess, req.params.id]
-      )
+    const result = await pool.query(
+      'UPDATE decks SET public_access = $1, updated_at = NOW() WHERE id = $2 RETURNING public_access',
+      [publicAccess, req.params.id]
     );
 
     if (result.rowCount === 0) {

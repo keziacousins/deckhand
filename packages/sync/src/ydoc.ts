@@ -137,15 +137,3 @@ export function yDocToDeck(ydoc: Y.Doc): Deck {
   return deck;
 }
 
-/**
- * Compute a hash of a deck for consistency checking.
- * Uses a stable JSON stringification.
- */
-export async function hashDeck(deck: Deck): Promise<string> {
-  const json = JSON.stringify(deck, Object.keys(deck).sort());
-  const encoder = new TextEncoder();
-  const data = encoder.encode(json);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}

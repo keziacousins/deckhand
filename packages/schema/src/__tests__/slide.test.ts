@@ -11,9 +11,6 @@ import {
   defaultSlideLayout,
   generateSlideId,
   createBlankSlide,
-  layoutToCssProperties,
-  styleToCssProperties,
-  backgroundSizeToCss,
 } from '../slide';
 
 describe('PositionSchema', () => {
@@ -287,43 +284,6 @@ describe('createBlankSlide', () => {
   });
 });
 
-describe('layoutToCssProperties', () => {
-  it('generates flex display by default', () => {
-    const css = layoutToCssProperties({});
-    expect(css['display']).toBe('flex');
-    expect(css['flex-direction']).toBe('column');
-  });
-
-  it('applies margin as padding', () => {
-    const css = layoutToCssProperties({
-      margin: { top: '20px', right: '10px', bottom: '20px', left: '10px' },
-    });
-    expect(css['padding-top']).toBe('20px');
-    expect(css['padding-right']).toBe('10px');
-    expect(css['padding-bottom']).toBe('20px');
-    expect(css['padding-left']).toBe('10px');
-  });
-
-  it('applies alignment properties', () => {
-    const css = layoutToCssProperties({
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    });
-    expect(css['align-items']).toBe('center');
-    expect(css['justify-content']).toBe('space-between');
-  });
-
-  it('applies direction', () => {
-    const css = layoutToCssProperties({ direction: 'row' });
-    expect(css['flex-direction']).toBe('row');
-  });
-
-  it('applies gap', () => {
-    const css = layoutToCssProperties({ gap: '24px' });
-    expect(css['gap']).toBe('24px');
-  });
-});
-
 describe('SlideStyleSchema', () => {
   it('validates empty style', () => {
     expect(SlideStyleSchema.parse({})).toEqual({});
@@ -364,60 +324,6 @@ describe('SlideStyleSchema', () => {
   it('allows optional backdropSlideId', () => {
     const style = { background: '#fff' };
     expect(SlideStyleSchema.parse(style).backdropSlideId).toBeUndefined();
-  });
-});
-
-describe('styleToCssProperties', () => {
-  it('returns empty object for empty style', () => {
-    const css = styleToCssProperties({});
-    expect(Object.keys(css)).toHaveLength(0);
-  });
-
-  it('maps color overrides to CSS custom properties', () => {
-    const css = styleToCssProperties({
-      background: '#ffffff',
-      textPrimary: '#000000',
-      textSecondary: '#666666',
-      accent: '#0066cc',
-    });
-    expect(css['--deck-color-background']).toBe('#ffffff');
-    expect(css['--deck-color-text-primary']).toBe('#000000');
-    expect(css['--deck-color-text-secondary']).toBe('#666666');
-    expect(css['--deck-color-accent']).toBe('#0066cc');
-  });
-
-  it('does not include backgroundAssetId in CSS (resolved at component level)', () => {
-    const css = styleToCssProperties({ backgroundAssetId: 'asset-123' });
-    expect(css['background-image']).toBeUndefined();
-  });
-
-  it('applies background size and position', () => {
-    const css = styleToCssProperties({
-      backgroundSize: 'fill',
-      backgroundPosition: 'center top',
-    });
-    expect(css['background-size']).toBe('cover');
-    expect(css['background-position']).toBe('center top');
-  });
-
-  it('maps backgroundSize values to CSS correctly', () => {
-    expect(styleToCssProperties({ backgroundSize: 'fill' })['background-size']).toBe('cover');
-    expect(styleToCssProperties({ backgroundSize: 'fit-width' })['background-size']).toBe('100% auto');
-    expect(styleToCssProperties({ backgroundSize: 'fit-height' })['background-size']).toBe('auto 100%');
-  });
-});
-
-describe('backgroundSizeToCss', () => {
-  it('maps fill to cover', () => {
-    expect(backgroundSizeToCss('fill')).toBe('cover');
-  });
-
-  it('maps fit-width to 100% auto', () => {
-    expect(backgroundSizeToCss('fit-width')).toBe('100% auto');
-  });
-
-  it('maps fit-height to auto 100%', () => {
-    expect(backgroundSizeToCss('fit-height')).toBe('auto 100%');
   });
 });
 

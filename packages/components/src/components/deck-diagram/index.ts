@@ -98,17 +98,6 @@ export class DeckDiagram extends DeckComponent {
     const source = this.getAttr('source', '');
     const theme = this.getAttr('theme', 'auto');
 
-    const linkedStyles = `
-      :host([linked]) {
-        transition: box-shadow 200ms ease, transform 200ms ease;
-      }
-      :host([linked]:hover) {
-        box-shadow: 0 0 0 3px var(--deck-color-accent, #3b82f6),
-                    0 0 12px 2px color-mix(in srgb, var(--deck-color-accent, #3b82f6) 40%, transparent);
-        transform: scale(1.02);
-      }
-    `;
-
     if (!source.trim()) {
       this.shadow.innerHTML = `
         <style>
@@ -122,7 +111,7 @@ export class DeckDiagram extends DeckComponent {
             font-size: var(--deck-font-size-sm, 0.875rem);
             opacity: 0.6;
           }
-          ${linkedStyles}
+          ${this.getLinkedStyles()}
         </style>
         <div class="placeholder">No diagram source</div>
       `;
@@ -220,7 +209,7 @@ export class DeckDiagram extends DeckComponent {
             ${maxHeightStyle}
             height: auto;
           }
-          ${linkedStyles}
+          ${this.getLinkedStyles()}
         </style>
         <div class="diagram">${svg}</div>
       `;
@@ -240,7 +229,7 @@ export class DeckDiagram extends DeckComponent {
             white-space: pre-wrap;
             word-break: break-word;
           }
-          ${linkedStyles}
+          ${this.getLinkedStyles()}
         </style>
         <div class="error">${this.escapeHtml(message)}</div>
       `;

@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useYDoc } from '../sync';
-import type { Edge, TransitionType } from '@deckhand/schema';
-import { SLIDE_WIDTH, getSlideHeight, DEFAULT_TRANSITION_DURATION, resolveEdgeSource } from '@deckhand/schema';
+import { SLIDE_WIDTH, getSlideHeight } from '@deckhand/schema';
 import { useAuthAssets } from '../hooks/useAuthAssets';
-import { computePlayOrder, getTransitionInfo, SlideRenderer, type TransitionState } from './presentationUtils';
+import { usePresentationPlayer, SlideRenderer } from './presentationUtils';
 import './Presentation.css';
 
 interface PresentationProps {
@@ -18,209 +17,15 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
   const resolvedAssets = useAuthAssets(rawAssets);
   // Replace assets with blob URLs so web components can load them
   const deck = useMemo(() => rawDeck ? { ...rawDeck, assets: resolvedAssets } : null, [rawDeck, resolvedAssets]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [scale, setScale] = useState(1);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [transition, setTransition] = useState<TransitionState | null>(null);
-  // Play order start slide — changes when a component link jumps outside
-  // the current linear order.
-  const [playOrderStart, setPlayOrderStart] = useState<string | undefined>(undefined);
-  // Navigation history stack — tracks positions before component link jumps
-  // so "back" returns to the jump origin rather than the linear predecessor.
-  const [navHistory, setNavHistory] = useState<Array<{ start: string | undefined; index: number }>>([]);
 
-  // Calculate scale to fit slide in viewport while maintaining aspect ratio
-  useEffect(() => {
-    if (!deck) return;
+  const player = usePresentationPlayer({ deck, startSlideId });
 
-    const slideHeight = getSlideHeight(deck.aspectRatio);
-
-    const updateScale = () => {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      // Calculate scale to fit slide in viewport (letterbox/pillarbox)
-      const scaleX = viewportWidth / SLIDE_WIDTH;
-      const scaleY = viewportHeight / slideHeight;
-      const newScale = Math.min(scaleX, scaleY);
-
-      setScale(newScale);
-    };
-
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, [deck]);
-
-  // Compute play order — recomputes when a component link jumps to a new start
-  const playOrder = useMemo(() => {
-    if (!deck) return [];
-    
-    let start = playOrderStart ?? startSlideId;
-    if (!start || !deck.slides[start]) {
-      const slideIds = Object.keys(deck.slides);
-      start = slideIds[0];
-    }
-    
-    if (!start) return [];
-    return computePlayOrder(deck, start);
-  }, [deck, startSlideId, playOrderStart]);
-
-  const currentEntry = playOrder[currentIndex];
-  const currentSlideId = currentEntry?.slideId;
-  const currentSlide = deck?.slides[currentSlideId];
-  
-  const canGoNext = currentIndex < playOrder.length - 1 && !transition?.isTransitioning;
-  const canGoPrev = (currentIndex > 0 || navHistory.length > 0) && !transition?.isTransitioning;
-
-  // Component links for the current slide.
-  // If a linked component is nested inside a container, bubble the link
-  // up to the top-level ancestor (same logic as the editor badge).
-  const componentLinks = useMemo(() => {
-    if (!deck || !currentSlideId) return new Map<string, Edge>();
-    const slide = deck.slides[currentSlideId];
-    if (!slide) return new Map<string, Edge>();
-    
-    const links = new Map<string, Edge>();
-    for (const edge of Object.values(deck.flow.edges)) {
-      const source = resolveEdgeSource(deck, edge.from);
-      if (source?.type === 'component' && source.slideId === currentSlideId) {
-        // Walk up to top-level ancestor
-        let comp = slide.components.find(c => c.id === source.componentId);
-        while (comp?.parentId) {
-          comp = slide.components.find(c => c.id === comp!.parentId);
-        }
-        const topLevelId = comp?.id ?? source.componentId;
-        links.set(topLevelId, edge);
-      }
-    }
-    return links;
-  }, [deck, currentSlideId]);
-
-  // Navigate to a slide by ID (for component links).
-  // Pushes current position onto navHistory so "back" returns here.
-  const navigateToSlide = useCallback((targetSlideId: string, edgeTransition?: TransitionType, edgeDuration?: number) => {
-    if (!deck || transition?.isTransitioning || !currentSlideId) return;
-    if (!deck.slides[targetSlideId]) return;
-
-    // Save current position so back returns here
-    setNavHistory(h => [...h, { start: playOrderStart, index: currentIndex }]);
-
-    const targetIndex = playOrder.findIndex(e => e.slideId === targetSlideId);
-
-    // Determine transition to use
-    const type = edgeTransition ?? deck.flow.defaultTransition ?? 'instant';
-    const duration = edgeDuration ?? deck.flow.defaultTransitionDuration ?? DEFAULT_TRANSITION_DURATION;
-
-    const applyNav = () => {
-      if (targetIndex !== -1) {
-        setCurrentIndex(targetIndex);
-      } else {
-        setPlayOrderStart(targetSlideId);
-        setCurrentIndex(0);
-      }
-    };
-
-    if (type === 'instant' || duration === 0) {
-      applyNav();
-    } else {
-      // Start transition animation with actual slide IDs (not indices,
-      // since the target may not be in the current play order yet)
-      setTransition({
-        isTransitioning: true,
-        type,
-        duration,
-        fromSlideId: currentSlideId,
-        toSlideId: targetSlideId,
-        phase: 'enter',
-      });
-
-      requestAnimationFrame(() => {
-        setTransition(t => t ? { ...t, phase: 'active' } : null);
-      });
-
-      setTimeout(() => {
-        applyNav();
-        setTransition(null);
-      }, duration * 1000);
-    }
-  }, [deck, transition, playOrder, currentIndex, currentSlideId, playOrderStart]);
-
-  const handleComponentClick = useCallback((componentId: string) => {
-    const edge = componentLinks.get(componentId);
-    if (edge) {
-      navigateToSlide(edge.to, edge.transition, edge.transitionDuration);
-    }
-  }, [componentLinks, navigateToSlide]);
-
-  const goNext = useCallback(() => {
-    if (!canGoNext || !deck || !currentSlideId) return;
-
-    const nextIndex = currentIndex + 1;
-    const nextEntry = playOrder[nextIndex];
-    const { type, duration } = getTransitionInfo(deck, nextEntry.incomingEdgeId, 'forward');
-
-    if (type === 'instant' || duration === 0) {
-      setCurrentIndex(nextIndex);
-    } else {
-      setTransition({
-        isTransitioning: true,
-        type,
-        duration,
-        fromSlideId: currentSlideId,
-        toSlideId: nextEntry.slideId,
-        phase: 'enter',
-      });
-
-      requestAnimationFrame(() => {
-        setTransition(t => t ? { ...t, phase: 'active' } : null);
-      });
-
-      setTimeout(() => {
-        setCurrentIndex(nextIndex);
-        setTransition(null);
-      }, duration * 1000);
-    }
-  }, [canGoNext, currentIndex, currentSlideId, deck, playOrder]);
-
-  const goPrev = useCallback(() => {
-    if (!canGoPrev || !deck || !currentSlideId) return;
-
-    // If at the start of current play order and there's history, pop back
-    if (currentIndex === 0 && navHistory.length > 0) {
-      const prev = navHistory[navHistory.length - 1];
-      setNavHistory(h => h.slice(0, -1));
-      setPlayOrderStart(prev.start);
-      setCurrentIndex(prev.index);
-      return;
-    }
-
-    const prevIndex = currentIndex - 1;
-    const prevEntry = playOrder[prevIndex];
-    const { type, duration } = getTransitionInfo(deck, currentEntry.incomingEdgeId, 'backward');
-
-    if (type === 'instant' || duration === 0) {
-      setCurrentIndex(prevIndex);
-    } else {
-      setTransition({
-        isTransitioning: true,
-        type,
-        duration,
-        fromSlideId: currentSlideId,
-        toSlideId: prevEntry.slideId,
-        phase: 'enter',
-      });
-
-      requestAnimationFrame(() => {
-        setTransition(t => t ? { ...t, phase: 'active' } : null);
-      });
-
-      setTimeout(() => {
-        setCurrentIndex(prevIndex);
-        setTransition(null);
-      }, duration * 1000);
-    }
-  }, [canGoPrev, currentIndex, currentSlideId, currentEntry, deck, navHistory, playOrder]);
+  const {
+    currentIndex, setCurrentIndex, scale, containerRef, transition,
+    playOrder, currentSlide,
+    canGoNext, canGoPrev, componentLinks,
+    goNext, goPrev, handleComponentClick, handleClick,
+  } = player;
 
   // Track if we were ever in fullscreen (to know if exiting fullscreen should exit presentation)
   const wasInFullscreen = useRef(false);
@@ -295,29 +100,6 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goNext, goPrev, onExit, playOrder.length]);
 
-  // Click to advance (or follow component link)
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-
-    // Don't advance if clicking on interactive elements
-    if (target.closest('a, button, input, textarea')) return;
-
-    // Check if click is inside a component link.
-    // Use composedPath to pierce Shadow DOM boundaries.
-    const path = e.nativeEvent.composedPath();
-    for (const el of path) {
-      if (el instanceof HTMLElement && el.classList.contains('component-link')) {
-        const compId = el.getAttribute('data-component-id');
-        if (compId) {
-          handleComponentClick(compId);
-          return;
-        }
-      }
-    }
-
-    goNext();
-  }, [goNext, handleComponentClick, componentLinks]);
-
   // Show loading state
   if (status === 'connecting' || (status === 'connected' && !deck)) {
     return (
@@ -370,8 +152,8 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
 
   return (
     <div className="presentation" ref={containerRef} onClick={handleClick}>
-      <div 
-        className="presentation-viewport" 
+      <div
+        className="presentation-viewport"
         style={{ ...viewportStyle, '--transition-duration': transitionDuration } as React.CSSProperties}
       >
         {transition && fromSlide && toSlide ? (
@@ -394,7 +176,7 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
           />
         )}
       </div>
-      
+
       {/* Progress indicator */}
       <div className="presentation-progress">
         <span className="presentation-progress-text">
@@ -404,7 +186,7 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
 
       {/* Navigation controls (visible on hover) */}
       <div className="presentation-controls">
-        <button 
+        <button
           className="presentation-nav presentation-nav-prev"
           onClick={(e) => { e.stopPropagation(); goPrev(); }}
           disabled={!canGoPrev}
@@ -414,7 +196,7 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
             <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <button 
+        <button
           className="presentation-nav presentation-nav-next"
           onClick={(e) => { e.stopPropagation(); goNext(); }}
           disabled={!canGoNext}
@@ -427,10 +209,10 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
       </div>
 
       {/* Exit button */}
-      <button 
+      <button
         className="presentation-exit"
-        onClick={(e) => { 
-          e.stopPropagation(); 
+        onClick={(e) => {
+          e.stopPropagation();
           if (window.opener) {
             window.close();
           } else {
@@ -446,5 +228,3 @@ export function Presentation({ deckId, startSlideId, onExit }: PresentationProps
     </div>
   );
 }
-
-

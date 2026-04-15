@@ -17,8 +17,6 @@ export const VIEWPORT_BROADCAST_INTERVAL_MS = 200;
 export const VIEWPORT_BURST_INTERVAL_MS = 50;
 export const VIEWPORT_BURST_COUNT = 6;
 export const VIEWPORT_BURST_RESET_MS = 300;
-export const FOLLOW_MODE_TRANSITION_MS = 300;
-
 /**
  * Predefined colors for users (assigned based on ID hash).
  * Chosen to be visually distinct and work on light backgrounds.

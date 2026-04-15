@@ -50,7 +50,7 @@ function componentBorderRadius(type: string, borderRadius: string | undefined): 
 /**
  * Compute the play order by traversing edges from a starting slide.
  */
-export function computePlayOrder(deck: Deck, startSlideId: string): PlayOrderEntry[] {
+function computePlayOrder(deck: Deck, startSlideId: string): PlayOrderEntry[] {
   const order: PlayOrderEntry[] = [];
   const visited = new Set<string>();
 
@@ -74,7 +74,7 @@ export function computePlayOrder(deck: Deck, startSlideId: string): PlayOrderEnt
 /**
  * Get transition info for navigating between slides.
  */
-export function getTransitionInfo(
+function getTransitionInfo(
   deck: Deck,
   edgeId: string | null,
   direction: 'forward' | 'backward'

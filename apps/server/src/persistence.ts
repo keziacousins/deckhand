@@ -61,7 +61,7 @@ export async function loadYDoc(deckId: string): Promise<Y.Doc | null> {
  * Converts to JSON, computes hash, and saves both binary and JSON atomically.
  * Throws on failure — callers must handle errors.
  */
-export async function saveYDoc(deckId: string, ydoc: Y.Doc): Promise<void> {
+async function saveYDoc(deckId: string, ydoc: Y.Doc): Promise<void> {
   // Convert YDoc to deck JSON
   const deck = yDocToDeck(ydoc);
 

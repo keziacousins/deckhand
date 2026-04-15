@@ -9,11 +9,6 @@
  */
 
 const TARGET_HANDLE_IDS = ['target-left', 'target-top'];
-const SOURCE_HANDLE_IDS = ['source-right', 'source-bottom'];
-
-function isSourceHandle(handleId: string): boolean {
-  return SOURCE_HANDLE_IDS.includes(handleId);
-}
 
 function getHandleCenter(handle: Element): { x: number; y: number } {
   const rect = handle.getBoundingClientRect();
@@ -54,47 +49,6 @@ export function findClosestTargetHandle(
 
     const pos = getHandleCenter(handle);
     const dist = Math.hypot(sourcePos.x - pos.x, sourcePos.y - pos.y);
-    if (dist < minDist) {
-      minDist = dist;
-      closest = handleId;
-    }
-  });
-
-  return closest;
-}
-
-/**
- * Find the closest source handle on a node relative to a target handle's position.
- * Used when reconnecting the source end of an edge.
- */
-export function findClosestSourceHandle(
-  sourceNodeId: string,
-  targetNodeId: string,
-  targetHandleId: string
-): string | null {
-  const targetNodeEl = document.querySelector(`[data-id="${targetNodeId}"]`);
-  if (!targetNodeEl) return null;
-
-  const targetHandle = targetNodeEl.querySelector(`[data-handleid="${targetHandleId}"]`);
-  if (!targetHandle) return null;
-
-  const targetPos = getHandleCenter(targetHandle);
-
-  const sourceNodeEl = document.querySelector(`[data-id="${sourceNodeId}"]`);
-  if (!sourceNodeEl) return null;
-
-  const sourceHandles = sourceNodeEl.querySelectorAll('.react-flow__handle.source[data-handleid]');
-  if (sourceHandles.length === 0) return null;
-
-  let closest: string | null = null;
-  let minDist = Infinity;
-
-  sourceHandles.forEach((handle) => {
-    const handleId = handle.getAttribute('data-handleid');
-    if (!handleId || !isSourceHandle(handleId)) return;
-
-    const pos = getHandleCenter(handle);
-    const dist = Math.hypot(targetPos.x - pos.x, targetPos.y - pos.y);
     if (dist < minDist) {
       minDist = dist;
       closest = handleId;

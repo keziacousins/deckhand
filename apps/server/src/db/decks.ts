@@ -166,7 +166,7 @@ export async function duplicateDeck(id: string, newId: string, ownerId: string):
 /**
  * Get YDoc state for a deck
  */
-export async function getYDocState(deckId: string): Promise<Buffer | null> {
+async function getYDocState(deckId: string): Promise<Buffer | null> {
   const { rows } = await pool.query(
     'SELECT data FROM ydoc_states WHERE deck_id = $1',
     [deckId]

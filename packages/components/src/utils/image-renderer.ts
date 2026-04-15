@@ -39,7 +39,7 @@ export function resolveAssetUrl(assetId: string | undefined, assetsJson: string 
 /**
  * Map size values to CSS background-size.
  */
-export function sizeToCss(size: string | undefined): string {
+function sizeToCss(size: string | undefined): string {
   switch (size) {
     case 'fill':
     case 'cover':
@@ -53,26 +53,6 @@ export function sizeToCss(size: string | undefined): string {
     default:
       return 'cover';
   }
-}
-
-/**
- * Generate CSS styles for image container.
- */
-export function generateImageContainerStyles(options: ImageRenderOptions): string {
-  const url = options.url || resolveAssetUrl(options.assetId, options.assetsJson);
-  if (!url) return '';
-
-  const size = sizeToCss(options.size);
-  const position = options.position || 'center';
-  const blur = options.blur || 0;
-
-  return `
-    background-image: url(${url});
-    background-size: ${size};
-    background-position: ${position};
-    background-repeat: no-repeat;
-    ${blur > 0 ? `filter: blur(${blur}px);` : ''}
-  `;
 }
 
 /**

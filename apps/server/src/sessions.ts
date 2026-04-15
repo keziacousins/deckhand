@@ -152,7 +152,7 @@ export function broadcastJSON(deckId: string, message: object, excludeWs?: WebSo
 /**
  * Send a JSON control message to a specific client.
  */
-export function sendJSON(ws: WebSocket, message: object): void {
+function sendJSON(ws: WebSocket, message: object): void {
   if (ws.readyState === 1) {
     try {
       ws.send(JSON.stringify(message));
@@ -167,7 +167,7 @@ export function sendJSON(ws: WebSocket, message: object): void {
 // ============================================================================
 
 /** Origin used for all LLM transactions — tracked by the LLM UndoManager. */
-export const LLM_ORIGIN = 'llm';
+const LLM_ORIGIN = 'llm';
 
 /**
  * Get or create an LLM UndoManager for a specific chat session.

@@ -131,11 +131,3 @@ export function registerComponent(component: DeckComponentClass): void {
   registry.add(component);
 }
 
-/**
- * Helper to register multiple components at once
- */
-export function registerComponents(...components: DeckComponentClass[]): void {
-  for (const component of components) {
-    registry.add(component);
-  }
-}

@@ -19,7 +19,6 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@deckhand/schema": "*",
     "dompurify": "^3.4.0",
     "katex": "^0.16.38",
     "marked": "^17.0.1",

@@ -11,6 +11,12 @@ const authRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
 });
+
+const FETCH_TIMEOUT_MS = 10000;
+
+function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
 import { upsertUser, getUser, updateUser } from '../db/users.js';
 import { jwtMiddleware, getAuthUser } from '../middleware/auth.js';
 
@@ -235,7 +241,7 @@ authRouter.post('/token', async (req, res) => {
       code_verifier,
     });
 
-    const response = await fetch(`${oryConfig.hydraUrl}/oauth2/token`, {
+    const response = await fetchWithTimeout(`${oryConfig.hydraUrl}/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
@@ -272,7 +278,7 @@ authRouter.post('/refresh', async (req, res) => {
       client_id: 'deckhand-editor',
     });
 
-    const response = await fetch(`${oryConfig.hydraUrl}/oauth2/token`, {
+    const response = await fetchWithTimeout(`${oryConfig.hydraUrl}/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
@@ -377,7 +383,7 @@ authRouter.get('/consent', async (req, res) => {
 
     if (!user && consentRequest.subject) {
       try {
-        const identityRes = await fetch(
+        const identityRes = await fetchWithTimeout(
           `${oryConfig.kratosAdminUrl}/admin/identities/${consentRequest.subject}`
         );
         if (identityRes.ok) {
@@ -459,12 +465,12 @@ authRouter.post('/settings/profile', jwtMiddleware, async (req, res) => {
     await updateUser(claims.sub, { name: name.trim() });
 
     // Update Kratos identity traits
-    const identityRes = await fetch(
+    const identityRes = await fetchWithTimeout(
       `${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`
     );
     if (identityRes.ok) {
       const identity = await identityRes.json();
-      await fetch(`${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`, {
+      await fetchWithTimeout(`${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -497,7 +503,7 @@ authRouter.post('/settings/password', jwtMiddleware, async (req, res) => {
 
   try {
     // Use Kratos admin API to update password
-    const identityRes = await fetch(
+    const identityRes = await fetchWithTimeout(
       `${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`
     );
     if (!identityRes.ok) {
@@ -505,7 +511,7 @@ authRouter.post('/settings/password', jwtMiddleware, async (req, res) => {
     }
     const identity = await identityRes.json();
 
-    await fetch(`${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`, {
+    await fetchWithTimeout(`${oryConfig.kratosAdminUrl}/admin/identities/${claims.sub}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

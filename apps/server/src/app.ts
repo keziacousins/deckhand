@@ -27,6 +27,9 @@ interface AppOptions {
 export function createApp(options: AppOptions = {}): Express {
   const app = express();
 
+  // Running behind nginx — trust X-Forwarded-* headers
+  app.set('trust proxy', 1);
+
   // JSON body parsing
   app.use(express.json());
 
@@ -103,6 +106,17 @@ export function createApp(options: AppOptions = {}): Express {
       res.sendFile(path.join(editorDist, 'index.html'));
     });
   }
+
+  // Global error handler — keeps the event loop clean by ensuring every
+  // request gets a response even when middleware (e.g. express-jwt) throws.
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (err?.name === 'UnauthorizedError') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    console.error('[Error]', err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: 'Internal server error' });
+  });
 
   return app;
 }

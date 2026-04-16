@@ -22,12 +22,16 @@ export interface JWTClaims {
   iat: number;
 }
 
+const JWKS_URI = `${oryConfig.hydraUrl}/.well-known/jwks.json`;
+const JWKS_TIMEOUT_MS = 5000;
+
 // Shared JWKS client for both Express middleware and manual verification
 const jwksClient = jwksRsa({
   cache: true,
   rateLimit: true,
   jwksRequestsPerMinute: 5,
-  jwksUri: `${oryConfig.hydraUrl}/.well-known/jwks.json`,
+  jwksUri: JWKS_URI,
+  timeout: JWKS_TIMEOUT_MS,
 });
 
 /**
@@ -39,7 +43,8 @@ export const jwtMiddleware = expressjwt({
     cache: true,
     rateLimit: true,
     jwksRequestsPerMinute: 5,
-    jwksUri: `${oryConfig.hydraUrl}/.well-known/jwks.json`,
+    jwksUri: JWKS_URI,
+    timeout: JWKS_TIMEOUT_MS,
   }) as jwksRsa.GetVerificationKey,
   algorithms: ['RS256'],
   issuer: hydraIssuer,

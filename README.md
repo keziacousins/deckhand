@@ -12,7 +12,7 @@ Everything runs in Docker. A single `docker compose up -d` starts the full stack
 ./scripts/generate-env.sh
 ```
 
-This creates `.env` and `ory/seaweedfs/s3.json` with random passwords and secrets. All credentials are kept in sync between services.
+This creates `.env` with random passwords and secrets for Postgres, S3-compatible storage, and Ory services.
 
 ### 2. Configure
 

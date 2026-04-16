@@ -47,9 +47,11 @@ export const allowedOrigins: string[] = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
   : ['http://localhost:5173', 'http://localhost:5178'];
 
+export const publicUrl = process.env.PUBLIC_URL || 'http://localhost:5178';
+
 export const oryConfig = {
-  kratosPublicUrl: process.env.KRATOS_PUBLIC_URL || 'http://localhost:4433',
+  kratosUrl: process.env.KRATOS_URL || 'http://localhost:4433',
   kratosAdminUrl: process.env.KRATOS_ADMIN_URL || 'http://localhost:4434',
-  hydraPublicUrl: process.env.HYDRA_PUBLIC_URL || 'http://localhost:4444',
+  hydraUrl: process.env.HYDRA_URL || 'http://localhost:4444',
   hydraAdminUrl: process.env.HYDRA_ADMIN_URL || 'http://localhost:4445',
 };

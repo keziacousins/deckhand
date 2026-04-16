@@ -29,9 +29,10 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET: ${S3_BUCKET:-deckhand-assets}
       S3_REGION: ${S3_REGION:-us-east-1}
-      KRATOS_PUBLIC_URL: http://kratos:4433
+      PUBLIC_URL: ${PUBLIC_URL:-https://localhost}
+      KRATOS_URL: http://kratos:4433
       KRATOS_ADMIN_URL: http://kratos:4434
-      HYDRA_PUBLIC_URL: ${PUBLIC_URL:-https://localhost}/oauth2
+      HYDRA_URL: http://hydra:4444
       HYDRA_ADMIN_URL: http://hydra:4445
       CORS_ORIGINS: ${PUBLIC_URL:-https://localhost}
     depends_on:
@@ -120,10 +121,11 @@ services:
     environment:
       DSN: postgres://${ORY_DB_USER:-ory}:${ORY_DB_PASSWORD:-ory}@ory-postgres:5432/hydra?sslmode=disable
       SECRETS_SYSTEM: ${HYDRA_SYSTEM_SECRET:-CHANGE-ME-IN-PRODUCTION-HYDRA-SYSTEM-SECRET!}
-      URLS_SELF_ISSUER: ${PUBLIC_URL:-https://localhost}/oauth2
-      URLS_LOGIN: http://app:3008/api/auth/login
-      URLS_CONSENT: http://app:3008/api/auth/consent
-      URLS_LOGOUT: http://app:3008/api/auth/logout
+      URLS_SELF_ISSUER: ${PUBLIC_URL:-https://localhost}
+      SERVE_COOKIES_SAME_SITE_MODE: Lax
+      URLS_LOGIN: ${PUBLIC_URL:-https://localhost}/api/auth/login
+      URLS_CONSENT: ${PUBLIC_URL:-https://localhost}/api/auth/consent
+      URLS_LOGOUT: ${PUBLIC_URL:-https://localhost}/api/auth/logout
       SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:-https://localhost}
     depends_on:
       hydra-migrate:
@@ -135,10 +137,9 @@ services:
   seaweedfs:
     build: ./ory/seaweedfs
     command: server -s3 -filer -dir=/data -s3.config=/etc/seaweedfs/s3.json
-    ports:
-      - "${SEAWEEDFS_S3_PORT:-8333}:8333"
-      - "${SEAWEEDFS_FILER_PORT:-8888}:8888"
-      - "${SEAWEEDFS_MASTER_PORT:-9333}:9333"
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
     volumes:
       - seaweedfs-data:/data
     healthcheck:

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Configuration, OAuth2Api, FrontendApi } from '@ory/client';
-import { oryConfig, allowedOrigins } from '../config.js';
+import { oryConfig, allowedOrigins, publicUrl } from '../config.js';
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -22,7 +22,7 @@ const hydraAdmin = new OAuth2Api(
 
 const kratosFrontend = new FrontendApi(
   new Configuration({
-    basePath: oryConfig.kratosPublicUrl,
+    basePath: oryConfig.kratosUrl,
   })
 );
 
@@ -198,14 +198,14 @@ authRouter.post('/recovery', authRateLimiter, async (req, res) => {
  */
 authRouter.get('/authorize', (req, res) => {
   const params = new URLSearchParams(req.query as Record<string, string>);
-  return res.redirect(`${oryConfig.hydraPublicUrl}/oauth2/auth?${params.toString()}`);
+  return res.redirect(`${publicUrl}/oauth2/auth?${params.toString()}`);
 });
 
 /**
  * GET /logout — Redirect to Hydra's logout endpoint.
  */
 authRouter.get('/end-session', (_req, res) => {
-  return res.redirect(`${oryConfig.hydraPublicUrl}/oauth2/sessions/logout`);
+  return res.redirect(`${publicUrl}/oauth2/sessions/logout`);
 });
 
 // ─── Hydra Token Proxies ──────────────────────────────────────────────
@@ -235,7 +235,7 @@ authRouter.post('/token', async (req, res) => {
       code_verifier,
     });
 
-    const response = await fetch(`${oryConfig.hydraPublicUrl}/oauth2/token`, {
+    const response = await fetch(`${oryConfig.hydraUrl}/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
@@ -272,7 +272,7 @@ authRouter.post('/refresh', async (req, res) => {
       client_id: 'deckhand-editor',
     });
 
-    const response = await fetch(`${oryConfig.hydraPublicUrl}/oauth2/token`, {
+    const response = await fetch(`${oryConfig.hydraUrl}/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
@@ -340,11 +340,11 @@ authRouter.get('/login', async (req, res) => {
     // Fallback: redirect to Kratos login UI
     const kratosLoginUrl = new URL(
       '/self-service/login/browser',
-      oryConfig.kratosPublicUrl
+      oryConfig.kratosUrl
     );
     kratosLoginUrl.searchParams.set(
       'return_to',
-      `${oryConfig.hydraPublicUrl}/oauth2/auth?login_challenge=${challenge}`
+      `${oryConfig.hydraUrl}/oauth2/auth?login_challenge=${challenge}`
     );
     return res.redirect(kratosLoginUrl.toString());
   } catch (error) {

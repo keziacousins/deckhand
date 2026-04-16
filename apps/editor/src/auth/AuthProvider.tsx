@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import { setAuthToken, setTokenExpiredHandler } from '../api/decks';
 
 // Auth config from env vars (with defaults for local dev)
-const PUBLIC_URL = import.meta.env.VITE_PUBLIC_URL || 'http://localhost:5178';
+const PUBLIC_URL = window.location.origin;
 const CLIENT_ID = import.meta.env.VITE_OAUTH2_CLIENT_ID || 'deckhand-editor';
 
 interface AuthUser {

@@ -1,7 +1,9 @@
 import { expressjwt } from 'express-jwt';
 import jwksRsa from 'jwks-rsa';
 import jwt from 'jsonwebtoken';
-import { oryConfig } from '../config.js';
+import { oryConfig, publicUrl } from '../config.js';
+
+const hydraIssuer = publicUrl;
 import type { Request } from 'express';
 
 /**
@@ -25,7 +27,7 @@ const jwksClient = jwksRsa({
   cache: true,
   rateLimit: true,
   jwksRequestsPerMinute: 5,
-  jwksUri: `${oryConfig.hydraPublicUrl}/.well-known/jwks.json`,
+  jwksUri: `${oryConfig.hydraUrl}/.well-known/jwks.json`,
 });
 
 /**
@@ -37,10 +39,10 @@ export const jwtMiddleware = expressjwt({
     cache: true,
     rateLimit: true,
     jwksRequestsPerMinute: 5,
-    jwksUri: `${oryConfig.hydraPublicUrl}/.well-known/jwks.json`,
+    jwksUri: `${oryConfig.hydraUrl}/.well-known/jwks.json`,
   }) as jwksRsa.GetVerificationKey,
   algorithms: ['RS256'],
-  issuer: oryConfig.hydraPublicUrl,
+  issuer: hydraIssuer,
   credentialsRequired: true,
 });
 
@@ -66,7 +68,7 @@ export async function verifyToken(token: string): Promise<JWTClaims | null> {
 
     const verified = jwt.verify(token, signingKey, {
       algorithms: ['RS256'],
-      issuer: oryConfig.hydraPublicUrl,
+      issuer: hydraIssuer,
     });
 
     return verified as JWTClaims;

@@ -47,7 +47,7 @@ The app will be available at your `PUBLIC_URL`.
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 23+
 - Docker (for infrastructure services)
 
 ### Setup

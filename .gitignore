@@ -53,6 +53,7 @@ coverage/
 pw
 PLAN-*.md
 RESEARCH-*.md
+TODO.md
 
 # Service credentials (local dev)
 ory/seaweedfs/s3.json

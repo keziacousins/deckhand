@@ -6,20 +6,34 @@
 import pg from 'pg';
 import { dbConfig } from '../config.js';
 
+// Lazy pool — resolves DB URL at first use so tests can set env vars
+// after module import. Subsequent calls return the same pool instance.
 let _pool: pg.Pool | null = null;
 
-function getPool(): pg.Pool {
-  if (!_pool) {
-    _pool = new pg.Pool({ connectionString: dbConfig.connectionString });
-  }
+function createPool(): pg.Pool {
+  return new pg.Pool({
+    connectionString: dbConfig.connectionString,
+    max: 10,
+    // Fail fast when pool is exhausted rather than waiting forever.
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30_000,
+    // Kill queries that hang at the DB level (e.g. lock waits).
+    statement_timeout: 30_000,
+    query_timeout: 30_000,
+  });
+}
+
+export function getPool(): pg.Pool {
+  if (!_pool) _pool = createPool();
   return _pool;
 }
 
-export const pool: pg.Pool = new Proxy({} as pg.Pool, {
-  get(_target, prop) {
-    return (getPool() as unknown as Record<string | symbol, unknown>)[prop];
-  },
-});
+// Backwards-compatible export — `pool.query(...)` just delegates to getPool().
+export const pool = {
+  query: ((...args: Parameters<pg.Pool['query']>) => getPool().query(...args)) as pg.Pool['query'],
+  connect: () => getPool().connect(),
+  end: () => (_pool ? _pool.end() : Promise.resolve()),
+} as unknown as pg.Pool;
 
 /**
  * Initialize the database schema

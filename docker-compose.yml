@@ -50,8 +50,6 @@ services:
       POSTGRES_USER: ${ORY_DB_USER:-ory}
       POSTGRES_PASSWORD: ${ORY_DB_PASSWORD:-ory}
       POSTGRES_DB: ory
-    ports:
-      - "${ORY_DB_PORT:-5434}:5432"
     volumes:
       - ory-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -59,6 +57,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   deckhand-postgres:
     image: postgres:16-alpine
@@ -66,8 +65,6 @@ services:
       POSTGRES_USER: ${DECKHAND_DB_USER:-deckhand}
       POSTGRES_PASSWORD: ${DECKHAND_DB_PASSWORD:-deckhand}
       POSTGRES_DB: ${DECKHAND_DB_NAME:-deckhand}
-    ports:
-      - "${DECKHAND_DB_PORT:-5433}:5432"
     volumes:
       - deckhand-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -75,6 +72,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   # --- Ory Kratos (Identity) ---
 

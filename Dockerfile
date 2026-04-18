@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:23-alpine AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -18,7 +18,7 @@ RUN npm run build -w packages/components && \
     npm run build -w apps/server && \
     npx vite build --outDir ../../dist/editor apps/editor
 
-FROM node:22-alpine
+FROM node:23-alpine
 
 RUN apk add --no-cache tini
 WORKDIR /app

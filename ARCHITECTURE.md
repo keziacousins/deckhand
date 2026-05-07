@@ -16,7 +16,7 @@ LLM-first presentation authoring. Users describe slides in natural language, an 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Editor (React)                       │
+│                     Editor (React)                      │
 │  Canvas (React Flow)  │  Inspector  │  LLM Chat Panel   │
 └───────────────────────┬─────────────────────────────────┘
                         │
@@ -27,10 +27,10 @@ LLM-first presentation authoring. Users describe slides in natural language, an 
                         │
            ┌────────────┼────────────┐
            ▼            ▼            ▼
-     ┌──────────┐ ┌──────────┐ ┌──────────────┐
+     ┌──────────┐ ┌──────────┐ ┌───────────────┐
      │ ID-based │ │  YDoc    │ │ Web Component │
      │   Diff   │ │  Sync    │ │   Renderer    │
-     └──────────┘ └──────────┘ └──────────────┘
+     └──────────┘ └──────────┘ └───────────────┘
 ```
 
 ## Data Flow

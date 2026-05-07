@@ -45,6 +45,16 @@ docker compose up -d
 
 The app will be available at your `PUBLIC_URL`.
 
+### Updating a remote deployment
+
+To redeploy local changes to a remote host (rsync + rebuild + health check):
+
+```bash
+./scripts/deploy.sh <hostname>
+```
+
+The host must already have `.env` and `nginx/certs/` configured. Defaults to `deckhand-dev`; pass `--url <public-url>` if the URL doesn't match `https://<hostname>`.
+
 ## Development
 
 ### Prerequisites

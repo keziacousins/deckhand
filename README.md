@@ -2,6 +2,8 @@
 
 LLM-first presentation authoring. Describe slides in natural language, and an AI builds them using structured components. Real-time multi-user collaboration via YJS.
 
+![Deckhand editor showing the spatial canvas, slide rendering, and LLM chat panel](screenshot.jpg)
+
 ## Deployment
 
 Everything runs in Docker. A single `docker compose up -d` starts the full stack: app server, frontend, PostgreSQL, Ory Kratos/Hydra (auth), SeaweedFS (object storage), and nginx (TLS/reverse proxy).

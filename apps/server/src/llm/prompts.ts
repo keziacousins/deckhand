@@ -3,6 +3,7 @@
  */
 
 import type { Deck } from '@deckhand/schema';
+import type Anthropic from '@anthropic-ai/sdk';
 import { SLIDE_WIDTH, SLIDE_HEIGHTS, generateComponentDocs } from '@deckhand/schema';
 import { tools } from './tools.js';
 
@@ -190,31 +191,22 @@ ${selectedComponent
 }
 
 /**
- * Build the system prompt for the first message in a session.
- * Includes full deck state so the agent has context.
+ * Build system prompt as content blocks for prompt caching.
+ *
+ * Block 1: Static instructions + tool docs (large, cacheable across all turns)
+ * Block 2: Dynamic deck state + selection (changes each turn, not cached)
+ *
+ * The cache_control breakpoint on block 1 tells the API to cache everything
+ * up to that point. Subsequent calls reuse the cached prefix even when
+ * the dynamic block changes.
  */
-export function buildSystemPrompt(deck: Deck, context?: ChatContext): string {
-  const selectionInfo = `## Current Selection (what "this" refers to)
-
-${buildSelectedSlideInfo(deck, context)}`;
-
-  return `${buildBasePrompt()}
-
-## Current Deck State
-
-${buildDeckStateSummary(deck)}
-
-${selectionInfo}`;
-}
-
-/**
- * Build a lighter system prompt for continuing a session.
- * Only includes selection context - agent can use get_deck_state for full state.
- */
-export function buildContinuationPrompt(deck: Deck, context?: ChatContext): string {
-  return `${buildBasePrompt()}
-
-## Context
+export function buildSystemPrompt(
+  deck: Deck,
+  context?: ChatContext,
+  hasHistory?: boolean
+): Anthropic.TextBlockParam[] {
+  const dynamicContext = hasHistory
+    ? `## Context
 
 Deck: "${deck.meta.title || 'Untitled'}" (${Object.keys(deck.slides).length} slides)
 
@@ -222,5 +214,27 @@ Deck: "${deck.meta.title || 'Untitled'}" (${Object.keys(deck.slides).length} sli
 
 ${buildSelectedSlideInfo(deck, context)}
 
-Note: Use get_deck_state tool to see full deck state if needed.`;
+Note: Use get_deck_state tool to see full deck state if needed.`
+    : `## Current Deck State
+
+${buildDeckStateSummary(deck)}
+
+## Current Selection (what "this" refers to)
+
+${buildSelectedSlideInfo(deck, context)}`;
+
+  return [
+    {
+      type: 'text' as const,
+      text: buildBasePrompt(),
+      cache_control: { type: 'ephemeral' as const },
+    },
+    {
+      type: 'text' as const,
+      text: dynamicContext,
+    },
+  ];
 }
+
+// Keep for backwards compat — not used in new code
+export const buildContinuationPrompt = buildSystemPrompt;

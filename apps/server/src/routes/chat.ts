@@ -15,7 +15,7 @@ import { yDocToDeck } from '@deckhand/sync';
 import { pool, type ChatMessageRow, type ChatSessionRow } from '../db/schema.js';
 import * as Y from 'yjs';
 import { tools, executeToolCall } from '../llm/tools.js';
-import { buildSystemPrompt, buildContinuationPrompt } from '../llm/prompts.js';
+import { buildSystemPrompt } from '../llm/prompts.js';
 import { requireDeckRole } from '../middleware/permissions.js';
 
 const router = Router();
@@ -475,10 +475,9 @@ router.post('/:deckId/chat', requireDeckRole('owner', 'editor'), async (req, res
 
     messages.push({ role: 'user', content: undoPrefix + errorPrefix + message + toolReminder });
 
-    // Use full prompt for first message in session, lighter prompt for continuation
-    const systemPrompt = hasHistory
-      ? buildContinuationPrompt(deck, context)
-      : buildSystemPrompt(deck, context);
+    // System prompt as content blocks — static instructions are cached,
+    // dynamic deck state changes each turn without busting the cache.
+    const systemPrompt = buildSystemPrompt(deck, context, hasHistory);
 
     const messageId = generateId('msg');
 

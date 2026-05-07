@@ -8,7 +8,54 @@ import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import sharp from 'sharp';
+
+// Limit libvips thread pool — prevents resource exhaustion on concurrent uploads
+sharp.concurrency(1);
+
 import { pool, type AssetRow } from '../db/schema.js';
+
+// ─── Background thumbnail processing queue ──────────────────────────────
+
+interface ThumbnailJob {
+  deckId: string;
+  assetId: string;
+  buffer: Buffer;
+  mimeType: string;
+}
+
+const thumbnailQueue: ThumbnailJob[] = [];
+let processingThumbnails = false;
+
+async function enqueueThumbnail(job: ThumbnailJob): Promise<void> {
+  thumbnailQueue.push(job);
+  if (!processingThumbnails) drainThumbnailQueue();
+}
+
+async function drainThumbnailQueue(): Promise<void> {
+  processingThumbnails = true;
+  while (thumbnailQueue.length > 0) {
+    const job = thumbnailQueue.shift()!;
+    try {
+      const processed = await processImage(job.buffer, job.mimeType);
+      if (!processed) continue;
+
+      await Promise.all([
+        uploadObject(`${job.deckId}/${job.assetId}_thumb.webp`, processed.thumbnail, 'image/webp'),
+        uploadObject(`${job.deckId}/${job.assetId}_preview.webp`, processed.preview, 'image/webp'),
+      ]);
+
+      await pool.query(
+        'UPDATE assets SET width = $1, height = $2, has_thumbnail = true WHERE id = $3',
+        [processed.width, processed.height, job.assetId]
+      );
+
+      console.log(`[Assets] Thumbnails ready for ${job.assetId}`);
+    } catch (err) {
+      console.error(`[Assets] Thumbnail generation failed for ${job.assetId}:`, err);
+    }
+  }
+  processingThumbnails = false;
+}
 import { uploadObject, getObject, deleteObject, deleteByPrefix } from '../storage.js';
 import { requireDeckRole } from '../middleware/permissions.js';
 
@@ -165,29 +212,11 @@ router.post(
       // Upload original to S3
       await uploadObject(storageKey, file.buffer, file.mimetype);
 
-      // Process image: extract dimensions, generate thumbnail + preview
-      const processed = await processImage(file.buffer, file.mimetype);
-      let width: number | null = null;
-      let height: number | null = null;
-      let hasThumbnail = false;
-
-      if (processed) {
-        width = processed.width;
-        height = processed.height;
-        hasThumbnail = true;
-
-        // Upload thumbnail and preview variants
-        await Promise.all([
-          uploadObject(`${deckId}/${assetId}_thumb.webp`, processed.thumbnail, 'image/webp'),
-          uploadObject(`${deckId}/${assetId}_preview.webp`, processed.preview, 'image/webp'),
-        ]);
-      }
-
-      // Insert into database
+      // Insert into database immediately (no thumbnail yet)
       await pool.query(
-        `INSERT INTO assets (id, deck_id, filename, mime_type, size, width, height, has_thumbnail, storage_key)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [assetId, deckId, file.originalname, file.mimetype, file.size, width, height, hasThumbnail, storageKey]
+        `INSERT INTO assets (id, deck_id, filename, mime_type, size, has_thumbnail, storage_key)
+         VALUES ($1, $2, $3, $4, $5, false, $6)`,
+        [assetId, deckId, file.originalname, file.mimetype, file.size, storageKey]
       );
 
       const asset = {
@@ -196,16 +225,17 @@ router.post(
         filename: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        width,
-        height,
-        hasThumbnail,
+        width: null,
+        height: null,
+        hasThumbnail: false,
         url: `/api/decks/${deckId}/assets/${assetId}`,
-        thumbnailUrl: hasThumbnail ? `/api/decks/${deckId}/assets/${assetId}/thumbnail` : undefined,
-        previewUrl: hasThumbnail ? `/api/decks/${deckId}/assets/${assetId}/preview` : undefined,
       };
 
-      console.log(`[Assets] Uploaded ${file.originalname} as ${assetId} for deck ${deckId}${hasThumbnail ? ' (with thumbnail+preview)' : ''}`);
+      console.log(`[Assets] Uploaded ${file.originalname} as ${assetId} for deck ${deckId}`);
       res.status(201).json(asset);
+
+      // Queue thumbnail generation in background
+      enqueueThumbnail({ deckId, assetId, buffer: file.buffer, mimeType: file.mimetype });
     } catch (error) {
       console.error('[Assets] Error uploading asset:', error);
       res.status(500).json({ error: 'Failed to upload asset' });

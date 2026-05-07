@@ -12,11 +12,21 @@
     "declarationMap": true,
     "composite": true,
   },
-  "exclude": ["reference-code", "node_modules", "dist", "apps/editor"],
+  "exclude": [
+    "reference-code",
+    "node_modules",
+    "dist",
+    "apps/editor",
+    "apps/server",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/vitest.config.ts",
+    "**/tsup.config.ts",
+    "tests"
+  ],
   "references": [
     { "path": "./packages/schema" },
     { "path": "./packages/sync" },
     { "path": "./packages/components" },
-    { "path": "./apps/server" },
   ],
 }

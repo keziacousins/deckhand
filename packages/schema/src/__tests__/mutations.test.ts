@@ -112,34 +112,34 @@ describe('updateSlide', () => {
     const deck = createTestDeck();
     const slideId = Object.keys(deck.slides)[0];
     const newDeck = updateSlide(deck, slideId, {
-      style: { backgroundColor: '#ff0000' },
+      style: { background: '#ff0000' },
     });
 
-    expect(newDeck.slides[slideId].style?.backgroundColor).toBe('#ff0000');
+    expect(newDeck.slides[slideId].style?.background).toBe('#ff0000');
   });
 
   it('merges style updates', () => {
     const deck = createTestDeck();
     const slideId = Object.keys(deck.slides)[0];
     const deck1 = updateSlide(deck, slideId, {
-      style: { backgroundColor: '#ff0000' },
+      style: { background: '#ff0000' },
     });
     const deck2 = updateSlide(deck1, slideId, {
-      style: { padding: '20px' },
+      style: { textPrimary: '#ffffff' },
     });
 
-    expect(deck2.slides[slideId].style?.backgroundColor).toBe('#ff0000');
-    expect(deck2.slides[slideId].style?.padding).toBe('20px');
+    expect(deck2.slides[slideId].style?.background).toBe('#ff0000');
+    expect(deck2.slides[slideId].style?.textPrimary).toBe('#ffffff');
   });
 
   it('removes empty style object', () => {
     const deck = createTestDeck();
     const slideId = Object.keys(deck.slides)[0];
     const deck1 = updateSlide(deck, slideId, {
-      style: { backgroundColor: '#ff0000' },
+      style: { background: '#ff0000' },
     });
     const deck2 = updateSlide(deck1, slideId, {
-      style: { backgroundColor: undefined },
+      style: { background: undefined },
     });
 
     expect(deck2.slides[slideId].style).toBeUndefined();
@@ -218,7 +218,7 @@ describe('addComponent', () => {
     const component = slide.components.find((c) => c.id === componentId);
     expect(component).toBeDefined();
     expect(component?.type).toBe('deck-text');
-    expect(component?.props.content).toBe('Some text');
+    expect((component?.props as { content?: string }).content).toBe('Some text');
   });
 
   it('adds component at specified position', () => {
@@ -318,7 +318,7 @@ describe('updateComponent', () => {
     });
 
     const component = newDeck.slides[slideId].components[0];
-    expect(component.props.content).toBe('Updated text');
+    expect((component.props as { content?: string }).content).toBe('Updated text');
   });
 
   it('merges props updates', () => {
@@ -330,7 +330,7 @@ describe('updateComponent', () => {
     const deck2 = updateComponent(deck1, slideId, componentId, { gridWidth: 6 });
 
     const component = deck2.slides[slideId].components[0];
-    expect(component.props.content).toBe('New text');
+    expect((component.props as { content?: string }).content).toBe('New text');
     expect(component.props.gridWidth).toBe(6);
   });
 
@@ -726,11 +726,11 @@ describe('updateEdge', () => {
     });
 
     const newDeck = updateEdge(deck2, edgeId, {
-      transition: 'fade',
+      transition: 'cross-fade',
       transitionDuration: 300,
     });
 
-    expect(newDeck.flow.edges[edgeId].transition).toBe('fade');
+    expect(newDeck.flow.edges[edgeId].transition).toBe('cross-fade');
     expect(newDeck.flow.edges[edgeId].transitionDuration).toBe(300);
   });
 
@@ -906,9 +906,9 @@ describe('deleteStartPoint', () => {
 describe('updateFlowSettings', () => {
   it('updates default transition', () => {
     const deck = createTestDeck();
-    const newDeck = updateFlowSettings(deck, { defaultTransition: 'fade' });
+    const newDeck = updateFlowSettings(deck, { defaultTransition: 'cross-fade' });
 
-    expect(newDeck.flow.defaultTransition).toBe('fade');
+    expect(newDeck.flow.defaultTransition).toBe('cross-fade');
   });
 
   it('updates default transition duration', () => {
@@ -1033,28 +1033,28 @@ describe('updateTheme', () => {
     const deck = createTestDeck();
     const newDeck = updateTheme(deck, {
       'color-background': '#000000',
-      'color-text': '#ffffff',
+      'color-text-primary': '#ffffff',
     });
 
     expect(newDeck.theme.tokens['color-background']).toBe('#000000');
-    expect(newDeck.theme.tokens['color-text']).toBe('#ffffff');
+    expect(newDeck.theme.tokens['color-text-primary']).toBe('#ffffff');
   });
 
   it('merges with existing tokens', () => {
     const deck = createTestDeck();
     const originalBackground = deck.theme.tokens['color-background'];
-    const newDeck = updateTheme(deck, { 'color-text': '#ffffff' });
+    const newDeck = updateTheme(deck, { 'color-text-primary': '#ffffff' });
 
     expect(newDeck.theme.tokens['color-background']).toBe(originalBackground);
-    expect(newDeck.theme.tokens['color-text']).toBe('#ffffff');
+    expect(newDeck.theme.tokens['color-text-primary']).toBe('#ffffff');
   });
 
   it('does not modify the original deck', () => {
     const deck = createTestDeck();
-    const originalColor = deck.theme.tokens['color-text'];
-    updateTheme(deck, { 'color-text': '#ffffff' });
+    const originalColor = deck.theme.tokens['color-text-primary'];
+    updateTheme(deck, { 'color-text-primary': '#ffffff' });
 
-    expect(deck.theme.tokens['color-text']).toBe(originalColor);
+    expect(deck.theme.tokens['color-text-primary']).toBe(originalColor);
   });
 });
 
